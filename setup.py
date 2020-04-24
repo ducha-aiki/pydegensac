@@ -91,7 +91,7 @@ class CMakeBuild(build_ext):
         copyfile(src_file, dest_file)
         copymode(src_file, dest_file)
 
-requirements = [ 'numpy', 'cmake']
+requirements = [ ]
 
 setup(
     name='pydegensac',
@@ -106,6 +106,7 @@ setup(
     packages=find_packages('src'),
     package_dir={'':'src'},
     ext_modules=[CMakeExtension('pydegensac/pydegensac')],
+    extra_compile_args = ["-O0"], 
     cmdclass=dict(build_ext=CMakeBuild),
     #test_suite='tests',
     zip_safe=False,

@@ -1,0 +1,4 @@
+login into docker
+alias cmake=/usr/local/bin/cmake
+/opt/python/cp36-cp36m/bin/python3 setup.py bdist_wheel
+auditwheel repair dist/pydegensac-0.1.1-cp36-cp36m-linux_x86_64.whl
