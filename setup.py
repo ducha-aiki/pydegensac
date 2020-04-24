@@ -94,7 +94,7 @@ class CMakeBuild(build_ext):
 requirements = ["numpy"]
 from os import path
 this_directory = path.abspath(path.dirname(__file__))
-with open(path.join(this_directory, 'README.md'), encoding='utf-8') as f:
+with open(path.join(this_directory, 'README.md')) as f:
     long_description = f.read()
 
 setup(
@@ -107,6 +107,7 @@ setup(
     download_url = 'https://github.com/ducha-aiki/pydegensac/archive/v_0.12.tar.gz',
     description='Advanced RANSAC (DEGENSAC) with bells and whistles for H and F estimation',
     long_description=long_description,
+    long_description_content_type='text/markdown',
     packages=find_packages('src'),
     package_dir={'':'src'},
     ext_modules=[CMakeExtension('pydegensac/pydegensac')],
