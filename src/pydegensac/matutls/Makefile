@@ -1,0 +1,17 @@
+include ../../config
+
+CFLAGS += -fno-builtin
+
+LIBS = matutls
+
+matutls_CFILES = atou1.c   cmcpy.c   csolv.c   hconj.c   house.c   mattr.c   otrma.c \
+			 qrbdv.c   ruinv.c   sv2u1v.c  svduv.c   utrncm.c  atovm.c   cminv.c \
+			 cvmul.c   heigval.c housev.c  mcopy.c   otrsm.c   qrecvc.c  smgen.c \
+			 sv2uv.c   svdval.c  utrnhm.c  chouse.c  cmmul.c   eigen.c  heigvec.c\
+			 ldumat.c  minv.c    psinv.c   qreval.c  solvps.c  sv2val.c  trncm.c \
+			 vmul.c    chousv.c  cmmult.c  eigval.c  hevmax.c  ldvmat.c  mmul.c \
+			 qrbdi.c   qrevec.c  solvru.c  trnm.c    cmattr.c  cmprt.c   evmax.c \
+			 hmgen.c   matprt.c  ortho.c   qrbdu1.c  rmmult.c  solvtd.c  svdu1v.c\
+			 unitary.c lsqsv.c   qrlsq.c
+
+$(do_libs)
