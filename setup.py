@@ -100,6 +100,7 @@ setup(
     author_email='ducha.aiki@gmail.com',
     license='MIT',  
     url = 'https://github.com/ducha-aiki/pydegensac',   # Provide either the link to your github or to your website
+    download_url = 'https://github.com/ducha-aiki/pydegensac/archive/v_0.1.tar.gz',
     description='Advanced RANSAC (DEGENSAC) with bells and whistles for H and F estimation',
     long_description='',
     packages=find_packages('src'),
