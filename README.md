@@ -1,12 +1,13 @@
-# pyransac
+# pydegensac
 
 This repository contains an Python wrapper of RANSAC for homography and fundamental matrix estimation
 from sparse correspondences. It implements [LO-RANSAC](https://link.springer.com/chapter/10.1007/978-3-540-45243-0_31) and [DEGENSAC](http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.466.2719&rep=rep1&type=pdf).
 
+It was originally located in [https://github.com/ducha-aiki/pyransac](https://github.com/ducha-aiki/pyransac), but was renamed to avoid conflict with already existing [pyransac](https://pypi.org/project/pyransac/) in pypi from other author.
 
 # Performance
 
-Vanilla pyransac implementation is marginally better than OpenCV one and with degeneracy-check enabled (DEGENSAC) it is the state of the art,
+Vanilla pydegensac implementation is marginally better than OpenCV one and with degeneracy-check enabled (DEGENSAC) it is the state of the art,
 according to the recent study Yin et.al."[Image Matching across Wide Baselines: From Paper to Practice](https://arxiv.org/abs/2003.01587.pdf)", 2020.
 
 ![IMW-benchmark](img/ransacs.png)
@@ -17,7 +18,13 @@ according to the recent study Yin et.al."[Image Matching across Wide Baselines: 
 
 # Installation
 
-To build and install `pyransac`, clone or download this repository and then, from within the repository, run:
+To build and install `pydegensac`, you can use pip:
+
+```bash
+pip install pydegensac
+```
+
+Or clone or download this repository and then, from within the repository, run:
 
 ```bash
 python3 ./setup.py install
@@ -31,7 +38,7 @@ pip3 install .
 
 # Building hints from Tomasz Malisiewicz
 
-1. Compiling pyransac without a system-wide install.
+1. Compiling pydegensac without a system-wide install.
 
 ```bash
 python3 ./setup.py build
@@ -45,7 +52,7 @@ CC=gcc-8 python3 ./setup.py build
 ```
 
 3. Compiling on Ubuntu 18.04
-You need LAPACK and a few other libraries and I always forget those specific package names. Take a look at my pyransac Dockerfile to see the exact packages you need to apt install on an Ubuntu 18.04 system (https://github.com/quantombone/pyransac-dockerfile/blob/master/Dockerfile)
+You need LAPACK and a few other libraries and I always forget those specific package names. Take a look at my pydegensac Dockerfile to see the exact packages you need to apt install on an Ubuntu 18.04 system (https://github.com/quantombone/pydegensac-dockerfile/blob/master/Dockerfile)
 
 ```bash
 FROM ubuntu:18.04
@@ -61,29 +68,29 @@ RUN apt-get install -y cmake libblas-dev liblapack-dev gfortran
 RUN apt-get install -y g++ gcc
 ```
 
-## download and build pyransac
+## download and build pydegensac
 ```
-RUN git clone https://github.com/ducha-aiki/pyransac.git
-WORKDIR pyransac
+RUN git clone https://github.com/ducha-aiki/pydegensac.git
+WORKDIR pydegensac
 RUN python3 ./setup.py build
 ```
 
 ## copy built assets into target directory (which will be a -v volume)
 ```docker
-CMD cp -R /pyransac/build/lib.linux-x86_64-3.6/pyransac /target_directory
+CMD cp -R /pydegensac/build/lib.linux-x86_64-3.6/pydegensac /target_directory
 ```
 
 # dockerfile
 
-https://github.com/quantombone/pyransac-dockerfile
+https://github.com/quantombone/pydegensac-dockerfile
 
 
 # Example of usage
 
 ```python
-import pyransac
-H, mask = pyransac.findHomography(src_pts, dst_pts, 3.0)
-F, mask = pyransac.findFundamentalMatrix(src_pts, dst_pts, 3.0)
+import pydegensac
+H, mask = pydegensac.findHomography(src_pts, dst_pts, 3.0)
+F, mask = pydegensac.findFundamentalMatrix(src_pts, dst_pts, 3.0)
 
 ```
 
