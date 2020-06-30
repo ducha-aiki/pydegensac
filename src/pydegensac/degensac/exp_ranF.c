@@ -12,6 +12,7 @@
 #include "../matutls/matutl.h"
 #include <time.h>
 //#include <mex.h>
+#include "degensac_rand.h"
 
 #define CHECK_ORIG(inl,orig) 1
 //#define CHECK_ORIG(inl,orig) (inl[orig[0]] && inl[orig[1]] && inl[orig[2]] && inl[orig[3]] && inl[orig[4]] && inl[orig[5]] && inl[orig[6]]) //to be used only with DegenSAC
@@ -31,8 +32,6 @@
     us = tv.tv_usec;
     return (s%10)*1000*1000 + us;
 }
-#endif /*__linux__*/
-
 #define min(a,b) \
     ({ __typeof__ (a) _a = (a); \
     __typeof__ (b) _b = (b); \
@@ -42,6 +41,7 @@
     ({ __typeof__ (a) _a = (a); \
     __typeof__ (b) _b = (b); \
     _a > _b ? _a : _b; })
+#endif /*__linux__*/
 
 int no_mto(double *A)
 {
@@ -315,18 +315,18 @@ int exp_ransacF(double *u, int len, double th, double conf, int max_sam,
     f1 = sol;
     f2 = sol+9;
 
-    seed = rand();
+    seed = degensac_rand();
 
-    /*  srand(RAND_SEED++); */
+    /*  degensac_srand(RAND_SEED++); */
     while(no_sam < max_sam) {
         no_sam ++;
 
-        srand(seed);
+        degensac_srand(seed);
 
         rsampleT(Z, 9, pool, 7, len, A);
         loadSample(u, samidx, 7, 6, u7);
 
-        seed = rand();
+        seed = degensac_rand();
         ////printf("Seed: %d\n",seed);
 
 
@@ -810,7 +810,7 @@ Score exp_inFranicustom (double *u, int len, int *inliers, int ninl,
 
 int exp_ransacFcustom(double *u, int len, double th, double conf, int max_sam,
                       double *F, unsigned char * inl,
-                      int * data_out, int do_lo, unsigned inlLimit, double **resids, double* H_best, int* Ih,exFDsPtr EXFDS1,FDsPtr FDS1, int doSymCheck) {
+                      int * data_out, int do_lo, unsigned inlLimit, double **resids, double* H_best, int* Ih,exFDsPtr EXFDS1,FDsPtr FDS1, int doSymCheck, int seed_value) {
     unsigned seed;
 
     int *pool, no_sam, new_sam;
@@ -836,7 +836,10 @@ int exp_ransacFcustom(double *u, int len, double th, double conf, int max_sam,
     int a; //Mishkin, counter;
     double SymCheck_th =  CHECK_COEF*th;
 
-    srand(time(NULL)); //Mishkin - randomization
+    if(seed_value == 0)
+        degensac_srand(time(NULL)); //Mishkin - randomization
+    else
+        degensac_srand(seed_value);
 
 #ifdef USE_QR
     double A[7*9], sol[2*9];
@@ -888,18 +891,18 @@ int exp_ransacFcustom(double *u, int len, double th, double conf, int max_sam,
     f1 = sol;
     f2 = sol+9;
 
-    seed = rand();
+    seed = degensac_rand();
 
-    /*  srand(RAND_SEED++); */
+    /*  degensac_srand(RAND_SEED++); */
     while(no_sam < max_sam) {
         no_sam ++;
 
-        srand(seed);
+        degensac_srand(seed);
 
         rsampleT(Z, 9, pool, 7, len, A);
         loadSample(u, samidx, 7, 6, u7);
 
-        seed = rand();
+        seed = degensac_rand();
         ////printf("Seed: %d\n",seed);
 
 
@@ -1245,7 +1248,7 @@ int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2,int len, double th,
                          double conf, int max_sam,
                          double *F, unsigned char * inl,
                          int * data_out, int do_lo, unsigned inlLimit, double **resids, double* H_best,
-                         int* Ih, exFDsPtr EXFDS1, FDsPtr FDS1, FDsidxPtr FDS1idx, double SymCheck_th, int enable_degen_check) {
+                         int* Ih, exFDsPtr EXFDS1, FDsPtr FDS1, FDsidxPtr FDS1idx, double SymCheck_th, int enable_degen_check, int seed_value) {
     unsigned seed;
 
     int *pool, no_sam, new_sam;  double *Z, *buffer, u7[6*7], H[3*3], FBest[3*3];
@@ -1274,7 +1277,10 @@ int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2,int len, double th,
     double *err_laf;
     int a;
 
-    srand(time(NULL)); //Mishkin - randomization
+    if(seed_value == 0)
+        degensac_srand(time(NULL)); //Mishkin - randomization
+    else
+        degensac_srand(seed_value);
 
 #ifdef USE_QR
     double A[7*9], sol[2*9];
@@ -1328,18 +1334,18 @@ int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2,int len, double th,
     f1 = sol;
     f2 = sol+9;
 
-    seed = rand();
+    seed = degensac_rand();
 
-    /*  srand(RAND_SEED++); */
+    /*  degensac_srand(RAND_SEED++); */
     while(no_sam < max_sam) {
         no_sam ++;
 
-        srand(seed);
+        degensac_srand(seed);
 
         rsampleT(Z, 9, pool, 7, len, A);
         loadSample(u, samidx, 7, 6, u7);
 
-        seed = rand();
+        seed = degensac_rand();
         ////printf("Seed: %d\n",seed);
 
 

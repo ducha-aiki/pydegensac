@@ -8,12 +8,12 @@
 #include "lapwrap.h"
 #include "rtools.h"
 #include "hash.h"
-
+#include "degensac_rand.h"
 
 #include "exp_ranH.h"
 #define __HASHING__
 //#define __FINAL_LSQ__
-
+#ifdef __linux__
 #define min(a,b) \
     ({ __typeof__ (a) _a = (a); \
     __typeof__ (b) _b = (b); \
@@ -23,6 +23,7 @@
     ({ __typeof__ (a) _a = (a); \
     __typeof__ (b) _b = (b); \
     _a > _b ? _a : _b; })
+#endif
 //#define FULL_SYMM
 
 int HcloseToSingular(const double *h){
@@ -267,7 +268,7 @@ void hMCEs(double *Z, double *u, double *d, int *samidx, int len, double * errs,
         lin_hgN(u, A + 8*9, &i, 1, A1, A2); /* Add one pair of equations */
         scalmul(A + 8*9, MCE_SOFT_WEIGHT, 2*9, 1); /* Weight the equations */
         cov_mat(C, A, 10, 9);
-        lap_eig(C, Cc, 9); /* Solve for h */
+        lap_eig(C, Cc, 3); /* Solve for h */
         memcpy(h, C, 3*3*sizeof(double));
 #endif /* __MCE_SOFT__ */
         denormH(h, A1, A2);
@@ -480,7 +481,8 @@ Score exp_ransacHcustomLAF (double *u, double *u_1, double *u_2,
                             HDsPtr HDS1,
                             HDsiPtr HDSi1,
                             HDsidxPtr HDSidx1,
-                            double SymCheck_th)
+                            double SymCheck_th,
+                            int seed_value)
 {
     int *pool, no_sam, new_sam, *samidx, bestsamidx[4];
     double *Z, *buffer;
@@ -506,8 +508,10 @@ Score exp_ransacHcustomLAF (double *u, double *u_1, double *u_2,
     }
     h = sol;
     //
-    srand(time(NULL)); //Mishkin - randomization
-
+    if(seed_value == 0)
+        degensac_srand(time(NULL)); //Mishkin - randomization
+    else
+        degensac_srand(seed_value);
 #ifdef __HASHING__
     htInit(&HASH_TABLE);
 #endif // __HASHING__
@@ -535,7 +539,7 @@ Score exp_ransacHcustomLAF (double *u, double *u_1, double *u_2,
 
 
     no_sam = 0;
-    seed = rand();
+    seed = degensac_rand();
 
     samidx = pool + len - 4;
 
@@ -546,9 +550,9 @@ Score exp_ransacHcustomLAF (double *u, double *u_1, double *u_2,
     while(no_sam < max_sam)
     {
         no_sam++;
-        srand(seed);
+        degensac_srand(seed);
         multirsampleT(Z, 9, 2, pool, 4, len, M);
-        seed = rand();
+        seed = degensac_rand();
 
         /* orientation */
 #ifndef __OC_OFF__
@@ -963,7 +967,7 @@ void hMCEscustom(double *Z, double *u, double *d, int *samidx, int len, double *
         lin_hgN(u, A + 8*9, &i, 1, A1, A2); /* Add one pair of equations */
         scalmul(A + 8*9, MCE_SOFT_WEIGHT, 2*9, 1); /* Weight the equations */
         cov_mat(C, A, 10, 9);
-        lap_eig(C, Cc, 9); /* Solve for h */
+        lap_eig(C, Cc, 3); /* Solve for h */
         memcpy(h, C, 3*3*sizeof(double));
 #endif /* __MCE_SOFT__ */
         denormH(h, A1, A2);

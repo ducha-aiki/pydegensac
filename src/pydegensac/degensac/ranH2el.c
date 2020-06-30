@@ -13,6 +13,7 @@
 
 
 #include "ranH2el.h"
+#include "degensac_rand.h"
 
 
 Score ransacH2el (double *u10, int len, double th, double conf, int max_sam,
@@ -64,19 +65,19 @@ Score ransacH2el (double *u10, int len, double th, double conf, int max_sam,
 	inliers = (int *) malloc(len * sizeof(int));
 
 	no_sam = 0;
-	seed = rand();
+	seed = degensac_rand();
 
 	/* main RANSAC loop */
 	while(no_sam < max_sam) {
 		no_sam ++;
 		new_max = 0; do_iterate = 0;
 
-		srand(seed);
+		degensac_srand(seed);
 
 		/* random minimal sample */
 		randsubset(pool, len, 2);
 		
-		seed = rand();
+		seed = degensac_rand();
 
 		/* model */
 		getTransf(u10 + 10*samidx[0], N1, D1);

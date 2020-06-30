@@ -1,9 +1,10 @@
 cmake_minimum_required(VERSION 2.8.12)
 project(pydegensac)
 
+if(UNIX)
 add_definitions(-fPIC)
-
 enable_language (Fortran)
+endif()
 FIND_PACKAGE(LAPACK REQUIRED)
 if (LAPACK_FOUND)
   SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${LAPACK_CXX_FLAGS}")

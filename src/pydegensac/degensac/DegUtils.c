@@ -12,6 +12,7 @@
 #include <math.h>
 //#include <mex.h>
 #include <time.h>
+#include "degensac_rand.h"
 
 /*function [deg, H, inl] = checksample(F, u7, th)
 
@@ -343,7 +344,7 @@ unsigned rFtH(double * u, unsigned char * hinl, double th, double * H, unsigned 
     } else {
       for(no_sam = 1; no_sam < 2*max_sam; ++no_sam) {
           for (pos = 0; pos < s_size; ++pos) {
-              idx = pos + 1 + rand()%(nhinlCount-pos-1);
+              idx = pos + 1 + degensac_rand()%(nhinlCount-pos-1);
               auxI = ptr[pos];
               ptr[pos] = ptr[idx];
               ptr[idx] = auxI;
@@ -606,13 +607,13 @@ void dual_sample(double * uA, unsigned lenA, unsigned sA, double * uB, unsigned 
 
   /*Shuffle pointers - at least the first 's̈́'*/
   for (pos = 0; pos < sA; ++pos) {
-      idx = rand() % lenA;
+      idx = degensac_rand() % lenA;
       i = ptrA[pos];
       ptrA[pos] = ptrA[idx];
       ptrA[idx] = i;
     }
   for (pos = 0; pos < sB; ++pos) {
-      idx = rand() % lenB;
+      idx = degensac_rand() % lenB;
       i = ptrB[pos];
       ptrB[pos] = ptrB[idx];
       ptrB[idx] = i;

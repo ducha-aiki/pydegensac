@@ -1,19 +1,16 @@
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
+#include "degensac_rand.h"
 
 #include "rtools.h"
-
-#ifdef WIN32
-#define random rand
-#endif
 
 /* inline int sample (int *pool, int max_sz, int i) */
 int sample (int *pool, int max_sz, int i)
 {
   int j,q,s;
 
-  s = random() % (max_sz - i);
+  s = degensac_rand() % (max_sz - i);
   j = max_sz - i - 1;
   q = pool[s];
   pool[s] = pool[j];
@@ -28,7 +25,7 @@ int * randsubset (int * pool, int max_sz, int siz)
 
   for (i = 0; i < siz; i++)
     {
-      s = random() % (max_sz - i);
+      s = degensac_rand() % (max_sz - i);
       j = max_sz - i - 1;
       q = pool[s];
       pool[s] = pool[j];
