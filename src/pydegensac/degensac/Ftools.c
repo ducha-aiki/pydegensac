@@ -11,6 +11,11 @@
 #define SYMMETRIC_ERROR
 #define SYMMETRIC_ERROR_CHECK
 #define pit 1.0471975511965967
+
+#ifdef USE_EIGEN
+#include "degensac_math.h"
+#endif
+
 void lin_fm(const double *u, double *p, const int* inl, const int len)
 {
     /* linearizes corresp. with respect to entries of fundamental matrix,
@@ -592,6 +597,9 @@ void FDso (const double *u, const double *F, double *p, double *sgn, int len)
 */
 int nullspace_qr7x9(const double *A, double *N)
 {
+#ifdef USE_EIGEN
+    return degensac_nullspace_qr7x9(A, N);
+#else
     const lapack_int rows=7;
     const lapack_int cols=9;
     int i,j;
@@ -663,5 +671,6 @@ int nullspace_qr7x9(const double *A, double *N)
         sol+=cols;
     }
     return 0;
+#endif
 }
 

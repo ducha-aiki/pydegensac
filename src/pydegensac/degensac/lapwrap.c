@@ -4,6 +4,10 @@
 
 #include "lapwrap.h"
 
+#ifdef USE_EIGEN
+#include "degensac_math.h"
+#endif
+
 /* DGESVD prototype (LAPACK) */
 #ifdef _WIN32
 extern void dgesvd_( char* jobu, char* jobvt, lapack_int* m, lapack_int* n, double* a,
@@ -19,6 +23,9 @@ extern void dgesvd_( char* jobu, char* jobvt, lapack_int* m, lapack_int* n, doub
 
 /* Standard (=FULL) SVD */
 int lap_SVD (double *d, double *a, double *u, lapack_int m, double *vt, lapack_int n) {
+#ifdef USE_EIGEN
+    return degensac_SVD(d, a, u, m, vt, n);
+#else
   lapack_int lda = m, ldu = m, ldvt = n, info = 1, lwork;
   double wkopt;
   double *work;
@@ -47,6 +54,7 @@ int lap_SVD (double *d, double *a, double *u, lapack_int m, double *vt, lapack_i
     } else {
       return 0;
     }
+#endif
 }
 
 
@@ -65,6 +73,9 @@ extern void dsyev_( char* jobz, char* uplo, lapack_int* n, double* a, lapack_int
 
 /* Eigen-decomposition */
 int lap_eig(double *a, double *ev, lapack_int n) {
+#ifdef USE_EIGEN
+    return degensac_eig(a, ev, n);
+#else
   lapack_int lda = n, info = 1, lwork;
   double wkopt;
   double *work;
@@ -94,4 +105,5 @@ int lap_eig(double *a, double *ev, lapack_int n) {
     } else {
       return 0;
     }
+#endif;
 }

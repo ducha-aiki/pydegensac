@@ -268,7 +268,7 @@ void hMCEs(double *Z, double *u, double *d, int *samidx, int len, double * errs,
         lin_hgN(u, A + 8*9, &i, 1, A1, A2); /* Add one pair of equations */
         scalmul(A + 8*9, MCE_SOFT_WEIGHT, 2*9, 1); /* Weight the equations */
         cov_mat(C, A, 10, 9);
-        lap_eig(C, Cc, 3); /* Solve for h */
+        lap_eig(C, Cc, 9); /* Solve for h */
         memcpy(h, C, 3*3*sizeof(double));
 #endif /* __MCE_SOFT__ */
         denormH(h, A1, A2);
@@ -947,6 +947,7 @@ void hMCEscustom(double *Z, double *u, double *d, int *samidx, int len, double *
             d[i] = errs[i];
             continue;
         }
+
 #ifndef __MCE_SOFT__
         lin_hgN(u, C, &i, 1, A1, A2);
         for (j = 2*9; j < 9*9; ++j) {
@@ -967,7 +968,7 @@ void hMCEscustom(double *Z, double *u, double *d, int *samidx, int len, double *
         lin_hgN(u, A + 8*9, &i, 1, A1, A2); /* Add one pair of equations */
         scalmul(A + 8*9, MCE_SOFT_WEIGHT, 2*9, 1); /* Weight the equations */
         cov_mat(C, A, 10, 9);
-        lap_eig(C, Cc, 3); /* Solve for h */
+        lap_eig(C, Cc, 9); /* Solve for h */
         memcpy(h, C, 3*3*sizeof(double));
 #endif /* __MCE_SOFT__ */
         denormH(h, A1, A2);
