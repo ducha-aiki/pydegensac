@@ -44,5 +44,8 @@ int qrbdv(double *x,double *y,double *z,int i,double *w,int j);
 int qrbdi(double *x,double *y,int l);
 int svduv(double *d,double *a,double *u,int m,double *v,int n);
 int svdu1v(double *d,double *a,int m,double *v,int n);
+void mattr(double *a,double *b,int m,int n);
+void mmul(double *c,double *a,double *b,int n);
+void rmmult(double *rm,double *a,double *b,int n,int m,int l);
 
 #endif
