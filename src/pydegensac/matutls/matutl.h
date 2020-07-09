@@ -8,6 +8,8 @@
 
 #ifndef _MATUTLS_MATUTL_H
 #define _MATUTLS_MATUTL_H
+#include <stdio.h>
+#include <math.h>
 /* Utility routines for real and complex matrix computations
  */
 #ifndef CPX
