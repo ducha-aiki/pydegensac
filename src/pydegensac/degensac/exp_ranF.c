@@ -2,6 +2,7 @@
 ////#include <stdio.h>
 #include <stdlib.h>
 #include <memory.h>
+#include <time.h>
 
 #include "exp_ranF.h"
 #include "DegUtils.h"
