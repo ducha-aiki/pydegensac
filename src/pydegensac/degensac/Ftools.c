@@ -638,7 +638,7 @@ int nullspace_qr7x9(const double *A, double *N)
     dgeqp3_(&r, &c, T, &r, p, tau, work, &work_size, &info);
 #endif
 
-#ifdef __linux__
+#if defined(__linux__) || defined(__APPLE__)
     dgeqp3_(&r, &c, T, &r, p, tau, work, &work_size, &info);
 #endif
     if (info!=0)

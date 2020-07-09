@@ -13,7 +13,7 @@
 #include "exp_ranH.h"
 #define __HASHING__
 //#define __FINAL_LSQ__
-#ifdef __linux__
+#if defined(__linux__) || defined(__APPLE__)
 #define min(a,b) \
     ({ __typeof__ (a) _a = (a); \
     __typeof__ (b) _b = (b); \

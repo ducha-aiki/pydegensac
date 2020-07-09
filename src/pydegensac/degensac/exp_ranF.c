@@ -21,7 +21,7 @@
 #define SYMM_COEF 0.6
 #define __HASHING__
 
-#ifdef __linux__
+#if defined(__linux__) || defined(__APPLE__)
 #include<sys/time.h>
 /*microseconds*/
 /*static __inline__*/ unsigned getticks(void) {

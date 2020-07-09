@@ -15,7 +15,7 @@ extern void dgesvd_( char* jobu, char* jobvt, lapack_int* m, lapack_int* n, doub
                     double* work, lapack_int* lwork, lapack_int* info );
 #endif
 
-#ifdef __linux__
+#if defined(__linux__) || defined(__APPLE__)
 extern void dgesvd_( char* jobu, char* jobvt, lapack_int* m, lapack_int* n, double* a,
                     lapack_int* lda, double* s, double* u, lapack_int* ldu, double* vt, lapack_int* ldvt,
                     double* work, lapack_int* lwork, lapack_int* info );
@@ -34,7 +34,7 @@ int lap_SVD (double *d, double *a, double *u, lapack_int m, double *vt, lapack_i
 #ifdef _WIN32
   dgesvd_( "All", "All", &m, &n, a, &lda, d, u, &ldu, vt, &ldvt, &wkopt, &lwork, &info );
 #endif
-#ifdef __linux__
+#if defined(__linux__) || defined(__APPLE__)
   dgesvd_( "All", "All", &m, &n, a, &lda, d, u, &ldu, vt, &ldvt, &wkopt, &lwork, &info );
 #endif
 
@@ -45,7 +45,7 @@ int lap_SVD (double *d, double *a, double *u, lapack_int m, double *vt, lapack_i
   dgesvd_( "All", "All", &m, &n, a, &lda, d, u, &ldu, vt, &ldvt, work, &lwork, &info );
 #endif
 
-#ifdef __linux__
+#if defined(__linux__) || defined(__APPLE__)
   dgesvd_( "All", "All", &m, &n, a, &lda, d, u, &ldu, vt, &ldvt, work, &lwork, &info );
 #endif
   free(work);
@@ -65,7 +65,7 @@ extern void dsyev_( char* jobz, char* uplo, lapack_int* n, double* a, lapack_int
 
 #endif
 
-#ifdef __linux__
+#if defined(__linux__) || defined(__APPLE__)
 extern void dsyev_( char* jobz, char* uplo, lapack_int* n, double* a, lapack_int* lda,
 		   double* w, double* work, lapack_int* lwork, lapack_int* info );
 #endif
@@ -85,7 +85,7 @@ int lap_eig(double *a, double *ev, lapack_int n) {
   dsyev_( "Vectors", "Upper", &n, a, &lda, ev, &wkopt, &lwork, &info );
 #endif
 
-#ifdef __linux__
+#if defined(__linux__) || defined(__APPLE__)
   dsyev_( "Vectors", "Upper", &n, a, &lda, ev, &wkopt, &lwork, &info );
 #endif
 
@@ -96,7 +96,7 @@ int lap_eig(double *a, double *ev, lapack_int n) {
   dsyev_( "Vectors", "Upper", &n, a, &lda, ev, work, &lwork, &info );
 #endif
 
-#ifdef __linux__
+#if defined(__linux__) || defined(__APPLE__)
   dsyev_( "Vectors", "Upper", &n, a, &lda, ev, work, &lwork, &info );
 #endif
   free(work);
