@@ -2,6 +2,7 @@
 #include <math.h>
 #include <string.h>
 #include <stddef.h>
+#include <matutls/ccmath.h>
 
 #include "../matutls/matutl.h"
 #include "utools.h"

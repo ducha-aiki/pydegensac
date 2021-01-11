@@ -6,6 +6,7 @@
  * ------------------------------------------------------------------------
  */
 #include "complex.h"
+#include <stdio.h>
 void cmprt(Cpx *a,int m,int n,char *f)
 { int i,j; Cpx *p;
   for(i=0,p=a; i<m ;++i){

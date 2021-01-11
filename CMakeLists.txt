@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8.12)
+cmake_minimum_required(VERSION 3.9)
 project(pydegensac)
 
 add_definitions(-fPIC)
@@ -41,6 +41,6 @@ set(degensac_srcs
         src/pydegensac/degensac/lapwrap.c
 )
 
-
-pybind11_add_module(pydegensac "src/pydegensac/bindings.cpp" ${degensac_srcs})
-target_link_libraries(pydegensac PRIVATE ${LAPACK_LIBRARIES} matutls)
+add_library(pydegensac_support ${degensac_srcs})
+pybind11_add_module(pydegensac "src/pydegensac/bindings.cpp")
+target_link_libraries(pydegensac PRIVATE ${LAPACK_LIBRARIES} matutls pydegensac_support)

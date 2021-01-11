@@ -2,6 +2,7 @@
 #include <limits.h>
 #include <math.h>
 #include <memory.h>
+#include <matutls/ccmath.h>
 #include "lapwrap.h"
 /*#include <mex.h> */
 

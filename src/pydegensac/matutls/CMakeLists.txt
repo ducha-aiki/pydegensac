@@ -1,5 +1,5 @@
-CMAKE_MINIMUM_REQUIRED(VERSION 2.6)
-PROJECT(MatUtls)
+CMAKE_MINIMUM_REQUIRED(VERSION 3.9)
+PROJECT(MatUtls C)
 
 IF(CMAKE_COMPILER_IS_GNUCXX)
   SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wno-strict-aliasing")
@@ -23,5 +23,5 @@ cmcpy.c   evmax.c    ldvmat.c  otrsm.c   rmmult.c  vmul.c
 cminv.c   hconj.c    lsqsv.c   psinv.c   ruinv.c   svdu1v.c
 cmmul.c   heigval.c  matprt.c  qrbdi.c   smgen.c   svduv.c
 cmmult.c  heigvec.c  mattr.c   qrbdu1.c  solvps.c  svdval.c
-)
+        matconsts.c)
 add_library(matutls ${matutls_srcs})
