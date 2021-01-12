@@ -111,7 +111,7 @@ setup(
     packages=find_packages('src'),
     package_dir={'':'src'},
     ext_modules=[CMakeExtension('pydegensac/pydegensac')],
-    extra_compile_args = ["-O0"], 
+    extra_compile_args = ["-O3"], 
     cmdclass=dict(build_ext=CMakeBuild),
     #test_suite='tests',
     zip_safe=False,
