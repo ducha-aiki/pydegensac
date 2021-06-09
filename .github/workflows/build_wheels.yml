@@ -46,3 +46,22 @@ jobs:
       - uses: actions/upload-artifact@v2
         with:
           path: ./wheelhouse/*.whl
+  build_wheels_windows:
+    name: Build wheels on Win
+    runs-on: windows-2019
+
+    steps:
+      - uses: actions/checkout@v2
+
+      # Used to host cibuildwheel
+      - uses: actions/setup-python@v2
+
+      - name: Install cibuildwheel
+        run: python3 -m pip install cibuildwheel==2.0.0a2
+      - name: Build wheels
+        run: python3 -m cibuildwheel --output-dir wheelhouse
+        # to supply options, put them in 'env', like:
+
+      - uses: actions/upload-artifact@v2
+        with:
+          path: ./wheelhouse/*.whl
