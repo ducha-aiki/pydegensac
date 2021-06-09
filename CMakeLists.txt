@@ -3,7 +3,6 @@ project(pydegensac)
 
 add_definitions(-fPIC)
 
-enable_language (Fortran)
 FIND_PACKAGE(LAPACK REQUIRED)
 if (LAPACK_FOUND)
   SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${LAPACK_CXX_FLAGS}")
