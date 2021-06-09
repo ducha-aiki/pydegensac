@@ -20,8 +20,8 @@ jobs:
       - name: Build wheels
         run: python3 -m cibuildwheel --output-dir wheelhouse
         # to supply options, put them in 'env', like:
-        # env:
-        #   CIBW_SOME_OPTION: value
+        env:
+          CIBW_BEFORE_ALL: yum install -y  lapack-devel  blas-devel
 
       - uses: actions/upload-artifact@v2
         with:
