@@ -15,13 +15,33 @@ jobs:
 
       - name: Install cibuildwheel
         run: python3 -m pip install cibuildwheel==2.0.0a2
-      - name: Install OpenBLAS
-        run: sudo apt-get update && sudo apt-get install libopenblas-dev && sudo ldconfig        
       - name: Build wheels
         run: python3 -m cibuildwheel --output-dir wheelhouse
         # to supply options, put them in 'env', like:
         env:
           CIBW_BEFORE_ALL: yum install -y  lapack-devel  blas-devel
+
+      - uses: actions/upload-artifact@v2
+        with:
+          path: ./wheelhouse/*.whl
+jobs:
+  build_wheels_mac:
+    name: Build wheels on mac
+    runs-on: macOS-10.15
+
+    steps:
+      - uses: actions/checkout@v2
+
+      # Used to host cibuildwheel
+      - uses: actions/setup-python@v2
+
+      - name: Install cibuildwheel
+        run: python3 -m pip install cibuildwheel==2.0.0a2
+      - name: Build wheels
+        run: python3 -m cibuildwheel --output-dir wheelhouse
+        # to supply options, put them in 'env', like:
+        env:
+          CIBW_BEFORE_ALL: brew install openblas
 
       - uses: actions/upload-artifact@v2
         with:
