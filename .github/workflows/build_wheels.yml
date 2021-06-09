@@ -8,13 +8,19 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-20.04, windows-2019, macos-10.15]
+        os: [ubuntu-20.04, windows-2019, macOS-10.15]
 
     steps:
       - uses: actions/checkout@v2
 
+      # Used to host cibuildwheel
+      - uses: actions/setup-python@v2
+
+      - name: Install cibuildwheel
+        run: python3 -m pip3 install cibuildwheel==2.0.0a2
+
       - name: Build wheels
-        uses: pypa/cibuildwheel@v1.11.1.post1
+        run: python3 -m cibuildwheel --output-dir wheelhouse
         # to supply options, put them in 'env', like:
         # env:
         #   CIBW_SOME_OPTION: value
