@@ -42,7 +42,7 @@ jobs:
         # to supply options, put them in 'env', like:
         env:
           CIBW_BEFORE_ALL: brew install openblas
-
+          CIBW_ARCHS_MACOS: x86_64 universal2
       - uses: actions/upload-artifact@v2
         with:
           path: ./wheelhouse/*.whl
@@ -61,6 +61,8 @@ jobs:
       - name: Build wheels
         run: python3 -m cibuildwheel --output-dir wheelhouse
         # to supply options, put them in 'env', like:
+        env:
+          CIBW_BEFORE_ALL: conda install openblas
 
       - uses: actions/upload-artifact@v2
         with:
