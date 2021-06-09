@@ -24,7 +24,7 @@ jobs:
       - uses: actions/upload-artifact@v2
         with:
           path: ./wheelhouse/*.whl
-jobs:
+  
   build_wheels_mac:
     name: Build wheels on mac
     runs-on: macOS-10.15
