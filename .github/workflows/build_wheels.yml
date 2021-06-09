@@ -5,7 +5,7 @@ on: [push, pull_request]
 jobs:
   build_wheels:
     name: Build wheels on ubuntu-20.04
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v2
@@ -27,7 +27,7 @@ jobs:
   
   build_wheels_mac:
     name: Build wheels on mac
-    runs-on: macOS-10.15
+    runs-on: macOS-latest
 
     steps:
       - uses: actions/checkout@v2
@@ -43,27 +43,6 @@ jobs:
         env:
           CIBW_BEFORE_ALL: brew install openblas
           CIBW_ARCHS_MACOS: x86_64 universal2
-      - uses: actions/upload-artifact@v2
-        with:
-          path: ./wheelhouse/*.whl
-  build_wheels_windows:
-    name: Build wheels on Win
-    runs-on: windows-2019
-
-    steps:
-      - uses: actions/checkout@v2
-
-      # Used to host cibuildwheel
-      - uses: actions/setup-python@v2
-
-      - name: Install cibuildwheel
-        run: python3 -m pip install cibuildwheel==2.0.0a2
-      - name: Build wheels
-        run: python3 -m cibuildwheel --output-dir wheelhouse
-        # to supply options, put them in 'env', like:
-        env:
-          CIBW_BEFORE_ALL: conda install openblas
-
       - uses: actions/upload-artifact@v2
         with:
           path: ./wheelhouse/*.whl
