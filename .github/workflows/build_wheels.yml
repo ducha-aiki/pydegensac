@@ -2,28 +2,28 @@ name: Build
 
 on: [push, pull_request]
 
-jobs:
-  build_wheels:
-    name: Build wheels on ubuntu-20.04
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v2
-
-      # Used to host cibuildwheel
-      - uses: actions/setup-python@v2
-
-      - name: Install cibuildwheel
-        run: python3 -m pip install cibuildwheel==2.0.0a2
-      - name: Build wheels
-        run: python3 -m cibuildwheel --output-dir wheelhouse
-        # to supply options, put them in 'env', like:
-        env:
-          CIBW_BEFORE_ALL: yum install -y  lapack-devel  blas-devel
-
-      - uses: actions/upload-artifact@v2
-        with:
-          path: ./wheelhouse/*.whl
+#jobs:
+#  build_wheels:
+#    name: Build wheels on ubuntu-20.04
+#    runs-on: ubuntu-latest
+#
+#    steps:
+#      - uses: actions/checkout@v2
+#
+#      # Used to host cibuildwheel
+#      - uses: actions/setup-python@v2
+#
+#      - name: Install cibuildwheel
+#        run: python3 -m pip install cibuildwheel==2.0.0a2
+#      - name: Build wheels
+#        run: python3 -m cibuildwheel --output-dir wheelhouse
+#        # to supply options, put them in 'env', like:
+#        env:
+#          CIBW_BEFORE_ALL: yum install -y  lapack-devel  blas-devel
+#
+#      - uses: actions/upload-artifact@v2
+#        with:
+#          path: ./wheelhouse/*.whl
   
   build_wheels_mac:
     name: Build wheels on mac
@@ -41,7 +41,7 @@ jobs:
         run: python3 -m cibuildwheel --output-dir wheelhouse
         # to supply options, put them in 'env', like:
         env:
-          CIBW_BEFORE_ALL: brew install openblas
+          CIBW_BEFORE_ALL: brew install openblas python
           CIBW_ARCHS_MACOS: x86_64 universal2
       - uses: actions/upload-artifact@v2
         with:
