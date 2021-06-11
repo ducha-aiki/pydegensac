@@ -18,7 +18,7 @@ according to the recent study Yin et.al."[Image Matching across Wide Baselines: 
 
 # Installation
 
-To build and install `pydegensac`, you can use pip:
+To build and install `pydegensac`, you can use pip from Windows, macOS and Linux:
 
 ```bash
 pip install pydegensac
@@ -34,6 +34,34 @@ or
 
 ```bash
 pip3 install .
+```
+
+To check if everything works, run the following:
+
+```bash
+cd examples
+python -utt simple-example.py
+```
+
+You should see the following output:
+
+```
+Running homography estimation
+cv2 found 40 inliers
+OpenCV runtime 0.02355  sec
+pydegensac found 78 inliers
+pydegensac runtime 0.00320  sec
+H =  [[ 5.59934334e-03 -2.36037104e-03 -2.78369679e+01]
+ [ 4.86321171e-02 -1.24542142e-01 -1.00600649e+01]
+ [ 1.95536148e-04  9.43300063e-06 -1.76685691e-01]]
+Running fundamental matrix estimation
+cv2 found 32 inliers
+OpenCV runtime 0.67554  sec
+pydegensac found 44 inliers
+pydegensac 0.04702  sec
+F =  [[-7.35044984e-04 -2.72572333e-03  1.38155992e+00]
+ [ 1.43946998e-03  2.33120834e-05 -7.88961637e-01]
+ [-3.35556093e-01  1.00000000e+00 -1.78675406e+02]]
 ```
 
 # Building hints from Tomasz Malisiewicz
