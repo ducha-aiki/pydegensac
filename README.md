@@ -24,8 +24,8 @@ To build and install `pydegensac`, you can use pip from Windows, macOS and Linux
 pip install pydegensac
 ```
 
-Or clone or download this repository and then, from within the repository, run:
-
+Or clone or download this repository, set the path to BLAS and LAPACK dir in the CMakeLists.txt
+I used the LAPACK binaries from here - just download and unpack https://packages.msys2.org/package/mingw-w64-x86_64-lapack?repo=mingw64 ) and then, from within the repository, run:
 ```bash
 python3 ./setup.py install
 ```
