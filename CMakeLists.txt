@@ -1,12 +1,19 @@
-cmake_minimum_required(VERSION 3.9)
+cmake_minimum_required(VERSION 3.5)
 project(pydegensac)
 
 add_definitions(-fPIC)
+add_definitions(-std=gnu++11)
+add_definitions(-fpermissive)
 
-FIND_PACKAGE(LAPACK REQUIRED)
+SET(LAPACK_DIR "C:/lapack64/mingw64/lib2")
+SET(BLAS_DIR "C:/lapack64/mingw64/lib2")
+
+FIND_PACKAGE(LAPACK)
 if (LAPACK_FOUND)
   SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${LAPACK_CXX_FLAGS}")
 endif (LAPACK_FOUND)
+  link_directories(C:/lapack64/mingw64/lib)
+  include_directories(C:/lapack64/mingw64/include)
 
 SET(CMAKE_BUILD_TYPE "RELEASE")
 
@@ -42,4 +49,4 @@ set(degensac_srcs
 
 add_library(pydegensac_support ${degensac_srcs})
 pybind11_add_module(pydegensac "src/pydegensac/bindings.cpp")
-target_link_libraries(pydegensac PRIVATE ${LAPACK_LIBRARIES} matutls pydegensac_support)
+target_link_libraries(pydegensac PRIVATE  matutls pydegensac_support lapack blas gfortran quadmath -static)
