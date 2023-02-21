@@ -1245,7 +1245,8 @@ int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2,int len, double th,
                          double conf, int max_sam,
                          double *F, unsigned char * inl,
                          int * data_out, int do_lo, unsigned inlLimit, double **resids, double* H_best,
-                         int* Ih, exFDsPtr EXFDS1, FDsPtr FDS1, FDsidxPtr FDS1idx, double SymCheck_th, int enable_degen_check) {
+                         int* Ih, exFDsPtr EXFDS1, FDsPtr FDS1, FDsidxPtr FDS1idx, double SymCheck_th, int enable_degen_check,
+                        int randomseed) {
     unsigned seed;
 
     int *pool, no_sam, new_sam;  double *Z, *buffer, u7[6*7], H[3*3], FBest[3*3];
@@ -1274,7 +1275,14 @@ int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2,int len, double th,
     double *err_laf;
     int a;
 
-    srand(time(NULL)); //Mishkin - randomization
+    unsigned int rseed;
+    if (randomseed > 0) {
+      rseed = (unsigned int) randomseed;
+    } else {
+      rseed = time(NULL);
+    }
+    srand(rseed);
+
 
 #ifdef USE_QR
     double A[7*9], sol[2*9];
@@ -1328,18 +1336,26 @@ int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2,int len, double th,
     f1 = sol;
     f2 = sol+9;
 
+    if (randomseed < 0) {
     seed = rand();
-
+}
     /*  srand(RAND_SEED++); */
     while(no_sam < max_sam) {
         no_sam ++;
 
-        srand(seed);
+    if (randomseed > 0) {
+      rsampleT(Z, 9, pool, 7, len, A);
+      loadSample(u, samidx, 7, 6, u7);
+    }
+    else {
+      srand(seed);
 
-        rsampleT(Z, 9, pool, 7, len, A);
-        loadSample(u, samidx, 7, 6, u7);
+      rsampleT(Z, 9, pool, 7, len, A);
+      loadSample(u, samidx, 7, 6, u7);
 
-        seed = rand();
+      seed = rand();
+    }
+
         ////printf("Seed: %d\n",seed);
 
 
@@ -1765,4 +1781,3 @@ int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2,int len, double th,
     return maxS.I;
 
 }
-

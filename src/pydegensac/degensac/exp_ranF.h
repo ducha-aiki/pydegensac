@@ -71,7 +71,8 @@ extern "C"
 #endif
 int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2,int len, double th,  double laf_coef, double conf, int max_sam,
             double *F, unsigned char * inl,
-            int * data_out, int do_lo, unsigned inlLimit, double **resids, double* H_best, int* Ih,exFDsPtr EXFDS1, FDsPtr FDS1, FDsidxPtr FDS1idx,  double SymCheck_th, int enable_degen_check);
+            int * data_out, int do_lo, unsigned inlLimit, double **resids, double* H_best, int* Ih,exFDsPtr EXFDS1, FDsPtr FDS1, FDsidxPtr FDS1idx,  double SymCheck_th, int enable_degen_check,
+            int randomseed);
 
 #ifdef __cplusplus
 extern "C"
@@ -110,4 +111,3 @@ void exFDsSym (const double *u, const double *F, double *p, double *w, int len);
 
 
 #endif // _EXP_RANSAC_RAN_F
-

@@ -24,7 +24,7 @@ error_type_dict_fundamental = {"sampson": 0,
 def convert_cv2_kpts_to_xyA(kps):
     """
     Converts OpenCV keypoints into transformation matrix
-    and pyramid index to extract from for the patch extraction 
+    and pyramid index to extract from for the patch extraction
     """
     num = len(kps)
     out = np.zeros((num,6)).astype(np.float64)
@@ -45,21 +45,21 @@ def convert_and_check(kps1):
         sh = kps1.shape
         err_message = ValueError("Keypoints should be list of cv2.KeyPoint \
                              or numpy.array [Nx2] or [Nx6]. N>=4  \
-                             Got shape of {} with shape instead".format(str(sh))) 
+                             Got shape of {} with shape instead".format(str(sh)))
         if len(sh) != 2:
             raise err_message
         num, dim = sh
         if (dim != 2) and (dim!=6):
             raise err_message
         if (num < 4):
-            raise err_message 
+            raise err_message
         out = kps1.astype(np.float64)
     elif type(kps1) is list:
         if OPENCV_HERE:
             if type(kps1[0]) is not cv2.KeyPoint:
                 raise ValueError("Keypoints should be list of cv2.KeyPoint \
                                 or numpy.array [Nx2] or [Nx6]. N>=4  \
-                                Got input of list of type {}".format(str(type(kps1[0])))) 
+                                Got input of list of type {}".format(str(type(kps1[0]))))
             else:
                 out = convert_cv2_kpts_to_xyA(kps1)
         else:
@@ -67,18 +67,19 @@ def convert_and_check(kps1):
     else:
         raise ValueError("Keypoints should be list of cv2.KeyPoint \
                              or numpy.array [Nx2] or [Nx6]. N>=4  \
-                             Got input of type {}".format(str(type(kps1)))) 
+                             Got input of type {}".format(str(type(kps1))))
     return out
 
 
 def findHomography(pts1_,
-                   pts2_, 
+                   pts2_,
                    px_th = 1.0,
                    conf = 0.999,
                    max_iters = 50000,
                    laf_consistensy_coef = -1.0,
                    error_type = "sampson",
-                   symmetric_error_check = True):
+                   symmetric_error_check = True,
+                   seed = -1):
     pts1 = convert_and_check(pts1_)
     pts2 = convert_and_check(pts2_)
     n, dim = pts1.shape
@@ -100,12 +101,13 @@ def findHomography(pts1_,
                              max_iters,
                              error_type_int,
                              symmetric_error_check,
-                             laf_consistensy_coef);
+                             laf_consistensy_coef,
+                             seed);
     if np.abs(H).sum() == 0:
         # If we haven`t found any good model, output zeros
         mask = [False]*len(mask)
         return H, mask
-    H_out = np.linalg.inv(H.T) 
+    H_out = np.linalg.inv(H.T)
     return H_out, mask
 
 def findFundamentalMatrix(pts1_,
@@ -116,7 +118,8 @@ def findFundamentalMatrix(pts1_,
                    laf_consistensy_coef = -1.0,
                    error_type = "sampson",
                    symmetric_error_check = True,
-                   enable_degeneracy_check = True):
+                   enable_degeneracy_check = True,
+                   seed = -1):
     pts1 = convert_and_check(pts1_)
     pts2 = convert_and_check(pts2_)
     n, dim = pts1.shape
@@ -139,9 +142,9 @@ def findFundamentalMatrix(pts1_,
                          error_type_int,
                          symmetric_error_check,
                          laf_consistensy_coef,
-                         enable_degeneracy_check);
+                         enable_degeneracy_check,
+                         seed);
     if np.abs(F).sum() == 0:
         # If we haven`t found any good model, output zeros
         mask = [False]*n
     return F, mask
-

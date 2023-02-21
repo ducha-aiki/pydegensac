@@ -481,7 +481,8 @@ Score exp_ransacHcustomLAF (double *u, double *u_1, double *u_2,
                             HDsPtr HDS1,
                             HDsiPtr HDSi1,
                             HDsidxPtr HDSidx1,
-                            double SymCheck_th)
+                            double SymCheck_th,
+                            int randomseed)
 {
     int *pool, no_sam, new_sam, *samidx, bestsamidx[4];
     double *Z, *buffer;
@@ -507,7 +508,13 @@ Score exp_ransacHcustomLAF (double *u, double *u_1, double *u_2,
     }
     h = sol;
     //
-    srand(time(NULL)); //Mishkin - randomization
+    unsigned int rseed;
+    if (randomseed >= 0) {
+      rseed = (unsigned int) randomseed;
+    } else {
+      rseed = time(NULL);
+    }
+    srand(rseed);
 
 #ifdef __HASHING__
     htInit(&HASH_TABLE);
@@ -536,8 +543,9 @@ Score exp_ransacHcustomLAF (double *u, double *u_1, double *u_2,
 
 
     no_sam = 0;
+    if (randomseed < 0) {
     seed = rand();
-
+  }
     samidx = pool + len - 4;
 
     *resids = (double *) malloc (iter_cnt * RESIDS_M * len * sizeof(double));
@@ -547,10 +555,13 @@ Score exp_ransacHcustomLAF (double *u, double *u_1, double *u_2,
     while(no_sam < max_sam)
     {
         no_sam++;
-        srand(seed);
-        multirsampleT(Z, 9, 2, pool, 4, len, M);
-        seed = rand();
-
+        if (randomseed >= 0) {
+            multirsampleT(Z, 9, 2, pool, 4, len, M);
+        } else {
+          srand(seed);
+          multirsampleT(Z, 9, 2, pool, 4, len, M);
+          seed = rand();
+        }
         /* orientation */
 #ifndef __OC_OFF__
         if (oriented_constraint && !all_Hori_valid (u, samidx))
@@ -977,4 +988,3 @@ void hMCEscustom(double *Z, double *u, double *d, int *samidx, int len, double *
         d[i] /= 4;
     }
 }
-
