@@ -10,15 +10,15 @@ It was originally located in [https://github.com/ducha-aiki/pyransac](https://gi
 Vanilla pydegensac implementation is marginally better than OpenCV one and with degeneracy-check enabled (DEGENSAC) it is the state of the art,
 according to the recent study Yin et.al."[Image Matching across Wide Baselines: From Paper to Practice](https://arxiv.org/abs/2003.01587.pdf)", 2020.
 
-For homography, though, pydegensac is worse than newest OpenCV, according to recent Barath et al. [A Large Scale Homography Benchmark](https://arxiv.org/abs/2302.09997), CVPR2023
-
 ![IMW-benchmark](img/ransacs.png)
 
 
 ![IMW-Challenge](img/ransacs2.png)
 
 
-pydegensac is green squares:
+For homography, pydegensac is worse than newest OpenCV MAGSAC++ (`cv2.USAC_MAGSAC`), but better than OpenCV vanilla RANSAC, according to recent Barath et al. [A Large Scale Homography Benchmark](https://arxiv.org/abs/2302.09997), CVPR2023
+
+
 ![H-benchmark](https://github.com/danini/homography-benchmark/raw/main/assets/heb_benchmark_traditional.png)
 
 
