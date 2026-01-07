@@ -9,7 +9,6 @@ import subprocess
 from distutils.version import LooseVersion
 from setuptools import setup, Extension, find_packages
 from setuptools.command.build_ext import build_ext
-from setuptools.command.test import test as TestCommand
 from shutil import copyfile, copymode
 
 
@@ -111,7 +110,6 @@ setup(
     packages=find_packages('src'),
     package_dir={'':'src'},
     ext_modules=[CMakeExtension('pydegensac/pydegensac')],
-    extra_compile_args = ["-O3"], 
     cmdclass=dict(build_ext=CMakeBuild),
     #test_suite='tests',
     zip_safe=False,
