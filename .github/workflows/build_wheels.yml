@@ -15,10 +15,12 @@ jobs:
       # Used to host cibuildwheel
       - uses: actions/setup-python@v5
 
+      - name: Create virtualenv
+        run: python3 -m venv .venv
       - name: Install cibuildwheel
-        run: python3 -m pip install cibuildwheel==2.21.2
+        run: .venv/bin/python -m pip install cibuildwheel==2.21.2
       - name: Build wheels
-        run: python3 -m cibuildwheel --output-dir wheelhouse
+        run: .venv/bin/python -m cibuildwheel --output-dir wheelhouse
         # to supply options, put them in 'env', like:
         env:
           CIBW_BEFORE_ALL_LINUX: yum install -y lapack-devel blas-devel gcc-gfortran
@@ -46,10 +48,12 @@ jobs:
       # Used to host cibuildwheel
       - uses: actions/setup-python@v5
 
+      - name: Create virtualenv
+        run: python3 -m venv .venv
       - name: Install cibuildwheel
-        run: python3 -m pip install cibuildwheel==2.21.2
+        run: .venv/bin/python -m pip install cibuildwheel==2.21.2
       - name: Build wheels
-        run: python3 -m cibuildwheel --output-dir wheelhouse
+        run: .venv/bin/python -m cibuildwheel --output-dir wheelhouse
         # to supply options, put them in 'env', like:
         env:
           CIBW_BEFORE_ALL: brew install openblas python
