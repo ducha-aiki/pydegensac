@@ -23,7 +23,8 @@ py::tuple findHomography_(py::array_t<double>  x1y1_,
                           int max_iters,
                           int error_type,
                           bool sym_check_enable,
-                          double laf_coef) {
+                          double laf_coef,
+                          int seed) {
     // Get the data
     py::buffer_info buf1 = x1y1_.request();
     size_t NUM_TENTS = buf1.shape[0];
@@ -223,7 +224,8 @@ py::tuple findHomography_(py::array_t<double>  x1y1_,
                          0,
                          &resids,
                          HDS1,HDSi1,HDSidx1,
-                         SymCheck_th);
+                         SymCheck_th,
+                         seed);
 
 
 
@@ -262,7 +264,8 @@ py::tuple findFundamentalMatrix_(py::array_t<double>  x1y1_,
                                  int error_type,
                                  bool sym_check_enable,
                                  double laf_coef,
-                                 bool enable_degeneracy_check) {
+                                 bool enable_degeneracy_check,
+                                 int seed) {
     // Get the data
     py::buffer_info buf1 = x1y1_.request();
     size_t NUM_TENTS = buf1.shape[0];
@@ -440,7 +443,8 @@ py::tuple findFundamentalMatrix_(py::array_t<double>  x1y1_,
                          HinF,Ihptr,
                          EXFDS1,FDS1,FDSidx1,
                          SymCheck_th,
-                         (int)enable_degeneracy_check);
+                         (int)enable_degeneracy_check,
+                         seed);
 
 
     // Convert and store output
@@ -497,7 +501,8 @@ PYBIND11_PLUGIN(pydegensac) {
             py::arg("max_iters") = 10000,
             py::arg("error_type") = 0,
             py::arg("sym_check_enable") = 1,
-            py::arg("laf_coef") = 0);
+            py::arg("laf_coef") = 0,
+            py::arg("seed") = -1);
 
     m.def("findFundamentalMatrix_", &findFundamentalMatrix_, R"doc(some doc)doc",
           py::arg("x1y1"),
@@ -508,7 +513,8 @@ PYBIND11_PLUGIN(pydegensac) {
           py::arg("error_type") = 0,
           py::arg("sym_check_enable") = 1,
           py::arg("laf_coef") = 0,
-          py::arg("enable_degeneracy_check") = 1);
+          py::arg("enable_degeneracy_check") = 1,
+          py::arg("seed") = -1);
 
     return m.ptr();
 }
