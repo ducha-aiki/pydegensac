@@ -29,11 +29,22 @@
 /* Complex Types */
 
 #ifndef CPX
+#ifdef _MSC_VER
+#ifndef _COMPLEX_DEFINED
+struct _complex
+{
+    double re,im;
+};
+#define _COMPLEX_DEFINED 1
+#endif
+typedef struct _complex Cpx;
+#else
 struct complex
 {
     double re,im;
 };
 typedef struct complex Cpx;
+#endif
 #define CPX  1
 #endif
 
@@ -930,5 +941,5 @@ double pwr(double y,int n) ;
      special declarations required for shared library
 */
 
-int np,nma,nar,nfc,ndif;
-struct mcof *par,*pma,*pfc;
+extern int np,nma,nar,nfc,ndif;
+extern struct mcof *par,*pma,*pfc;

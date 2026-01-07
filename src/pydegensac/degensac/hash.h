@@ -29,7 +29,7 @@ typedef struct _HashTable
 {
     HashField * fields[HT_FIELDS];
 } HashTable;
-HashTable HASH_TABLE;
+extern HashTable HASH_TABLE;
 
 void htInit(HashTable * ht);
 

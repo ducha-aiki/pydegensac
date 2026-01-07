@@ -1,0 +1,56 @@
+name: Publish to PyPI
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_run_id:
+        description: "Run ID for the build_wheels workflow to pull artifacts from."
+        required: true
+        type: string
+
+jobs:
+  publish:
+    name: Publish wheels to PyPI
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Download Linux wheels artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: wheels-linux
+          path: dist
+          run-id: ${{ inputs.build_run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download macOS wheels artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: wheels-macos
+          path: dist
+          run-id: ${{ inputs.build_run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download Windows wheels artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: wheels-windows
+          path: dist
+          run-id: ${{ inputs.build_run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish to PyPI (API token)
+        if: ${{ secrets.PYPI_API_TOKEN != '' }}
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist
+          user: __token__
+          password: ${{ secrets.PYPI_API_TOKEN }}
+
+      - name: Publish to PyPI (trusted publishing)
+        if: ${{ secrets.PYPI_API_TOKEN == '' }}
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist
