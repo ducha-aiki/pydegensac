@@ -89,7 +89,7 @@ jobs:
           CIBW_ARCHS_WINDOWS: AMD64
           CIBW_BEFORE_ALL_WINDOWS: vcpkg install openblas --triplet x64-windows
           CIBW_BUILD: cp310-win_amd64 cp311-win_amd64 cp312-win_amd64 cp313-win_amd64 cp314-win_amd64
-          CIBW_ENVIRONMENT_WINDOWS: "VCPKG_ROOT=${{ env.VCPKG_INSTALLATION_ROOT }} CMAKE_TOOLCHAIN_FILE=${{ env.VCPKG_INSTALLATION_ROOT }}\\scripts\\buildsystems\\vcpkg.cmake"
+          CIBW_ENVIRONMENT_WINDOWS: 'VCPKG_ROOT=${{ env.VCPKG_INSTALLATION_ROOT }} CMAKE_TOOLCHAIN_FILE=${{ env.VCPKG_INSTALLATION_ROOT }}\scripts\buildsystems\vcpkg.cmake'
 
       - uses: actions/upload-artifact@v4
         with:
