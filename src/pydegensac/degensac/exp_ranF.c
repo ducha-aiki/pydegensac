@@ -33,14 +33,6 @@
 }
 #endif /*__linux__*/
 
-#ifndef min
-#define min(a,b) ((a) < (b) ? (a) : (b))
-#endif
-
-#ifndef max
-#define max(a,b) ((a) > (b) ? (a) : (b))
-#endif
-
 int no_mto(double *A)
 {
     double x,y;
@@ -1269,7 +1261,7 @@ int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2, int len, double th
     const int doSymCheck = SymCheck_th > 0;
     const int DO_LAF_CHECK =  laf_coef > 0;
     const double th_laf_check = laf_coef * th;
-    int p1_inliers = 0;
+    unsigned p1_inliers = 0;
     double *err_laf;
     int a;
 
@@ -1409,7 +1401,7 @@ int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2, int len, double th
                     for (j = 0; j < S.I; j++)
                         if (err_laf[inliers[j]] <= th_laf_check)  S.Ilafs++;
 
-                    S.Ilafs = min(S.Ilafs, p1_inliers);
+                    S.Ilafs = dmin(S.Ilafs, p1_inliers);
                     if (S.Ilafs < maxS.Ilafs)
                         continue; //skip if first is not good
                 }
@@ -1552,7 +1544,7 @@ int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2, int len, double th
                     for (j = 0; j < S.I; j++)
                         if (err_laf[inliers[j]] <= th_laf_check)  S.Ilafs++;
 
-                    S.Ilafs = min(S.Ilafs, p1_inliers);
+                    S.Ilafs = dmin(S.Ilafs, p1_inliers);
                     if (S.Ilafs < maxS.Ilafs)
                         do_update = 0; //skip if first is not good
                 }
@@ -1680,7 +1672,7 @@ int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2, int len, double th
                     for (j = 0; j < S.I; j++)
                         if (err_laf[inliers[j]] <= th_laf_check)  S.Ilafs++;
 
-                    S.Ilafs = min(S.Ilafs, p1_inliers);
+                    S.Ilafs = dmin(S.Ilafs, p1_inliers);
                     if (S.Ilafs < maxS.Ilafs)
                         do_update = 0; //skip if first is not good
                 }

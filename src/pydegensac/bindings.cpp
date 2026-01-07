@@ -58,18 +58,16 @@ py::tuple findHomography_(py::array_t<double>  x1y1_,
     // Convert the data
 
     int oriented_constr = 1;
-    HDsPtr HDS1 = nullptr;
-    HDsiPtr HDSi1 = nullptr;
-    HDsidxPtr HDSidx1 = nullptr;
+    HDsPtr HDS1 = &HDs;
+    HDsiPtr HDSi1 = &HDsi;
+    HDsidxPtr HDSidx1 = &HDsidx;
 
-    double error_threshold = 0.0;
+    double error_threshold = px_th*px_th;
     double SymCheck_th = 0.0;
     const double SYM_CHECK_COEF = 3.0*sym_check_enable;
+    SymCheck_th = px_th * SYM_CHECK_COEF;
     switch (error_type)   {
     case SAMPSON:   {
-        HDS1 = &HDs;
-        HDSi1 = &HDsi;
-        HDSidx1 = &HDsidx;
         error_threshold = px_th*px_th;
         SymCheck_th = px_th * SYM_CHECK_COEF;
         break;
@@ -105,9 +103,6 @@ py::tuple findHomography_(py::array_t<double>  x1y1_,
         error_threshold = px_th;
         SymCheck_th = px_th * SYM_CHECK_COEF;
         break;
-    }
-    default: {
-        throw std::invalid_argument("Unsupported error_type");
     }
     }
 
@@ -297,19 +292,16 @@ py::tuple findFundamentalMatrix_(py::array_t<double>  x1y1_,
     x2y2.assign(ptr1a, ptr1a + buf1a.size);
 
     // Convert the data
-    FDsPtr FDS1 = nullptr;
-    exFDsPtr EXFDS1 = nullptr;
-    FDsidxPtr FDSidx1 = nullptr;
+    FDsPtr FDS1 = &FDs;
+    exFDsPtr EXFDS1 = &exFDs;
+    FDsidxPtr FDSidx1 = &FDsidx;
 
-    double error_threshold = 0.0;
+    double error_threshold = px_th*px_th;
     double SymCheck_th = 0.0;
     const double SYM_CHECK_COEF = 3.0*sym_check_enable;
+    SymCheck_th = px_th*px_th * SYM_CHECK_COEF;
     switch (error_type)   {
     case SAMPSON_F:   {
-        FDS1 = &FDs;
-        EXFDS1 = &exFDs;
-        FDSidx1 = &FDsidx;
-
         error_threshold = px_th*px_th;
         SymCheck_th = px_th*px_th * SYM_CHECK_COEF;
         break;
@@ -322,9 +314,6 @@ py::tuple findFundamentalMatrix_(py::array_t<double>  x1y1_,
         error_threshold = px_th*px_th;
         SymCheck_th = px_th*px_th * SYM_CHECK_COEF;
         break;
-    }
-    default: {
-        throw std::invalid_argument("Unsupported error_type");
     }
     }
 

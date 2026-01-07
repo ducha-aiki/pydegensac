@@ -15,13 +15,6 @@
 #define __HASHING__
 //#define __FINAL_LSQ__
 
-#ifndef min
-#define min(a,b) ((a) < (b) ? (a) : (b))
-#endif
-
-#ifndef max
-#define max(a,b) ((a) > (b) ? (a) : (b))
-#endif
 //#define FULL_SYMM
 
 int HcloseToSingular(const double *h){
@@ -497,7 +490,7 @@ Score exp_ransacHcustomLAF (double *u, double *u_1, double *u_2,
     const int doSymCheck = SymCheck_th > 0;
     const int DO_LAF_CHECK =  laf_coef > 0;
     const double th_laf_check = laf_coef * th;
-    int p1_inliers = 0;
+    unsigned p1_inliers = 0;
     // int rr;
     int nullspace_buff[2*9], nullsize;
 
@@ -615,7 +608,7 @@ Score exp_ransacHcustomLAF (double *u, double *u_1, double *u_2,
                 for (j = 0; j < Scheck.I; j++)
                     if (d_check[j] <= th_laf_check) S.Ilafs++;
 
-                S.Ilafs = min(S.Ilafs, p1_inliers);
+                S.Ilafs = dmin(S.Ilafs, p1_inliers);
                 if (S.Ilafs < maxS.Ilafs)
                     continue;
 
@@ -732,7 +725,7 @@ Score exp_ransacHcustomLAF (double *u, double *u_1, double *u_2,
                     for (j = 0; j < Scheck.I; j++)
                         if (d_check[j] <= th_laf_check) S.Ilafs++;
 
-                    S.Ilafs = min(S.Ilafs, p1_inliers);
+                    S.Ilafs = dmin(S.Ilafs, p1_inliers);
                     if (S.Ilafs < maxS.Ilafs)
                         do_update = 0; //skip if first is not good
 
@@ -848,7 +841,7 @@ Score exp_ransacHcustomLAF (double *u, double *u_1, double *u_2,
                 for (j = 0; j < Scheck.I; j++)
                     if (d_check[j] <= th_laf_check) S.Ilafs++;
 
-                S.Ilafs = min(S.Ilafs, p1_inliers);
+                S.Ilafs = dmin(S.Ilafs, p1_inliers);
                 if (S.Ilafs < maxS.Ilafs)
                     do_update = 0; //skip if first is not good
             }
