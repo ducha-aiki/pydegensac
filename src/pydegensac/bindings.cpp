@@ -57,11 +57,12 @@ py::tuple findHomography_(py::array_t<double>  x1y1_,
     // Convert the data
 
     int oriented_constr = 1;
-    HDsPtr HDS1;
-    HDsiPtr HDSi1;
-    HDsidxPtr HDSidx1;
+    HDsPtr HDS1 = nullptr;
+    HDsiPtr HDSi1 = nullptr;
+    HDsidxPtr HDSidx1 = nullptr;
 
-    double error_threshold, SymCheck_th;
+    double error_threshold = 0.0;
+    double SymCheck_th = 0.0;
     const double SYM_CHECK_COEF = 3.0*sym_check_enable;
     switch (error_type)   {
     case SAMPSON:   {
@@ -103,6 +104,9 @@ py::tuple findHomography_(py::array_t<double>  x1y1_,
         error_threshold = px_th;
         SymCheck_th = px_th * SYM_CHECK_COEF;
         break;
+    }
+    default: {
+        throw std::invalid_argument("Unsupported error_type");
     }
     }
 
@@ -290,11 +294,12 @@ py::tuple findFundamentalMatrix_(py::array_t<double>  x1y1_,
     x2y2.assign(ptr1a, ptr1a + buf1a.size);
 
     // Convert the data
-    FDsPtr FDS1;
-    exFDsPtr EXFDS1;
-    FDsidxPtr FDSidx1;
+    FDsPtr FDS1 = nullptr;
+    exFDsPtr EXFDS1 = nullptr;
+    FDsidxPtr FDSidx1 = nullptr;
 
-    double error_threshold, SymCheck_th;
+    double error_threshold = 0.0;
+    double SymCheck_th = 0.0;
     const double SYM_CHECK_COEF = 3.0*sym_check_enable;
     switch (error_type)   {
     case SAMPSON_F:   {
@@ -314,6 +319,9 @@ py::tuple findFundamentalMatrix_(py::array_t<double>  x1y1_,
         error_threshold = px_th*px_th;
         SymCheck_th = px_th*px_th * SYM_CHECK_COEF;
         break;
+    }
+    default: {
+        throw std::invalid_argument("Unsupported error_type");
     }
     }
 
