@@ -53,7 +53,7 @@ jobs:
         # to supply options, put them in 'env', like:
         env:
           CIBW_BEFORE_ALL: brew install openblas python
-          CIBW_ARCHS_MACOS: x86_64 universal2
+          CIBW_ARCHS_MACOS: x86_64 arm64
       - uses: actions/upload-artifact@v4
         with:
           name: wheels-macos
