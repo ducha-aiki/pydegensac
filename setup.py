@@ -110,6 +110,7 @@ setup(
     packages=find_packages('src'),
     package_dir={'':'src'},
     ext_modules=[CMakeExtension('pydegensac/pydegensac')],
+    extra_compile_args = ["-std=c++11"], 
     cmdclass=dict(build_ext=CMakeBuild),
     #test_suite='tests',
     zip_safe=False,
