@@ -87,7 +87,7 @@ jobs:
         # to supply options, put them in 'env', like:
         env:
           CIBW_ARCHS_WINDOWS: AMD64
-          CIBW_BEFORE_ALL_WINDOWS: vcpkg install openblas --triplet x64-windows
+          CIBW_BEFORE_ALL_WINDOWS: vcpkg install openblas lapack --triplet x64-windows
           CIBW_BUILD: cp310-win_amd64 cp311-win_amd64 cp312-win_amd64 cp313-win_amd64 cp314-win_amd64
           CIBW_ENVIRONMENT_WINDOWS: "VCPKG_ROOT=C:/vcpkg CMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake"
 
