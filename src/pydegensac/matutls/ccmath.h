@@ -29,11 +29,22 @@
 /* Complex Types */
 
 #ifndef CPX
+#ifdef _MSC_VER
+#ifndef _COMPLEX_DEFINED
+struct _complex
+{
+    double re,im;
+};
+#define _COMPLEX_DEFINED 1
+#endif
+typedef struct _complex Cpx;
+#else
 struct complex
 {
     double re,im;
 };
 typedef struct complex Cpx;
+#endif
 #define CPX  1
 #endif
 

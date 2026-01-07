@@ -15,15 +15,13 @@
 #define __HASHING__
 //#define __FINAL_LSQ__
 
-#define min(a,b) \
-    ({ __typeof__ (a) _a = (a); \
-    __typeof__ (b) _b = (b); \
-    _a < _b ? _a : _b; })
+#ifndef min
+#define min(a,b) ((a) < (b) ? (a) : (b))
+#endif
 
-#define max(a,b) \
-    ({ __typeof__ (a) _a = (a); \
-    __typeof__ (b) _b = (b); \
-    _a > _b ? _a : _b; })
+#ifndef max
+#define max(a,b) ((a) > (b) ? (a) : (b))
+#endif
 //#define FULL_SYMM
 
 int HcloseToSingular(const double *h){
@@ -977,4 +975,3 @@ void hMCEscustom(double *Z, double *u, double *d, int *samidx, int len, double *
         d[i] /= 4;
     }
 }
-
