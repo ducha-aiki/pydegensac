@@ -479,7 +479,8 @@ Score exp_ransacHcustomLAF (double *u, double *u_1, double *u_2,
                             HDsPtr HDS1,
                             HDsiPtr HDSi1,
                             HDsidxPtr HDSidx1,
-                            double SymCheck_th)
+                            double SymCheck_th,
+                            int seed)
 {
     int *pool, no_sam, new_sam, *samidx, bestsamidx[4];
     double *Z, *buffer;
@@ -489,7 +490,7 @@ Score exp_ransacHcustomLAF (double *u, double *u_1, double *u_2,
     int i, j, *inliers, *inliersS;
     char do_update = 0;
     Score maxS = {0,0,0,0}, maxSs = {0,0,0,0}, S = {0,0,0,0}, Scheck= {0,0,0,0};
-    unsigned seed;
+    unsigned rand_seed;
     int do_iterate;
     int iter_cnt = 0, no_rej = 0, iterID = 0;
     char new_max = 0;
@@ -505,7 +506,11 @@ Score exp_ransacHcustomLAF (double *u, double *u_1, double *u_2,
     }
     h = sol;
     //
-    srand(time(NULL)); //Mishkin - randomization
+    if (seed >= 0) {
+        srand((unsigned)seed);
+    } else {
+        srand(time(NULL)); //Mishkin - randomization
+    }
 
 #ifdef __HASHING__
     htInit(&HASH_TABLE);
@@ -534,7 +539,7 @@ Score exp_ransacHcustomLAF (double *u, double *u_1, double *u_2,
 
 
     no_sam = 0;
-    seed = rand();
+    rand_seed = rand();
 
     samidx = pool + len - 4;
 
@@ -545,9 +550,9 @@ Score exp_ransacHcustomLAF (double *u, double *u_1, double *u_2,
     while(no_sam < max_sam)
     {
         no_sam++;
-        srand(seed);
+        srand(rand_seed);
         multirsampleT(Z, 9, 2, pool, 4, len, M);
-        seed = rand();
+        rand_seed = rand();
 
         /* orientation */
 #ifndef __OC_OFF__
