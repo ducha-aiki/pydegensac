@@ -23,5 +23,6 @@ cmcpy.c   evmax.c    ldvmat.c  otrsm.c   rmmult.c  vmul.c
 cminv.c   hconj.c    lsqsv.c   psinv.c   ruinv.c   svdu1v.c
 cmmul.c   heigval.c  matprt.c  qrbdi.c   smgen.c   svduv.c
 cmmult.c  heigvec.c  mattr.c   qrbdu1.c  solvps.c  svdval.c
-        matconsts.c)
+        matconsts.c
+        ccmath_globals.c)
 add_library(matutls ${matutls_srcs})

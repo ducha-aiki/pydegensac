@@ -1,4 +1,6 @@
 #include "hash.h"
+
+HashTable HASH_TABLE;
 //#include <mex.h>
 
 uint32_t SuperFastHash (const char * data, int len) {
@@ -94,6 +96,5 @@ int htContains(HashTable * ht, uint32_t hash, int length, int iterID) { /* compa
 	}
 	return -1;
 }
-
 
 
