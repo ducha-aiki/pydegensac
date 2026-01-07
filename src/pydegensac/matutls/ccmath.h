@@ -930,5 +930,5 @@ double pwr(double y,int n) ;
      special declarations required for shared library
 */
 
-int np,nma,nar,nfc,ndif;
-struct mcof *par,*pma,*pfc;
+extern int np,nma,nar,nfc,ndif;
+extern struct mcof *par,*pma,*pfc;

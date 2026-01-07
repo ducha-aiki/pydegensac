@@ -3,46 +3,65 @@ name: Build
 on: [push, pull_request]
 
 jobs:
-#  build_wheels:
-#    name: Build wheels on ubuntu-20.04
-#    runs-on: ubuntu-latest
-#
-#    steps:
-#      - uses: actions/checkout@v2
-#
-#      # Used to host cibuildwheel
-#      - uses: actions/setup-python@v2
-#
-#      - name: Install cibuildwheel
-#        run: python3 -m pip install cibuildwheel==2.0.0a2
-#      - name: Build wheels
-#        run: python3 -m cibuildwheel --output-dir wheelhouse
-#        # to supply options, put them in 'env', like:
-#        env:
-#          CIBW_BEFORE_ALL: yum install -y  lapack-devel  blas-devel
-#
-#      - uses: actions/upload-artifact@v2
-#        with:
-#          path: ./wheelhouse/*.whl
+  build_wheels_linux:
+    name: Build wheels on linux
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Used to host cibuildwheel
+      - uses: actions/setup-python@v5
+
+      - name: Create virtualenv
+        run: python3 -m venv .venv
+      - name: Install cibuildwheel
+        run: .venv/bin/python -m pip install cibuildwheel==2.21.2
+      - name: Build wheels
+        run: .venv/bin/python -m cibuildwheel --output-dir wheelhouse
+        # to supply options, put them in 'env', like:
+        env:
+          CIBW_BEFORE_ALL_LINUX: yum install -y lapack-devel blas-devel gcc-gfortran
+          CIBW_BUILD: cp310-manylinux_x86_64 cp311-manylinux_x86_64 cp312-manylinux_x86_64 cp313-manylinux_x86_64 cp314-manylinux_x86_64
+          CIBW_REPAIR_WHEEL_COMMAND_LINUX: "auditwheel repair -w {dest_dir} {wheel}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheels-linux
+          path: ./wheelhouse/*.whl
+
+      - name: Publish wheels to GitHub release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ./wheelhouse/*.whl
   
   build_wheels_mac:
     name: Build wheels on mac
     runs-on: macOS-latest
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
       # Used to host cibuildwheel
-      - uses: actions/setup-python@v2
+      - uses: actions/setup-python@v5
 
+      - name: Create virtualenv
+        run: python3 -m venv .venv
       - name: Install cibuildwheel
-        run: python3 -m pip install cibuildwheel==2.0.0a2
+        run: .venv/bin/python -m pip install cibuildwheel==2.21.2
       - name: Build wheels
-        run: python3 -m cibuildwheel --output-dir wheelhouse
+        run: .venv/bin/python -m cibuildwheel --output-dir wheelhouse
         # to supply options, put them in 'env', like:
         env:
           CIBW_BEFORE_ALL: brew install openblas python
-          CIBW_ARCHS_MACOS: x86_64 universal2
-      - uses: actions/upload-artifact@v2
+          CIBW_ARCHS_MACOS: x86_64 arm64
+          CIBW_BUILD: cp310-macosx_x86_64 cp310-macosx_arm64 cp311-macosx_x86_64 cp311-macosx_arm64 cp312-macosx_x86_64 cp312-macosx_arm64 cp313-macosx_x86_64 cp313-macosx_arm64 cp314-macosx_x86_64 cp314-macosx_arm64
+          CIBW_ENVIRONMENT_MACOS: CMAKE_OSX_ARCHITECTURES=$CIBW_ARCHS
+          CIBW_REPAIR_WHEEL_COMMAND_MACOS: ""
+      - uses: actions/upload-artifact@v4
         with:
+          name: wheels-macos
           path: ./wheelhouse/*.whl
