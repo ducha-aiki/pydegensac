@@ -1,9 +1,12 @@
 #!/usr/bin/env python
 # coding: utf-8
+import os
+os.environ.setdefault("MPLBACKEND", "Agg")
 import numpy as np
 import matplotlib.pyplot as plt
 import cv2
 import pydegensac
+import sys
 from time import time
 from copy import deepcopy
 
@@ -62,6 +65,10 @@ if __name__ == '__main__':
     cmp_H, cmp_mask = verify_pydegensac(kps1,kps2,tentatives, th, n_iter)
     print ("pydegensac runtime {0:.5f}".format(time()-t), ' sec')
     print ("H = ", cmp_H)
+    pydegensac_inliers = int(deepcopy(cmp_mask).astype(np.float32).sum())
+    if pydegensac_inliers <= 20:
+        print("pydegensac inliers too low: {}".format(pydegensac_inliers))
+        sys.exit(1)
     th = 0.5
     n_iter = 50000
     print ("Running fundamental matrix estimation")

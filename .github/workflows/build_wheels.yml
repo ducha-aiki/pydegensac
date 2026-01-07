@@ -26,6 +26,9 @@ jobs:
           CIBW_BEFORE_ALL_LINUX: yum install -y lapack-devel blas-devel gcc-gfortran
           CIBW_BUILD: cp38-manylinux_x86_64 cp39-manylinux_x86_64 cp310-manylinux_x86_64 cp311-manylinux_x86_64 cp312-manylinux_x86_64 cp313-manylinux_x86_64 cp314-manylinux_x86_64
           CIBW_REPAIR_WHEEL_COMMAND_LINUX: "auditwheel repair -w {dest_dir} {wheel}"
+          CIBW_TEST_COMMAND: >-
+            python -c "import os, runpy; os.chdir(r'{project}/examples'); runpy.run_path('simple-example.py', run_name='__main__')"
+          CIBW_TEST_REQUIRES: opencv-python-headless matplotlib
 
       - uses: actions/upload-artifact@v4
         with:
@@ -56,11 +59,14 @@ jobs:
         run: .venv/bin/python -m cibuildwheel --output-dir wheelhouse
         # to supply options, put them in 'env', like:
         env:
-          CIBW_BEFORE_ALL: brew install openblas python
+          CIBW_BEFORE_ALL_MACOS: brew install openblas lapack
           CIBW_ARCHS_MACOS: x86_64 arm64
           CIBW_BUILD: cp38-macosx_x86_64 cp38-macosx_arm64 cp39-macosx_x86_64 cp39-macosx_arm64 cp310-macosx_x86_64 cp310-macosx_arm64 cp311-macosx_x86_64 cp311-macosx_arm64 cp312-macosx_x86_64 cp312-macosx_arm64 cp313-macosx_x86_64 cp313-macosx_arm64 cp314-macosx_x86_64 cp314-macosx_arm64
           CIBW_ENVIRONMENT_MACOS: CMAKE_OSX_ARCHITECTURES=$CIBW_ARCHS
           CIBW_REPAIR_WHEEL_COMMAND_MACOS: ""
+          CIBW_TEST_COMMAND: >-
+            python -c "import os, runpy; os.chdir(r'{project}/examples'); runpy.run_path('simple-example.py', run_name='__main__')"
+          CIBW_TEST_REQUIRES: opencv-python-headless matplotlib
       - uses: actions/upload-artifact@v4
         with:
           name: wheels-macos
@@ -90,6 +96,9 @@ jobs:
           CIBW_BEFORE_ALL_WINDOWS: vcpkg install openblas lapack --triplet x64-windows
           CIBW_BUILD: cp38-win_amd64 cp39-win_amd64 cp310-win_amd64 cp311-win_amd64 cp312-win_amd64 cp313-win_amd64 cp314-win_amd64
           CIBW_ENVIRONMENT_WINDOWS: "VCPKG_ROOT=C:/vcpkg CMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake"
+          CIBW_TEST_COMMAND: >-
+            python -c "import os, runpy; os.chdir(r'{project}/examples'); runpy.run_path('simple-example.py', run_name='__main__')"
+          CIBW_TEST_REQUIRES: opencv-python-headless matplotlib
 
       - uses: actions/upload-artifact@v4
         with:
