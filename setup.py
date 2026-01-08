@@ -42,6 +42,17 @@ class CMakeBuild(build_ext):
         cmake_args = ['-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=' + extdir,
                       '-DPYTHON_EXECUTABLE=' + sys.executable]
 
+        # Respect architecture requested by cibuildwheel / CI on macOS.
+        # CMake does not reliably pick up CMAKE_OSX_ARCHITECTURES from the environment,
+        # so pass it explicitly and also isolate the build directory per-arch to avoid
+        # cross-arch CMake cache reuse.
+        osx_archs = os.environ.get('CMAKE_OSX_ARCHITECTURES')
+        if osx_archs:
+            cmake_args += ['-DCMAKE_OSX_ARCHITECTURES={}'.format(osx_archs)]
+            if platform.system() == 'Darwin':
+                self.build_temp = self.build_temp + '-' + osx_archs.replace(';', '_').replace(' ', '_')
+
+
         cfg = 'Debug' if self.debug else 'Release'
         build_args = ['--config', cfg]
 
