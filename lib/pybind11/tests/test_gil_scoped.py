@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import multiprocessing
 import sys
 import threading
@@ -69,24 +71,28 @@ def test_cross_module_gil_inner_pybind11_acquired():
     m.test_cross_module_gil_inner_pybind11_acquired()
 
 
+@pytest.mark.skipif(sys.platform.startswith("emscripten"), reason="Requires threads")
 def test_cross_module_gil_nested_custom_released():
     """Makes sure that the GIL can be nested acquired/released by another module
     from a GIL-released state using custom locking logic."""
     m.test_cross_module_gil_nested_custom_released()
 
 
+@pytest.mark.skipif(sys.platform.startswith("emscripten"), reason="Requires threads")
 def test_cross_module_gil_nested_custom_acquired():
     """Makes sure that the GIL can be nested acquired/acquired by another module
     from a GIL-acquired state using custom locking logic."""
     m.test_cross_module_gil_nested_custom_acquired()
 
 
+@pytest.mark.skipif(sys.platform.startswith("emscripten"), reason="Requires threads")
 def test_cross_module_gil_nested_pybind11_released():
     """Makes sure that the GIL can be nested acquired/released by another module
     from a GIL-released state using pybind11 locking logic."""
     m.test_cross_module_gil_nested_pybind11_released()
 
 
+@pytest.mark.skipif(sys.platform.startswith("emscripten"), reason="Requires threads")
 def test_cross_module_gil_nested_pybind11_acquired():
     """Makes sure that the GIL can be nested acquired/acquired by another module
     from a GIL-acquired state using pybind11 locking logic."""
@@ -101,6 +107,7 @@ def test_nested_acquire():
     assert m.test_nested_acquire(0xAB) == "171"
 
 
+@pytest.mark.skipif(sys.platform.startswith("emscripten"), reason="Requires threads")
 def test_multi_acquire_release_cross_module():
     for bits in range(16 * 8):
         internals_ids = m.test_multi_acquire_release_cross_module(bits)
@@ -148,10 +155,7 @@ ALL_BASIC_TESTS_PLUS_INTENTIONAL_DEADLOCK = ALL_BASIC_TESTS + (_intentional_dead
 
 
 def _run_in_process(target, *args, **kwargs):
-    if len(args) == 0:
-        test_fn = target
-    else:
-        test_fn = args[0]
+    test_fn = target if len(args) == 0 else args[0]
     # Do not need to wait much, 10s should be more than enough.
     timeout = 0.1 if test_fn is _intentional_deadlock else 10
     process = multiprocessing.Process(target=target, args=args, kwargs=kwargs)
@@ -178,7 +182,8 @@ def _run_in_process(target, *args, **kwargs):
         elif test_fn is _intentional_deadlock:
             assert process.exitcode is None
             return 0
-        elif process.exitcode is None:
+
+        if process.exitcode is None:
             assert t_delta > 0.9 * timeout
             msg = "DEADLOCK, most likely, exactly what this test is meant to detect."
             if env.PYPY and env.WIN:
@@ -204,7 +209,7 @@ def _run_in_threads(test_fn, num_threads, parallel):
         thread.join()
 
 
-# TODO: FIXME, sometimes returns -11 (segfault) instead of 0 on macOS Python 3.9
+@pytest.mark.skipif(sys.platform.startswith("emscripten"), reason="Requires threads")
 @pytest.mark.parametrize("test_fn", ALL_BASIC_TESTS_PLUS_INTENTIONAL_DEADLOCK)
 def test_run_in_process_one_thread(test_fn):
     """Makes sure there is no GIL deadlock when running in a thread.
@@ -214,7 +219,7 @@ def test_run_in_process_one_thread(test_fn):
     assert _run_in_process(_run_in_threads, test_fn, num_threads=1, parallel=False) == 0
 
 
-# TODO: FIXME on macOS Python 3.9
+@pytest.mark.skipif(sys.platform.startswith("emscripten"), reason="Requires threads")
 @pytest.mark.parametrize("test_fn", ALL_BASIC_TESTS_PLUS_INTENTIONAL_DEADLOCK)
 def test_run_in_process_multiple_threads_parallel(test_fn):
     """Makes sure there is no GIL deadlock when running in a thread multiple times in parallel.
@@ -224,7 +229,7 @@ def test_run_in_process_multiple_threads_parallel(test_fn):
     assert _run_in_process(_run_in_threads, test_fn, num_threads=8, parallel=True) == 0
 
 
-# TODO: FIXME on macOS Python 3.9
+@pytest.mark.skipif(sys.platform.startswith("emscripten"), reason="Requires threads")
 @pytest.mark.parametrize("test_fn", ALL_BASIC_TESTS_PLUS_INTENTIONAL_DEADLOCK)
 def test_run_in_process_multiple_threads_sequential(test_fn):
     """Makes sure there is no GIL deadlock when running in a thread multiple times sequentially.
@@ -234,7 +239,7 @@ def test_run_in_process_multiple_threads_sequential(test_fn):
     assert _run_in_process(_run_in_threads, test_fn, num_threads=8, parallel=False) == 0
 
 
-# TODO: FIXME on macOS Python 3.9
+@pytest.mark.skipif(sys.platform.startswith("emscripten"), reason="Requires threads")
 @pytest.mark.parametrize("test_fn", ALL_BASIC_TESTS_PLUS_INTENTIONAL_DEADLOCK)
 def test_run_in_process_direct(test_fn):
     """Makes sure there is no GIL deadlock when using processes.

@@ -1,12 +1,15 @@
 #!/usr/bin/env python
 # coding: utf-8
+import os
+os.environ.setdefault("MPLBACKEND", "Agg")
 import numpy as np
 import matplotlib.pyplot as plt
 import cv2
 import pydegensac
+import sys
 from time import time
 from copy import deepcopy
-
+run_cv2 = True
 #Now helper function for running homography RANSAC
 def verify_cv2(kps1, kps2, tentatives, th = 4.0 , n_iter = 2000):
     src_pts = np.float32([ kps1[m.queryIdx].pt for m in tentatives ]).reshape(-1,2)
@@ -55,22 +58,33 @@ if __name__ == '__main__':
     th = 4.0
     n_iter = 2000
     t=time()
+    print (f"Num tentatives: {len(tentatives)}")
     print ("Running homography estimation")
-    cv2_H, cv2_mask = verify_cv2(kps1,kps2,tentatives, th, n_iter )
-    print ("OpenCV runtime {0:.5f}".format(time()-t), ' sec')
+    if run_cv2:
+        cv2_H, cv2_mask = verify_cv2(kps1,kps2,tentatives, th, n_iter )
+        print ("OpenCV runtime {0:.5f}".format(time()-t), ' sec')
     t=time()
     cmp_H, cmp_mask = verify_pydegensac(kps1,kps2,tentatives, th, n_iter)
     print ("pydegensac runtime {0:.5f}".format(time()-t), ' sec')
     print ("H = ", cmp_H)
+    pydegensac_inliers = int(deepcopy(cmp_mask).astype(np.float32).sum())
+    if pydegensac_inliers <= 20:
+        print("pydegensac inliers too low: {}".format(pydegensac_inliers))
+        sys.exit(1)
     th = 0.5
     n_iter = 50000
     print ("Running fundamental matrix estimation")
 
     t=time()
-    cv2_H, cv2_mask = verify_cv2_fundam(kps1,kps2,tentatives, th, n_iter )
-    print ("OpenCV runtime {0:.5f}".format(time()-t), ' sec')
+    if run_cv2:
+        cv2_F, cv2_mask = verify_cv2_fundam(kps1,kps2,tentatives, th, n_iter )
+        print ("OpenCV runtime {0:.5f}".format(time()-t), ' sec')
 
     t=time()
-    cmp_H, cmp_mask = verify_pydegensac_fundam(kps1,kps2,tentatives, th, n_iter)
+    cmp_F, cmp_mask = verify_pydegensac_fundam(kps1,kps2,tentatives, th, n_iter)
     print ("pydegensac {0:.5f}".format(time()-t), ' sec')
-    print ("F = ", cmp_H)
+    print ("F = ", cmp_F)
+    pydegensac_inliers = int(deepcopy(cmp_mask).astype(np.float32).sum())
+    if pydegensac_inliers <= 20:
+        print("pydegensac inliers too low: {}".format(pydegensac_inliers))
+        sys.exit(1)
