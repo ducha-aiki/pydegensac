@@ -16,8 +16,8 @@ enum RANSAC_error_t_h {SAMPSON = 0,
 enum RANSAC_error_t_f {SAMPSON_F = 0,
     SYMM_EPI_F = 1};
 
-py::tuple findHomography_(py::array_t<double>  x1y1_,
-                          py::array_t<double>   x2y2_,
+py::tuple findHomography_(py::array_t<double, py::array::c_style | py::array::forcecast>  x1y1_,
+                          py::array_t<double, py::array::c_style | py::array::forcecast>   x2y2_,
                           double px_th,
                           double conf,
                           int max_iters,
@@ -251,8 +251,8 @@ py::tuple findHomography_(py::array_t<double>  x1y1_,
     return py::make_tuple(H_out, inliers_out);
 }
 
-py::tuple findFundamentalMatrix_(py::array_t<double>  x1y1_,
-                                 py::array_t<double>   x2y2_,
+py::tuple findFundamentalMatrix_(py::array_t<double, py::array::c_style | py::array::forcecast>  x1y1_,
+                                 py::array_t<double, py::array::c_style | py::array::forcecast>   x2y2_,
                                  double px_th,
                                  double conf,
                                  int max_iters,
