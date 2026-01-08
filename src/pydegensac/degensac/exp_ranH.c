@@ -500,9 +500,9 @@ Score exp_ransacHcustomLAF (double *u, double *u_1, double *u_2,
     h = sol;
     //
     if (seed >= 0) {
-        rng_seed((unsigned)seed);
+        srand((unsigned)seed);
     } else {
-        rng_seed(time(NULL)); //Mishkin - randomization
+        srand(time(NULL)); //Mishkin - randomization
     }
 
 #ifdef __HASHING__
@@ -532,7 +532,7 @@ Score exp_ransacHcustomLAF (double *u, double *u_1, double *u_2,
 
 
     no_sam = 0;
-    rand_seed = rng_next();
+    rand_seed = rand();
 
     samidx = pool + len - 4;
 
@@ -543,9 +543,9 @@ Score exp_ransacHcustomLAF (double *u, double *u_1, double *u_2,
     while(no_sam < max_sam)
     {
         no_sam++;
-        rng_seed(rand_seed);
+        srand(rand_seed);
         multirsampleT(Z, 9, 2, pool, 4, len, M);
-        rand_seed = rng_next();
+        rand_seed = rand();
 
         /* orientation */
 #ifndef __OC_OFF__

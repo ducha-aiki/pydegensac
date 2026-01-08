@@ -14,14 +14,6 @@
 
 #define RESIDS_M (2 + RAN_REP*(1+ILSQ_ITERS+1))
 
-#ifdef _WIN32
-#define rng_seed(seed) srand((unsigned)(seed))
-#define rng_next() rand()
-#else
-#define rng_seed(seed) srandom((unsigned)(seed))
-#define rng_next() random()
-#endif
-
 /* RANSAC Scoring */
 typedef struct
 {

@@ -4,12 +4,16 @@
 
 #include "rtools.h"
 
+#ifdef WIN32
+#define random rand
+#endif
+
 /* inline int sample (int *pool, int max_sz, int i) */
 int sample (int *pool, int max_sz, int i)
 {
   int j,q,s;
 
-  s = rng_next() % (max_sz - i);
+  s = random() % (max_sz - i);
   j = max_sz - i - 1;
   q = pool[s];
   pool[s] = pool[j];
@@ -24,7 +28,7 @@ int * randsubset (int * pool, int max_sz, int siz)
 
   for (i = 0; i < siz; i++)
     {
-      s = rng_next() % (max_sz - i);
+      s = random() % (max_sz - i);
       j = max_sz - i - 1;
       q = pool[s];
       pool[s] = pool[j];

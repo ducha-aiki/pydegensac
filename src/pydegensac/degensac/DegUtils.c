@@ -344,7 +344,7 @@ unsigned rFtH(double * u, unsigned char * hinl, double th, double * H, unsigned 
     } else {
       for(no_sam = 1; no_sam < 2*max_sam; ++no_sam) {
           for (pos = 0; pos < s_size; ++pos) {
-              idx = pos + 1 + rng_next()%(nhinlCount-pos-1);
+              idx = pos + 1 + rand()%(nhinlCount-pos-1);
               auxI = ptr[pos];
               ptr[pos] = ptr[idx];
               ptr[idx] = auxI;
@@ -607,13 +607,13 @@ void dual_sample(double * uA, unsigned lenA, unsigned sA, double * uB, unsigned 
 
   /*Shuffle pointers - at least the first 's̈́'*/
   for (pos = 0; pos < sA; ++pos) {
-      idx = rng_next() % lenA;
+      idx = rand() % lenA;
       i = ptrA[pos];
       ptrA[pos] = ptrA[idx];
       ptrA[idx] = i;
     }
   for (pos = 0; pos < sB; ++pos) {
-      idx = rng_next() % lenB;
+      idx = rand() % lenB;
       i = ptrB[pos];
       ptrB[pos] = ptrB[idx];
       ptrB[idx] = i;
@@ -739,5 +739,4 @@ void transformInliers(int * inl, int * inl2, unsigned inlCount, unsigned len) {
       inl2[inl[i]] = 1;
     }
 }
-
 
