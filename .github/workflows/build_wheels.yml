@@ -43,6 +43,7 @@ jobs:
   
   build_wheels_mac:
     name: Build wheels on mac
+    needs: build_wheels_linux
     runs-on: macOS-latest
 
     steps:
@@ -74,6 +75,7 @@ jobs:
 
   build_wheels_windows:
     name: Build wheels on windows
+    needs: build_wheels_linux
     runs-on: windows-latest
     permissions:
       contents: write

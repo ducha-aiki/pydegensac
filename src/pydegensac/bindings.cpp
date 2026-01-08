@@ -65,6 +65,9 @@ py::tuple findHomography_(py::array_t<double>  x1y1_,
     const double SYM_CHECK_COEF = 3.0*sym_check_enable;
     switch (error_type)   {
     case SAMPSON:   {
+        HDS1 = &HDs;
+        HDSi1 = &HDsi;
+        HDSidx1 = &HDsidx;
         error_threshold = px_th*px_th;
         SymCheck_th = px_th * SYM_CHECK_COEF;
         break;
@@ -295,6 +298,9 @@ py::tuple findFundamentalMatrix_(py::array_t<double>  x1y1_,
     const double SYM_CHECK_COEF = 3.0*sym_check_enable;
     switch (error_type)   {
     case SAMPSON_F:   {
+        FDS1 = &FDs;
+        EXFDS1 = &exFDs;
+        FDSidx1 = &FDsidx;
         error_threshold = px_th*px_th;
         SymCheck_th = px_th*px_th * SYM_CHECK_COEF;
         break;
