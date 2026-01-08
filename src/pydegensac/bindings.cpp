@@ -252,7 +252,7 @@ py::tuple findHomography_(py::array_t<double>  x1y1_,
 }
 
 py::tuple findFundamentalMatrix_(py::array_t<double>  x1y1_,
-                                 py::array_t<double>   x2y2_,
+                                 py::array_t<double>  x2y2_,
                                  double px_th,
                                  double conf,
                                  int max_iters,
