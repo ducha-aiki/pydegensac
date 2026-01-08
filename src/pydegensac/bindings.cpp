@@ -16,15 +16,14 @@ enum RANSAC_error_t_h {SAMPSON = 0,
 enum RANSAC_error_t_f {SAMPSON_F = 0,
     SYMM_EPI_F = 1};
 
-py::tuple findHomography_(py::array_t<double, py::array::c_style | py::array::forcecast>  x1y1_,
-                          py::array_t<double, py::array::c_style | py::array::forcecast>   x2y2_,
+py::tuple findHomography_(py::array_t<double>  x1y1_,
+                          py::array_t<double>   x2y2_,
                           double px_th,
                           double conf,
                           int max_iters,
                           int error_type,
                           bool sym_check_enable,
-                          double laf_coef,
-                          int seed) {
+                          double laf_coef) {
     // Get the data
     py::buffer_info buf1 = x1y1_.request();
     size_t NUM_TENTS = buf1.shape[0];
@@ -58,14 +57,12 @@ py::tuple findHomography_(py::array_t<double, py::array::c_style | py::array::fo
     // Convert the data
 
     int oriented_constr = 1;
-    HDsPtr HDS1 = &HDs;
-    HDsiPtr HDSi1 = &HDsi;
-    HDsidxPtr HDSidx1 = &HDsidx;
+    HDsPtr HDS1;
+    HDsiPtr HDSi1;
+    HDsidxPtr HDSidx1;
 
-    double error_threshold = px_th*px_th;
-    double SymCheck_th = 0.0;
+    double error_threshold, SymCheck_th;
     const double SYM_CHECK_COEF = 3.0*sym_check_enable;
-    SymCheck_th = px_th * SYM_CHECK_COEF;
     switch (error_type)   {
     case SAMPSON:   {
         error_threshold = px_th*px_th;
@@ -219,8 +216,7 @@ py::tuple findHomography_(py::array_t<double, py::array::c_style | py::array::fo
                          0,
                          &resids,
                          HDS1,HDSi1,HDSidx1,
-                         SymCheck_th,
-                         seed);
+                         SymCheck_th);
 
 
 
@@ -251,16 +247,15 @@ py::tuple findHomography_(py::array_t<double, py::array::c_style | py::array::fo
     return py::make_tuple(H_out, inliers_out);
 }
 
-py::tuple findFundamentalMatrix_(py::array_t<double, py::array::c_style | py::array::forcecast>  x1y1_,
-                                 py::array_t<double, py::array::c_style | py::array::forcecast>   x2y2_,
+py::tuple findFundamentalMatrix_(py::array_t<double>  x1y1_,
+                                 py::array_t<double>   x2y2_,
                                  double px_th,
                                  double conf,
                                  int max_iters,
                                  int error_type,
                                  bool sym_check_enable,
                                  double laf_coef,
-                                 bool enable_degeneracy_check,
-                                 int seed) {
+                                 bool enable_degeneracy_check) {
     // Get the data
     py::buffer_info buf1 = x1y1_.request();
     size_t NUM_TENTS = buf1.shape[0];
@@ -292,14 +287,12 @@ py::tuple findFundamentalMatrix_(py::array_t<double, py::array::c_style | py::ar
     x2y2.assign(ptr1a, ptr1a + buf1a.size);
 
     // Convert the data
-    FDsPtr FDS1 = &FDs;
-    exFDsPtr EXFDS1 = &exFDs;
-    FDsidxPtr FDSidx1 = &FDsidx;
+    FDsPtr FDS1;
+    exFDsPtr EXFDS1;
+    FDsidxPtr FDSidx1;
 
-    double error_threshold = px_th*px_th;
-    double SymCheck_th = 0.0;
+    double error_threshold, SymCheck_th;
     const double SYM_CHECK_COEF = 3.0*sym_check_enable;
-    SymCheck_th = px_th*px_th * SYM_CHECK_COEF;
     switch (error_type)   {
     case SAMPSON_F:   {
         error_threshold = px_th*px_th;
@@ -432,8 +425,7 @@ py::tuple findFundamentalMatrix_(py::array_t<double, py::array::c_style | py::ar
                          HinF,Ihptr,
                          EXFDS1,FDS1,FDSidx1,
                          SymCheck_th,
-                         (int)enable_degeneracy_check,
-                         seed);
+                         (int)enable_degeneracy_check);
 
 
     // Convert and store output
@@ -490,8 +482,7 @@ PYBIND11_PLUGIN(pydegensac) {
             py::arg("max_iters") = 10000,
             py::arg("error_type") = 0,
             py::arg("sym_check_enable") = 1,
-            py::arg("laf_coef") = 0,
-            py::arg("seed") = -1);
+            py::arg("laf_coef") = 0);
 
     m.def("findFundamentalMatrix_", &findFundamentalMatrix_, R"doc(some doc)doc",
           py::arg("x1y1"),
@@ -502,8 +493,7 @@ PYBIND11_PLUGIN(pydegensac) {
           py::arg("error_type") = 0,
           py::arg("sym_check_enable") = 1,
           py::arg("laf_coef") = 0,
-          py::arg("enable_degeneracy_check") = 1,
-          py::arg("seed") = -1);
+          py::arg("enable_degeneracy_check") = 1);
 
     return m.ptr();
 }

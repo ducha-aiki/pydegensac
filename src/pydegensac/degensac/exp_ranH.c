@@ -472,8 +472,7 @@ Score exp_ransacHcustomLAF (double *u, double *u_1, double *u_2,
                             HDsPtr HDS1,
                             HDsiPtr HDSi1,
                             HDsidxPtr HDSidx1,
-                            double SymCheck_th,
-                            int seed)
+                            double SymCheck_th)
 {
     int *pool, no_sam, new_sam, *samidx, bestsamidx[4];
     double *Z, *buffer;
@@ -499,11 +498,7 @@ Score exp_ransacHcustomLAF (double *u, double *u_1, double *u_2,
     }
     h = sol;
     //
-    if (seed >= 0) {
-        srand((unsigned)seed);
-    } else {
-        srand(time(NULL)); //Mishkin - randomization
-    }
+    srand(time(NULL)); //Mishkin - randomization
 
 #ifdef __HASHING__
     htInit(&HASH_TABLE);

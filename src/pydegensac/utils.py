@@ -78,8 +78,7 @@ def findHomography(pts1_,
                    max_iters = 50000,
                    laf_consistensy_coef = -1.0,
                    error_type = "sampson",
-                   symmetric_error_check = True,
-                   seed = -1):
+                   symmetric_error_check = True):
     pts1 = convert_and_check(pts1_)
     pts2 = convert_and_check(pts2_)
     n, dim = pts1.shape
@@ -101,8 +100,7 @@ def findHomography(pts1_,
                              max_iters,
                              error_type_int,
                              symmetric_error_check,
-                             laf_consistensy_coef,
-                             seed);
+                             laf_consistensy_coef);
     if np.abs(H).sum() == 0:
         # If we haven`t found any good model, output zeros
         mask = [False]*len(mask)
@@ -118,8 +116,7 @@ def findFundamentalMatrix(pts1_,
                    laf_consistensy_coef = -1.0,
                    error_type = "sampson",
                    symmetric_error_check = True,
-                   enable_degeneracy_check = True,
-                   seed = -1):
+                   enable_degeneracy_check = True):
     pts1 = convert_and_check(pts1_)
     pts2 = convert_and_check(pts2_)
     n, dim = pts1.shape
@@ -142,8 +139,7 @@ def findFundamentalMatrix(pts1_,
                          error_type_int,
                          symmetric_error_check,
                          laf_consistensy_coef,
-                         enable_degeneracy_check,
-                         seed);
+                         enable_degeneracy_check);
     if np.abs(F).sum() == 0:
         # If we haven`t found any good model, output zeros
         mask = [False]*n
