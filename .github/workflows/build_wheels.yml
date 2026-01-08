@@ -62,10 +62,9 @@ jobs:
         env:
           CIBW_BEFORE_ALL_MACOS: brew install openblas lapack
           CIBW_BUILD: cp38-macosx_x86_64 cp39-macosx_x86_64 cp39-macosx_arm64 cp310-macosx_x86_64 cp310-macosx_arm64 cp311-macosx_x86_64 cp311-macosx_arm64 cp312-macosx_x86_64 cp312-macosx_arm64 cp313-macosx_x86_64 cp313-macosx_arm64 cp314-macosx_x86_64 cp314-macosx_arm64
-          env:
-            CIBW_ARCHS_MACOS: "x86_64 arm64"
-            CIBW_ENVIRONMENT_MACOS: >
-              CMAKE_OSX_ARCHITECTURES="$(echo $_PYTHON_HOST_PLATFORM | awk -F- '{print $NF}')"
+          CIBW_ARCHS_MACOS: "x86_64 arm64"
+          CIBW_ENVIRONMENT_MACOS: >
+            CMAKE_OSX_ARCHITECTURES="$(echo $_PYTHON_HOST_PLATFORM | awk -F- '{print $NF}')"
           CIBW_REPAIR_WHEEL_COMMAND_MACOS: ""
           CIBW_TEST_COMMAND: >-
             python -c "import os, runpy; os.chdir(r'{project}/examples'); runpy.run_path('simple-example.py', run_name='__main__')"
