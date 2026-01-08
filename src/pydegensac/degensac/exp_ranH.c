@@ -15,6 +15,15 @@
 #define __HASHING__
 //#define __FINAL_LSQ__
 
+#define min(a,b) \
+    ({ __typeof__ (a) _a = (a); \
+    __typeof__ (b) _b = (b); \
+    _a < _b ? _a : _b; })
+
+#define max(a,b) \
+    ({ __typeof__ (a) _a = (a); \
+    __typeof__ (b) _b = (b); \
+    _a > _b ? _a : _b; })
 //#define FULL_SYMM
 
 int HcloseToSingular(const double *h){
@@ -482,14 +491,14 @@ Score exp_ransacHcustomLAF (double *u, double *u_1, double *u_2,
     int i, j, *inliers, *inliersS;
     char do_update = 0;
     Score maxS = {0,0,0,0}, maxSs = {0,0,0,0}, S = {0,0,0,0}, Scheck= {0,0,0,0};
-    unsigned rand_seed;
+    unsigned seed;
     int do_iterate;
     int iter_cnt = 0, no_rej = 0, iterID = 0;
     char new_max = 0;
     const int doSymCheck = SymCheck_th > 0;
     const int DO_LAF_CHECK =  laf_coef > 0;
     const double th_laf_check = laf_coef * th;
-    unsigned p1_inliers = 0;
+    int p1_inliers = 0;
     // int rr;
     int nullspace_buff[2*9], nullsize;
 
@@ -527,7 +536,7 @@ Score exp_ransacHcustomLAF (double *u, double *u_1, double *u_2,
 
 
     no_sam = 0;
-    rand_seed = rand();
+    seed = rand();
 
     samidx = pool + len - 4;
 
@@ -538,9 +547,9 @@ Score exp_ransacHcustomLAF (double *u, double *u_1, double *u_2,
     while(no_sam < max_sam)
     {
         no_sam++;
-        srand(rand_seed);
+        srand(seed);
         multirsampleT(Z, 9, 2, pool, 4, len, M);
-        rand_seed = rand();
+        seed = rand();
 
         /* orientation */
 #ifndef __OC_OFF__
@@ -603,7 +612,7 @@ Score exp_ransacHcustomLAF (double *u, double *u_1, double *u_2,
                 for (j = 0; j < Scheck.I; j++)
                     if (d_check[j] <= th_laf_check) S.Ilafs++;
 
-                S.Ilafs = dmin(S.Ilafs, p1_inliers);
+                S.Ilafs = min(S.Ilafs, p1_inliers);
                 if (S.Ilafs < maxS.Ilafs)
                     continue;
 
@@ -720,7 +729,7 @@ Score exp_ransacHcustomLAF (double *u, double *u_1, double *u_2,
                     for (j = 0; j < Scheck.I; j++)
                         if (d_check[j] <= th_laf_check) S.Ilafs++;
 
-                    S.Ilafs = dmin(S.Ilafs, p1_inliers);
+                    S.Ilafs = min(S.Ilafs, p1_inliers);
                     if (S.Ilafs < maxS.Ilafs)
                         do_update = 0; //skip if first is not good
 
@@ -836,7 +845,7 @@ Score exp_ransacHcustomLAF (double *u, double *u_1, double *u_2,
                 for (j = 0; j < Scheck.I; j++)
                     if (d_check[j] <= th_laf_check) S.Ilafs++;
 
-                S.Ilafs = dmin(S.Ilafs, p1_inliers);
+                S.Ilafs = min(S.Ilafs, p1_inliers);
                 if (S.Ilafs < maxS.Ilafs)
                     do_update = 0; //skip if first is not good
             }
@@ -968,3 +977,4 @@ void hMCEscustom(double *Z, double *u, double *d, int *samidx, int len, double *
         d[i] /= 4;
     }
 }
+

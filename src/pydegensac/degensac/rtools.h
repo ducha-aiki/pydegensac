@@ -80,3 +80,4 @@ int scoreLess(const Score s1, const Score s2);
 void loadSample(double * u, int * samidx, unsigned sample_size, unsigned data_size, double * u_out);
 
 #endif /* __RTOOLS_H__ */
+

@@ -33,6 +33,16 @@
 }
 #endif /*__linux__*/
 
+#define min(a,b) \
+    ({ __typeof__ (a) _a = (a); \
+    __typeof__ (b) _b = (b); \
+    _a < _b ? _a : _b; })
+
+#define max(a,b) \
+    ({ __typeof__ (a) _a = (a); \
+    __typeof__ (b) _b = (b); \
+    _a > _b ? _a : _b; })
+
 int no_mto(double *A)
 {
     double x,y;
@@ -1231,12 +1241,11 @@ int exp_ransacFcustom(double *u, int len, double th, double conf, int max_sam,
     return maxS.I;
 };
 
-int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2, int len, double th, double laf_coef,
+int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2,int len, double th,  double laf_coef,
                          double conf, int max_sam,
                          double *F, unsigned char * inl,
                          int * data_out, int do_lo, unsigned inlLimit, double **resids, double* H_best,
-                         int* Ih, exFDsPtr EXFDS1, FDsPtr FDS1, FDsidxPtr FDS1idx, double SymCheck_th,
-                         int enable_degen_check) {
+                         int* Ih, exFDsPtr EXFDS1, FDsPtr FDS1, FDsidxPtr FDS1idx, double SymCheck_th, int enable_degen_check) {
     unsigned seed;
 
     int *pool, no_sam, new_sam;  double *Z, *buffer, u7[6*7], H[3*3], FBest[3*3];
@@ -1261,7 +1270,7 @@ int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2, int len, double th
     const int doSymCheck = SymCheck_th > 0;
     const int DO_LAF_CHECK =  laf_coef > 0;
     const double th_laf_check = laf_coef * th;
-    unsigned p1_inliers = 0;
+    int p1_inliers = 0;
     double *err_laf;
     int a;
 
@@ -1397,7 +1406,7 @@ int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2, int len, double th
                     for (j = 0; j < S.I; j++)
                         if (err_laf[inliers[j]] <= th_laf_check)  S.Ilafs++;
 
-                    S.Ilafs = dmin(S.Ilafs, p1_inliers);
+                    S.Ilafs = min(S.Ilafs, p1_inliers);
                     if (S.Ilafs < maxS.Ilafs)
                         continue; //skip if first is not good
                 }
@@ -1540,7 +1549,7 @@ int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2, int len, double th
                     for (j = 0; j < S.I; j++)
                         if (err_laf[inliers[j]] <= th_laf_check)  S.Ilafs++;
 
-                    S.Ilafs = dmin(S.Ilafs, p1_inliers);
+                    S.Ilafs = min(S.Ilafs, p1_inliers);
                     if (S.Ilafs < maxS.Ilafs)
                         do_update = 0; //skip if first is not good
                 }
@@ -1668,7 +1677,7 @@ int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2, int len, double th
                     for (j = 0; j < S.I; j++)
                         if (err_laf[inliers[j]] <= th_laf_check)  S.Ilafs++;
 
-                    S.Ilafs = dmin(S.Ilafs, p1_inliers);
+                    S.Ilafs = min(S.Ilafs, p1_inliers);
                     if (S.Ilafs < maxS.Ilafs)
                         do_update = 0; //skip if first is not good
                 }
@@ -1756,3 +1765,4 @@ int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2, int len, double th
     return maxS.I;
 
 }
+

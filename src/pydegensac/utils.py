@@ -144,3 +144,4 @@ def findFundamentalMatrix(pts1_,
         # If we haven`t found any good model, output zeros
         mask = [False]*n
     return F, mask
+

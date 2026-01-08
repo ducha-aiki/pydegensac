@@ -312,3 +312,4 @@ void ransacFsimple (double *u, int len, double th, double *F) {
 	/* default settings, LO turned on with default inlier limit, only F returned */
 	ransacF (u, len, th, CONFIDENCE, MAX_SAMPLES, F, 0, data_out, 1, INL_LIMIT_F);
 }
+

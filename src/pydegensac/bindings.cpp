@@ -301,6 +301,7 @@ py::tuple findFundamentalMatrix_(py::array_t<double>  x1y1_,
         FDS1 = &FDs;
         EXFDS1 = &exFDs;
         FDSidx1 = &FDsidx;
+
         error_threshold = px_th*px_th;
         SymCheck_th = px_th*px_th * SYM_CHECK_COEF;
         break;

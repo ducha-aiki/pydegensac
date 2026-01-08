@@ -371,3 +371,4 @@ void ransacHsimple (double *u, int len, double th, double *H) {
 	/* default settings, LO turned on with default inlier limit, only H returned */
 	ransacH (u, len, th, CONFIDENCE, MAX_SAMPLES, H, 0, 0, 1, INL_LIMIT_H);
 }
+
