@@ -305,18 +305,18 @@ int exp_ransacF(double *u, int len, double th, double conf, int max_sam,
     f1 = sol;
     f2 = sol+9;
 
-    seed = rand();
+    seed = rng_next();
 
     /*  srand(RAND_SEED++); */
     while(no_sam < max_sam) {
         no_sam ++;
 
-        srand(seed);
+        rng_seed(seed);
 
         rsampleT(Z, 9, pool, 7, len, A);
         loadSample(u, samidx, 7, 6, u7);
 
-        seed = rand();
+        seed = rng_next();
         ////printf("Seed: %d\n",seed);
 
 
@@ -826,7 +826,7 @@ int exp_ransacFcustom(double *u, int len, double th, double conf, int max_sam,
     int a; //Mishkin, counter;
     double SymCheck_th =  CHECK_COEF*th;
 
-    srand(time(NULL)); //Mishkin - randomization
+    rng_seed(time(NULL)); //Mishkin - randomization
 
 #ifdef USE_QR
     double A[7*9], sol[2*9];
@@ -878,18 +878,18 @@ int exp_ransacFcustom(double *u, int len, double th, double conf, int max_sam,
     f1 = sol;
     f2 = sol+9;
 
-    seed = rand();
+    seed = rng_next();
 
     /*  srand(RAND_SEED++); */
     while(no_sam < max_sam) {
         no_sam ++;
 
-        srand(seed);
+        rng_seed(seed);
 
         rsampleT(Z, 9, pool, 7, len, A);
         loadSample(u, samidx, 7, 6, u7);
 
-        seed = rand();
+        seed = rng_next();
         ////printf("Seed: %d\n",seed);
 
 
@@ -1266,9 +1266,9 @@ int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2, int len, double th
     int a;
 
     if (seed >= 0) {
-        srand((unsigned)seed);
+        rng_seed((unsigned)seed);
     } else {
-        srand(time(NULL)); //Mishkin - randomization
+        rng_seed(time(NULL)); //Mishkin - randomization
     }
 
 #ifdef USE_QR
@@ -1323,18 +1323,18 @@ int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2, int len, double th
     f1 = sol;
     f2 = sol+9;
 
-    rand_seed = rand();
+    rand_seed = rng_next();
 
     /*  srand(RAND_SEED++); */
     while(no_sam < max_sam) {
         no_sam ++;
 
-        srand(rand_seed);
+        rng_seed(rand_seed);
 
         rsampleT(Z, 9, pool, 7, len, A);
         loadSample(u, samidx, 7, 6, u7);
 
-        rand_seed = rand();
+        rand_seed = rng_next();
         ////printf("Seed: %d\n",seed);
 
 

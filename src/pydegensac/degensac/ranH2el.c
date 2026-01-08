@@ -65,19 +65,19 @@ Score ransacH2el (double *u10, int len, double th, double conf, int max_sam,
 	inliers = (int *) malloc(len * sizeof(int));
 
 	no_sam = 0;
-	seed = rand();
+	seed = rng_next();
 
 	/* main RANSAC loop */
 	while(no_sam < max_sam) {
 		no_sam ++;
 		new_max = 0; do_iterate = 0;
 
-		srand(seed);
+		rng_seed(seed);
 
 		/* random minimal sample */
 		randsubset(pool, len, 2);
 		
-		seed = rand();
+		seed = rng_next();
 
 		/* model */
 		getTransf(u10 + 10*samidx[0], N1, D1);
@@ -540,7 +540,6 @@ Score inHraniEl (double * u10, double *u6, int len, int *inliers, int ninl, doub
 	free(intbuff);
 	return maxS;
 }
-
 
 
 

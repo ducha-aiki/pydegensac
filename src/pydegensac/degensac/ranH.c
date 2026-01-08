@@ -179,19 +179,19 @@ Score ransacH (double *u, int len, double th, double conf, int max_sam,
 	inliers_sym = (int *) malloc(len * sizeof(int));
 
 	no_sam = 0;
-	seed = rand();
+	seed = rng_next();
 
 	/* main RANSAC loop */
 	while(no_sam < max_sam) {
 		no_sam ++;
 		new_max = 0; do_iterate = 0;
 
-		srand(seed); /* to keep the same samples regardless any random sampling in the LO */
+		rng_seed(seed); /* to keep the same samples regardless any random sampling in the LO */
 
 		/* random minimal sample */
 		multirsampleT(Z, 9, 2, pool, 4, len, M); /* nullspace function expects M row-wise, thus 'T' */
 
-		seed = rand();
+		seed = rng_next();
 
 		/* orientation check */
 		if (!all_Hori_valid (u, samidx)) {
@@ -371,4 +371,3 @@ void ransacHsimple (double *u, int len, double th, double *H) {
 	/* default settings, LO turned on with default inlier limit, only H returned */
 	ransacH (u, len, th, CONFIDENCE, MAX_SAMPLES, H, 0, 0, 1, INL_LIMIT_H);
 }
-

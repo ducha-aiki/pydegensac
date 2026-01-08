@@ -14,6 +14,14 @@
 
 #define RESIDS_M (2 + RAN_REP*(1+ILSQ_ITERS+1))
 
+#ifdef _WIN32
+#define rng_seed(seed) srand((unsigned)(seed))
+#define rng_next() rand()
+#else
+#define rng_seed(seed) srandom((unsigned)(seed))
+#define rng_next() random()
+#endif
+
 /* RANSAC Scoring */
 typedef struct
 {
@@ -80,4 +88,3 @@ int scoreLess(const Score s1, const Score s2);
 void loadSample(double * u, int * samidx, unsigned sample_size, unsigned data_size, double * u_out);
 
 #endif /* __RTOOLS_H__ */
-

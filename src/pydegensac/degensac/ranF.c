@@ -163,19 +163,19 @@ Score ransacF (double *u, int len, double th, double conf, int max_sam,
 	inliers = (int *) malloc(len * sizeof(int));
 
 	no_sam = 0;
-	seed = rand();
+	seed = rng_next();
 
 	/* main RANSAC loop */
 	while(no_sam < max_sam) {
 		no_sam ++;
 		new_max = 0; do_iterate = 0;
 
-		srand(seed); /* to keep the same samples regardless any random sampling in the LO */
+		rng_seed(seed); /* to keep the same samples regardless any random sampling in the LO */
 
 		/* random minimal sample */
 		rsampleT(Z, 9, pool, 7, len, A);
 
-		seed = rand();
+		seed = rng_next();
 
 		/* use LU */
 		for (i = 7*9; i < 9*9; ++i) { /* Fill with zeros to square */
@@ -312,4 +312,3 @@ void ransacFsimple (double *u, int len, double th, double *F) {
 	/* default settings, LO turned on with default inlier limit, only F returned */
 	ransacF (u, len, th, CONFIDENCE, MAX_SAMPLES, F, 0, data_out, 1, INL_LIMIT_F);
 }
-
