@@ -1,6 +1,5 @@
 #include "hash.h"
 
-HashTable HASH_TABLE;
 //#include <mex.h>
 
 uint32_t SuperFastHash (const char * data, int len) {

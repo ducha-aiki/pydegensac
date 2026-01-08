@@ -6,6 +6,9 @@
 #include "exp_ranF.h"
 #include "DegUtils.h"
 #include "hash.h"
+
+static HashTable HASH_TABLE_F;
+
 #include "Ftools.h"
 #include "rtools.h"
 #include "utools.h"
@@ -108,7 +111,7 @@ Score exp_iterF(double *u, int len, int *inliers, int * inl2, double th, double 
 
 #ifdef __HASHING__
         hash = SuperFastHash((const char *)inliers, S.I * sizeof(*inliers));
-        iterIDret = htContains(&HASH_TABLE, hash, S.I, iterID);
+        iterIDret = htContains(&HASH_TABLE_F, hash, S.I, iterID);
         if (iterIDret != -1 && iterIDret != iterID) {
             S.I = 0;
             S.J = 0;
@@ -116,7 +119,7 @@ Score exp_iterF(double *u, int len, int *inliers, int * inl2, double th, double 
             return S;
         }
         if (iterIDret == -1) {
-            htInsert(&HASH_TABLE, hash, S.I, iterID);
+            htInsert(&HASH_TABLE_F, hash, S.I, iterID);
         }
 #endif //__HASHING__
 
@@ -276,7 +279,7 @@ int exp_ransacF(double *u, int len, double th, double conf, int max_sam,
 #endif
 
 #ifdef __HASHING__
-    htInit(&HASH_TABLE);
+    htInit(&HASH_TABLE_F);
 #endif // __HASHING__
 
     ////printf("__PROFILE: BEFORE ransac: %d\n", getticks()/1000);
@@ -594,7 +597,7 @@ int exp_ransacF(double *u, int len, double th, double conf, int max_sam,
     /* deallocations */
 
 #ifdef __HASHING__
-    htClear(&HASH_TABLE);
+    htClear(&HASH_TABLE_F);
 #endif // __HASHING__
 
     free(pool);
@@ -671,7 +674,7 @@ Score exp_iterFcustom(double *u, int len, int *inliers, int * inl2, double th, d
 
 #ifdef __HASHING__
         hash = SuperFastHash((const char *)inliers, S.I * sizeof(*inliers));
-        iterIDret = htContains(&HASH_TABLE, hash, S.I, iterID);
+        iterIDret = htContains(&HASH_TABLE_F, hash, S.I, iterID);
         if (iterIDret != -1 && iterIDret != iterID) {
             S.I = 0;
             S.J = 0;
@@ -679,7 +682,7 @@ Score exp_iterFcustom(double *u, int len, int *inliers, int * inl2, double th, d
             return S;
         }
         if (iterIDret == -1) {
-            htInsert(&HASH_TABLE, hash, S.I, iterID);
+            htInsert(&HASH_TABLE_F, hash, S.I, iterID);
         }
 #endif //__HASHING__
 
@@ -848,7 +851,7 @@ int exp_ransacFcustom(double *u, int len, double th, double conf, int max_sam,
 #endif
 
 #ifdef __HASHING__
-    htInit(&HASH_TABLE);
+    htInit(&HASH_TABLE_F);
 #endif // __HASHING__
 
     ////printf("__PROFILE: BEFORE ransac: %d\n", getticks()/1000);
@@ -1218,7 +1221,7 @@ int exp_ransacFcustom(double *u, int len, double th, double conf, int max_sam,
     /* deallocations */
 
 #ifdef __HASHING__
-    htClear(&HASH_TABLE);
+    htClear(&HASH_TABLE_F);
 #endif // __HASHING__
     free(d_check);
     free(pool);
@@ -1291,7 +1294,7 @@ int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2, int len, double th
 #endif
 
 #ifdef __HASHING__
-    htInit(&HASH_TABLE);
+    htInit(&HASH_TABLE_F);
 #endif // __HASHING__
 
     ////printf("__PROFILE: BEFORE ransac: %d\n", getticks()/1000);
@@ -1746,7 +1749,7 @@ int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2, int len, double th
     /* deallocations */
 
 #ifdef __HASHING__
-    htClear(&HASH_TABLE);
+    htClear(&HASH_TABLE_F);
 #endif // __HASHING__
     free(d_check);
     free(err_laf);

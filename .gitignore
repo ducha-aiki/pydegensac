@@ -10,6 +10,7 @@ __pycache__
 
 # VS Code
 .vscode
+.DS_Store
 
 # Prerequisites
 *.d

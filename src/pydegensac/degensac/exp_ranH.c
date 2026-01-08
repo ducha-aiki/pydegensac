@@ -11,6 +11,9 @@
 #include "hash.h"
 
 
+static HashTable HASH_TABLE_H;
+
+
 #include "exp_ranH.h"
 #define __HASHING__
 //#define __FINAL_LSQ__
@@ -101,14 +104,14 @@ Score exp_iterH(double *u, int len, int *inliers, double th, double ths,
         Ss = inlidxs(d, len, th, inliers);
 #ifdef __HASHING__
         hash = SuperFastHash((const char *)inliers, Ss.I * sizeof(*inliers));
-        iterIDret = htContains(&HASH_TABLE, hash, Ss.I, iterID);
+        iterIDret = htContains(&HASH_TABLE_H, hash, Ss.I, iterID);
         if (iterIDret != -1 && iterIDret != iterID) {
             S.I = 0;
             S.J = 0;
             return S;
         }
         if (iterIDret == -1) {
-            htInsert(&HASH_TABLE, hash, Ss.I, iterID);
+            htInsert(&HASH_TABLE_H, hash, Ss.I, iterID);
         }
 #endif //__HASHING__
         S = inlidxs (d, len, ths*MWM, inliers);
@@ -343,14 +346,14 @@ Score exp_iterHcustom(double *u, int len, int *inliers, double th, double ths,
         Ss = inlidxs(d, len, th, inliers);
 #ifdef __HASHING__
         hash = SuperFastHash((const char *)inliers, Ss.I * sizeof(*inliers));
-        iterIDret = htContains(&HASH_TABLE, hash, Ss.I, iterID);
+        iterIDret = htContains(&HASH_TABLE_H, hash, Ss.I, iterID);
         if (iterIDret != -1 && iterIDret != iterID) {
             S.I = 0;
             S.J = 0;
             return S;
         }
         if (iterIDret == -1) {
-            htInsert(&HASH_TABLE, hash, Ss.I, iterID);
+            htInsert(&HASH_TABLE_H, hash, Ss.I, iterID);
         }
 #endif //__HASHING__
         S = inlidxs (d, len, ths*MWM, inliers);
@@ -513,7 +516,7 @@ Score exp_ransacHcustomLAF (double *u, double *u_1, double *u_2,
     }
 
 #ifdef __HASHING__
-    htInit(&HASH_TABLE);
+    htInit(&HASH_TABLE_H);
 #endif // __HASHING__
 
     /* allocations */
@@ -912,7 +915,7 @@ Score exp_ransacHcustomLAF (double *u, double *u_1, double *u_2,
     /* deallocations */
 
 #ifdef __HASHING__
-    htClear(&HASH_TABLE);
+    htClear(&HASH_TABLE_H);
 #endif // __HASHING__
 
     free(pool);

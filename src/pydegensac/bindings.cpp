@@ -47,13 +47,8 @@ py::tuple findHomography_(py::array_t<double>  x1y1_,
         throw std::invalid_argument( "x1y1 and x2y2 should be the same size");
     }
 
-    double *ptr1 = (double *) buf1.ptr;
-    std::vector<double> x1y1;
-    x1y1.assign(ptr1, ptr1 + buf1.size);
-
-    double *ptr1a = (double *) buf1a.ptr;
-    std::vector<double> x2y2;
-    x2y2.assign(ptr1a, ptr1a + buf1a.size);
+    double *ptr1 = (double *) buf1.ptr; // pointer to x1y1 data
+    double *ptr1a = (double *) buf1a.ptr; // pointer to x2y2 data
 
     // Convert the data
 
@@ -132,50 +127,50 @@ py::tuple findHomography_(py::array_t<double>  x1y1_,
         for (size_t i=0; i < NUM_TENTS; i++) {
 
             //x1,y1,1
-            *u2Ptr =  x1y1[DIM*i];
+            *u2Ptr =  ptr1[DIM*i];
             u2Ptr++;
-            *u2Ptr =  x1y1[DIM*i+1];
+            *u2Ptr =  ptr1[DIM*i+1];
             u2Ptr++;
             *u2Ptr =  1.;
             u2Ptr++;
 
             //x2,y2,1
-            *u2Ptr =  x2y2[DIM*i];
+            *u2Ptr =  ptr1a[DIM*i];
             u2Ptr++;
-            *u2Ptr =  x2y2[DIM*i+1];
+            *u2Ptr =  ptr1a[DIM*i+1];
             u2Ptr++;
             *u2Ptr =  1.;
             u2Ptr++;
 
             //x1 + a12,y1 + a22,1
-            *u2Ptr_p1 = x1y1[DIM*i] + x1y1[DIM*i+3];
+            *u2Ptr_p1 = ptr1[DIM*i] + ptr1[DIM*i+3];
             u2Ptr_p1++;
-            *u2Ptr_p1 = x1y1[DIM*i+1] + x1y1[DIM*i+5];
+            *u2Ptr_p1 = ptr1[DIM*i+1] + ptr1[DIM*i+5];
             u2Ptr_p1++;
             *u2Ptr_p1 =  1.;
             u2Ptr_p1++;
 
             //x2 + a12,y2 + a22,1
-            *u2Ptr_p1 = x2y2[DIM*i] + x2y2[DIM*i+3];
+            *u2Ptr_p1 = ptr1a[DIM*i] + ptr1a[DIM*i+3];
             u2Ptr_p1++;
-            *u2Ptr_p1 = x2y2[DIM*i+1] + x2y2[DIM*i+5];
+            *u2Ptr_p1 = ptr1a[DIM*i+1] + ptr1a[DIM*i+5];
             u2Ptr_p1++;
             *u2Ptr_p1 =  1.;
             u2Ptr_p1++;
 
 
             //x1 + a11,y1 + a21,1
-            *u2Ptr_p2 = x1y1[DIM*i] + x1y1[DIM*i+2];
+            *u2Ptr_p2 = ptr1[DIM*i] + ptr1[DIM*i+2];
             u2Ptr_p2++;
-            *u2Ptr_p2 = x1y1[DIM*i+1] + x1y1[DIM*i+4];
+            *u2Ptr_p2 = ptr1[DIM*i+1] + ptr1[DIM*i+4];
             u2Ptr_p2++;
             *u2Ptr_p2 =  1.;
             u2Ptr_p2++;
 
             //x2 + a11,y2 + a21,1
-            *u2Ptr_p2 = x2y2[DIM*i] + x2y2[DIM*i+2];
+            *u2Ptr_p2 = ptr1a[DIM*i] + ptr1a[DIM*i+2];
             u2Ptr_p2++;
-            *u2Ptr_p2 = x2y2[DIM*i+1] + x2y2[DIM*i+4];
+            *u2Ptr_p2 = ptr1a[DIM*i+1] + ptr1a[DIM*i+4];
             u2Ptr_p2++;
             *u2Ptr_p2 =  1.;
             u2Ptr_p2++;
@@ -184,18 +179,18 @@ py::tuple findHomography_(py::array_t<double>  x1y1_,
     } else {
         for (size_t i=0; i < NUM_TENTS; i++) {
 
-            *u2Ptr =  x1y1[DIM*i];
+            *u2Ptr =  ptr1[DIM*i];
             u2Ptr++;
 
-            *u2Ptr =  x1y1[DIM*i+1];
+            *u2Ptr =  ptr1[DIM*i+1];
             u2Ptr++;
             *u2Ptr =  1.;
             u2Ptr++;
 
-            *u2Ptr =  x2y2[DIM*i];
+            *u2Ptr =  ptr1a[DIM*i];
             u2Ptr++;
 
-            *u2Ptr =  x2y2[DIM*i+1];
+            *u2Ptr =  ptr1a[DIM*i+1];
             u2Ptr++;
             *u2Ptr =  1.;
             u2Ptr++;
@@ -257,7 +252,7 @@ py::tuple findHomography_(py::array_t<double>  x1y1_,
 }
 
 py::tuple findFundamentalMatrix_(py::array_t<double>  x1y1_,
-                                 py::array_t<double>   x2y2_,
+                                 py::array_t<double>  x2y2_,
                                  double px_th,
                                  double conf,
                                  int max_iters,
@@ -288,13 +283,8 @@ py::tuple findFundamentalMatrix_(py::array_t<double>  x1y1_,
         throw std::invalid_argument( "x1y1 and x2y2 should be the same size");
     }
 
-    double *ptr1 = (double *) buf1.ptr;
-    std::vector<double> x1y1;
-    x1y1.assign(ptr1, ptr1 + buf1.size);
-
-    double *ptr1a = (double *) buf1a.ptr;
-    std::vector<double> x2y2;
-    x2y2.assign(ptr1a, ptr1a + buf1a.size);
+    double *ptr1 = (double *) buf1.ptr; // pointer to x1y1 data
+    double *ptr1a = (double *) buf1a.ptr; // pointer to x2y2 data
 
     // Convert the data
     FDsPtr FDS1 = nullptr;
@@ -349,50 +339,50 @@ py::tuple findFundamentalMatrix_(py::array_t<double>  x1y1_,
         for (size_t i=0; i < NUM_TENTS; i++) {
 
             //x1,y1,1
-            *u2Ptr =  x1y1[DIM*i];
+            *u2Ptr =  ptr1[DIM*i];
             u2Ptr++;
-            *u2Ptr =  x1y1[DIM*i+1];
+            *u2Ptr =  ptr1[DIM*i+1];
             u2Ptr++;
             *u2Ptr =  1.;
             u2Ptr++;
 
             //x2,y2,1
-            *u2Ptr =  x2y2[DIM*i];
+            *u2Ptr =  ptr1a[DIM*i];
             u2Ptr++;
-            *u2Ptr =  x2y2[DIM*i+1];
+            *u2Ptr =  ptr1a[DIM*i+1];
             u2Ptr++;
             *u2Ptr =  1.;
             u2Ptr++;
 
             //x1 + a12,y1 + a22,1
-            *u2Ptr_p1 = x1y1[DIM*i] + x1y1[DIM*i+3];
+            *u2Ptr_p1 = ptr1[DIM*i] + ptr1[DIM*i+3];
             u2Ptr_p1++;
-            *u2Ptr_p1 = x1y1[DIM*i+1] + x1y1[DIM*i+5];
+            *u2Ptr_p1 = ptr1[DIM*i+1] + ptr1[DIM*i+5];
             u2Ptr_p1++;
             *u2Ptr_p1 =  1.;
             u2Ptr_p1++;
 
             //x2 + a12,y2 + a22,1
-            *u2Ptr_p1 = x2y2[DIM*i] + x2y2[DIM*i+3];
+            *u2Ptr_p1 = ptr1a[DIM*i] + ptr1a[DIM*i+3];
             u2Ptr_p1++;
-            *u2Ptr_p1 = x2y2[DIM*i+1] + x2y2[DIM*i+5];
+            *u2Ptr_p1 = ptr1a[DIM*i+1] + ptr1a[DIM*i+5];
             u2Ptr_p1++;
             *u2Ptr_p1 =  1.;
             u2Ptr_p1++;
 
 
             //x1 + a11,y1 + a21,1
-            *u2Ptr_p2 = x1y1[DIM*i] + x1y1[DIM*i+2];
+            *u2Ptr_p2 = ptr1[DIM*i] + ptr1[DIM*i+2];
             u2Ptr_p2++;
-            *u2Ptr_p2 = x1y1[DIM*i+1] + x1y1[DIM*i+4];
+            *u2Ptr_p2 = ptr1[DIM*i+1] + ptr1[DIM*i+4];
             u2Ptr_p2++;
             *u2Ptr_p2 =  1.;
             u2Ptr_p2++;
 
             //x2 + a11,y2 + a21,1
-            *u2Ptr_p2 = x2y2[DIM*i] + x2y2[DIM*i+2];
+            *u2Ptr_p2 = ptr1a[DIM*i] + ptr1a[DIM*i+2];
             u2Ptr_p2++;
-            *u2Ptr_p2 = x2y2[DIM*i+1] + x2y2[DIM*i+4];
+            *u2Ptr_p2 = ptr1a[DIM*i+1] + ptr1a[DIM*i+4];
             u2Ptr_p2++;
             *u2Ptr_p2 =  1.;
             u2Ptr_p2++;
@@ -401,18 +391,18 @@ py::tuple findFundamentalMatrix_(py::array_t<double>  x1y1_,
     } else {
         for (size_t i=0; i < NUM_TENTS; i++) {
 
-            *u2Ptr =  x1y1[DIM*i];
+            *u2Ptr =  ptr1[DIM*i];
             u2Ptr++;
 
-            *u2Ptr =  x1y1[DIM*i+1];
+            *u2Ptr =  ptr1[DIM*i+1];
             u2Ptr++;
             *u2Ptr =  1.;
             u2Ptr++;
 
-            *u2Ptr =  x2y2[DIM*i];
+            *u2Ptr =  ptr1a[DIM*i];
             u2Ptr++;
 
-            *u2Ptr =  x2y2[DIM*i+1];
+            *u2Ptr =  ptr1a[DIM*i+1];
             u2Ptr++;
             *u2Ptr =  1.;
             u2Ptr++;

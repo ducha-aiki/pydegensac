@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+import sys
+
 import pytest
 
 import env  # noqa: F401
@@ -192,8 +196,7 @@ def test_move_support():
     class NCVirtExt(m.NCVirt):
         def get_noncopyable(self, a, b):
             # Constructs and returns a new instance:
-            nc = m.NonCopyable(a * a, b * b)
-            return nc
+            return m.NonCopyable(a * a, b * b)
 
         def get_movable(self, a, b):
             # Return a referenced copy
@@ -256,7 +259,7 @@ def test_dispatch_issue(msg):
     assert m.dispatch_issue_go(b) == "Yay.."
 
 
-def test_recursive_dispatch_issue(msg):
+def test_recursive_dispatch_issue():
     """#3357: Recursive dispatch fails to find python function override"""
 
     class Data(m.Data):
@@ -269,7 +272,7 @@ def test_recursive_dispatch_issue(msg):
             # lambda is a workaround, which adds extra frame to the
             # current CPython thread. Removing lambda reveals the bug
             # [https://github.com/pybind/pybind11/issues/3357]
-            (lambda: visitor(Data(first.value + second.value)))()
+            (lambda: visitor(Data(first.value + second.value)))()  # noqa: PLC3002
 
     class StoreResultVisitor:
         def __init__(self):
@@ -434,6 +437,7 @@ def test_inherited_virtuals():
     assert obj.say_everything() == "BT -7"
 
 
+@pytest.mark.skipif(sys.platform.startswith("emscripten"), reason="Requires threads")
 def test_issue_1454():
     # Fix issue #1454 (crash when acquiring/releasing GIL on another thread in Python 2.7)
     m.test_gil()

@@ -11,6 +11,9 @@
 #include "object.h"
 #include "pybind11_tests.h"
 
+// This breaks on PYBIND11_DECLARE_HOLDER_TYPE
+PYBIND11_WARNING_DISABLE_GCC("-Wpedantic")
+
 namespace {
 
 // This is just a wrapper around unique_ptr, but with extra fields to deliberately bloat up the
@@ -103,21 +106,26 @@ private:
     int value;
 };
 
+template <typename T>
+std::unordered_set<T *> &pointer_set() {
+    // https://google.github.io/styleguide/cppguide.html#Static_and_Global_Variables
+    static auto singleton = new std::unordered_set<T *>();
+    return *singleton;
+}
+
 // test_unique_nodelete
 // Object with a private destructor
-class MyObject4;
-std::unordered_set<MyObject4 *> myobject4_instances;
 class MyObject4 {
 public:
     explicit MyObject4(int value) : value{value} {
         print_created(this);
-        myobject4_instances.insert(this);
+        pointer_set<MyObject4>().insert(this);
     }
     int value;
 
     static void cleanupAllInstances() {
-        auto tmp = std::move(myobject4_instances);
-        myobject4_instances.clear();
+        auto tmp = std::move(pointer_set<MyObject4>());
+        pointer_set<MyObject4>().clear();
         for (auto *o : tmp) {
             delete o;
         }
@@ -125,7 +133,7 @@ public:
 
 private:
     ~MyObject4() {
-        myobject4_instances.erase(this);
+        pointer_set<MyObject4>().erase(this);
         print_destroyed(this);
     }
 };
@@ -133,19 +141,17 @@ private:
 // test_unique_deleter
 // Object with std::unique_ptr<T, D> where D is not matching the base class
 // Object with a protected destructor
-class MyObject4a;
-std::unordered_set<MyObject4a *> myobject4a_instances;
 class MyObject4a {
 public:
     explicit MyObject4a(int i) : value{i} {
         print_created(this);
-        myobject4a_instances.insert(this);
+        pointer_set<MyObject4a>().insert(this);
     };
     int value;
 
     static void cleanupAllInstances() {
-        auto tmp = std::move(myobject4a_instances);
-        myobject4a_instances.clear();
+        auto tmp = std::move(pointer_set<MyObject4a>());
+        pointer_set<MyObject4a>().clear();
         for (auto *o : tmp) {
             delete o;
         }
@@ -153,7 +159,7 @@ public:
 
 protected:
     virtual ~MyObject4a() {
-        myobject4a_instances.erase(this);
+        pointer_set<MyObject4a>().erase(this);
         print_destroyed(this);
     }
 };
@@ -276,13 +282,13 @@ struct holder_helper<ref<T>> {
 } // namespace PYBIND11_NAMESPACE
 
 // Make pybind aware of the ref-counted wrapper type (s):
-PYBIND11_DECLARE_HOLDER_TYPE(T, ref<T>, true);
+PYBIND11_DECLARE_HOLDER_TYPE(T, ref<T>, true)
 // The following is not required anymore for std::shared_ptr, but it should compile without error:
-PYBIND11_DECLARE_HOLDER_TYPE(T, std::shared_ptr<T>);
-PYBIND11_DECLARE_HOLDER_TYPE(T, huge_unique_ptr<T>);
-PYBIND11_DECLARE_HOLDER_TYPE(T, custom_unique_ptr<T>);
-PYBIND11_DECLARE_HOLDER_TYPE(T, shared_ptr_with_addressof_operator<T>);
-PYBIND11_DECLARE_HOLDER_TYPE(T, unique_ptr_with_addressof_operator<T>);
+PYBIND11_DECLARE_HOLDER_TYPE(T, std::shared_ptr<T>)
+PYBIND11_DECLARE_HOLDER_TYPE(T, huge_unique_ptr<T>)
+PYBIND11_DECLARE_HOLDER_TYPE(T, custom_unique_ptr<T>)
+PYBIND11_DECLARE_HOLDER_TYPE(T, shared_ptr_with_addressof_operator<T>)
+PYBIND11_DECLARE_HOLDER_TYPE(T, unique_ptr_with_addressof_operator<T>)
 
 TEST_SUBMODULE(smart_ptr, m) {
     // Please do not interleave `struct` and `class` definitions with bindings code,
