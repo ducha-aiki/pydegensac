@@ -11,68 +11,82 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-
-      # Used to host cibuildwheel
       - uses: actions/setup-python@v5
 
       - name: Create virtualenv
         run: python3 -m venv .venv
+
       - name: Install cibuildwheel
         run: .venv/bin/python -m pip install cibuildwheel==2.21.2
+
       - name: Build wheels
         run: .venv/bin/python -m cibuildwheel --output-dir wheelhouse
-        # to supply options, put them in 'env', like:
         env:
           CIBW_BEFORE_ALL_LINUX: yum install -y lapack-devel blas-devel gcc-gfortran
-          CIBW_BUILD: cp38-manylinux_x86_64 cp39-manylinux_x86_64 cp310-manylinux_x86_64 cp311-manylinux_x86_64 cp312-manylinux_x86_64 cp313-manylinux_x86_64 cp314-manylinux_x86_64
+          CIBW_BUILD: >
+            cp38-manylinux_x86_64
+            cp39-manylinux_x86_64
+            cp310-manylinux_x86_64
+            cp311-manylinux_x86_64
+            cp312-manylinux_x86_64
+            cp313-manylinux_x86_64
+            cp314-manylinux_x86_64
           CIBW_REPAIR_WHEEL_COMMAND_LINUX: "auditwheel repair -w {dest_dir} {wheel}"
-          CIBW_TEST_COMMAND: >-
-            python -c "import os, runpy; os.chdir(r'{project}/examples'); runpy.run_path('simple-example.py', run_name='__main__')"
+          CIBW_TEST_COMMAND: >
+            python -c "import os, runpy; os.chdir(r'{project}/examples');
+            runpy.run_path('simple-example.py', run_name='__main__')"
           CIBW_TEST_REQUIRES: opencv-python-headless matplotlib
 
       - uses: actions/upload-artifact@v4
         with:
           name: wheels-linux
-          path: ./wheelhouse/*.whl
+          path: wheelhouse/*.whl
 
       - name: Publish wheels to GitHub release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: ./wheelhouse/*.whl
-  
+          files: wheelhouse/*.whl
+
   build_wheels_mac:
-    name: Build wheels on mac
+    name: Build wheels on macOS
     needs: build_wheels_linux
     runs-on: macOS-latest
 
     steps:
       - uses: actions/checkout@v4
-
-      # Used to host cibuildwheel
       - uses: actions/setup-python@v5
 
       - name: Create virtualenv
         run: python3 -m venv .venv
+
       - name: Install cibuildwheel
         run: .venv/bin/python -m pip install cibuildwheel==2.21.2
+
       - name: Build wheels
         run: .venv/bin/python -m cibuildwheel --output-dir wheelhouse
-        # to supply options, put them in 'env', like:
         env:
           CIBW_BEFORE_ALL_MACOS: brew install openblas lapack
-          CIBW_BUILD: cp38-macosx_x86_64 cp39-macosx_x86_64 cp39-macosx_arm64 cp310-macosx_x86_64 cp310-macosx_arm64 cp311-macosx_x86_64 cp311-macosx_arm64 cp312-macosx_x86_64 cp312-macosx_arm64 cp313-macosx_x86_64 cp313-macosx_arm64 cp314-macosx_x86_64 cp314-macosx_arm64
           CIBW_ARCHS_MACOS: "x86_64 arm64"
-          CIBW_ENVIRONMENT_MACOS: >
-            CMAKE_OSX_ARCHITECTURES="$(echo $_PYTHON_HOST_PLATFORM | awk -F- '{print $NF}')"
+          CIBW_BUILD: >
+            cp38-macosx_x86_64
+            cp39-macosx_x86_64 cp39-macosx_arm64
+            cp310-macosx_x86_64 cp310-macosx_arm64
+            cp311-macosx_x86_64 cp311-macosx_arm64
+            cp312-macosx_x86_64 cp312-macosx_arm64
+            cp313-macosx_x86_64 cp313-macosx_arm64
+            cp314-macosx_x86_64 cp314-macosx_arm64
           CIBW_REPAIR_WHEEL_COMMAND_MACOS: ""
-          CIBW_TEST_COMMAND: >-
-            python -c "import os, runpy; os.chdir(r'{project}/examples'); runpy.run_path('simple-example.py', run_name='__main__')"
+          CIBW_TEST_COMMAND: >
+            python -c "import os, runpy; os.chdir(r'{project}/examples');
+            runpy.run_path('simple-example.py', run_name='__main__')"
           CIBW_TEST_REQUIRES: opencv-python-headless matplotlib
+          CIBW_TEST_SKIP: "cp38-macosx_*:arm64"
+
       - uses: actions/upload-artifact@v4
         with:
           name: wheels-macos
-          path: ./wheelhouse/*.whl
+          path: wheelhouse/*.whl
 
   build_wheels_windows:
     name: Build wheels on windows
@@ -83,34 +97,42 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-
-      # Used to host cibuildwheel
       - uses: actions/setup-python@v5
 
       - name: Create virtualenv
         run: python -m venv .venv
+
       - name: Install cibuildwheel
         run: .venv\Scripts\python -m pip install cibuildwheel==2.21.2
+
       - name: Build wheels
         run: .venv\Scripts\python -m cibuildwheel --output-dir wheelhouse
-        # to supply options, put them in 'env', like:
         env:
           CIBW_ARCHS_WINDOWS: AMD64
           CIBW_BEFORE_ALL_WINDOWS: vcpkg install openblas lapack --triplet x64-windows
-          CIBW_BUILD: cp38-win_amd64 cp39-win_amd64 cp310-win_amd64 cp311-win_amd64 cp312-win_amd64 cp313-win_amd64 cp314-win_amd64
-          CIBW_ENVIRONMENT_WINDOWS: "VCPKG_ROOT=C:/vcpkg CMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake"
-          CIBW_TEST_COMMAND: >-
-            python -c "import os, runpy; os.chdir(r'{project}/examples'); runpy.run_path('simple-example.py', run_name='__main__')"
+          CIBW_BUILD: >
+            cp38-win_amd64
+            cp39-win_amd64
+            cp310-win_amd64
+            cp311-win_amd64
+            cp312-win_amd64
+            cp313-win_amd64
+            cp314-win_amd64
+          CIBW_ENVIRONMENT_WINDOWS: >
+            VCPKG_ROOT=C:/vcpkg
+            CMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake
+          CIBW_TEST_COMMAND: >
+            python -c "import os, runpy; os.chdir(r'{project}/examples');
+            runpy.run_path('simple-example.py', run_name='__main__')"
           CIBW_TEST_REQUIRES: opencv-python-headless matplotlib
 
       - uses: actions/upload-artifact@v4
         with:
           name: wheels-windows
-          path: ./wheelhouse/*.whl
+          path: wheelhouse/*.whl
 
       - name: Publish wheels to GitHub release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: ./wheelhouse/*.whl
-
+          files: wheelhouse/*.whl
