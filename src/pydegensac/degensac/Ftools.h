@@ -32,6 +32,29 @@
 #define rr_d (*(po + 3))
 
 #include "Fcustomdef.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+void F_sampson_count(const double *u, int len, const double *F, double th,
+                     unsigned *I, double *J);
+
+void F_sampson_gather(const double *u, int len, const double *F, double th,
+                      double *err_out, int *inliers_out,
+                      unsigned *I, double *J);
+
+void F_symm_count(const double *u, int len, const double *F, double th,
+                  unsigned *I, double *J);
+
+void F_symm_gather(const double *u, int len, const double *F, double th,
+                   double *err_out, int *inliers_out,
+                   unsigned *I, double *J);
+
+#ifdef __cplusplus
+}
+#endif
+
 void lin_fm(const double *u, double *p, const int* inl, const int len);
 
 void slcm(double *A, double *B, double *p);

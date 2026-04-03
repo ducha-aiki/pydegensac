@@ -12,6 +12,156 @@
 #define SYMMETRIC_ERROR
 #define SYMMETRIC_ERROR_CHECK
 #define pit 1.0471975511965967
+
+static inline double trunc_quad_local(double epsilon, double thr)
+{
+    if (thr == 0) {
+        return 0;
+    }
+    if (epsilon >= thr * 9 / 4) {
+        return 0;
+    }
+    return 1 - (epsilon / (thr * 9 / 4));
+}
+
+static inline void score_accum_local(double e, double th, unsigned *I, double *J)
+{
+    if (e <= th) {
+        ++(*I);
+    }
+    *J += trunc_quad_local(e, th);
+}
+
+void F_sampson_count(const double *uu, int len, const double *FF, double th,
+                     unsigned *I, double *J)
+{
+    const double f1 = FF[0], f2 = FF[1], f3 = FF[2];
+    const double f4 = FF[3], f5 = FF[4], f6 = FF[5];
+    const double f7 = FF[6], f8 = FF[7], f9 = FF[8];
+    unsigned Ii = 0;
+    double Jj = 0;
+    const double *p = uu;
+    int idx;
+
+    for (idx = 0; idx < len; ++idx, p += 6) {
+        const double x1 = p[0], y1 = p[1];
+        const double x2 = p[3], y2 = p[4];
+        const double rxc = f1 * x2 + f4 * y2 + f7;
+        const double ryc = f2 * x2 + f5 * y2 + f8;
+        const double rwc = f3 * x2 + f6 * y2 + f9;
+        const double r = x1 * rxc + y1 * ryc + rwc;
+        const double rx = f1 * x1 + f2 * y1 + f3;
+        const double ry = f4 * x1 + f5 * y1 + f6;
+        const double denom = rxc * rxc + ryc * ryc + rx * rx + ry * ry;
+        const double e = r * r / denom;
+        score_accum_local(e, th, &Ii, &Jj);
+    }
+
+    *I = Ii;
+    *J = Jj;
+}
+
+void F_sampson_gather(const double *uu, int len, const double *FF, double th,
+                      double *err_out, int *inliers_out,
+                      unsigned *I, double *J)
+{
+    const double f1 = FF[0], f2 = FF[1], f3 = FF[2];
+    const double f4 = FF[3], f5 = FF[4], f6 = FF[5];
+    const double f7 = FF[6], f8 = FF[7], f9 = FF[8];
+    unsigned Ii = 0;
+    double Jj = 0;
+    const double *p = uu;
+    int idx;
+
+    for (idx = 0; idx < len; ++idx, p += 6) {
+        const double x1 = p[0], y1 = p[1];
+        const double x2 = p[3], y2 = p[4];
+        const double rxc = f1 * x2 + f4 * y2 + f7;
+        const double ryc = f2 * x2 + f5 * y2 + f8;
+        const double rwc = f3 * x2 + f6 * y2 + f9;
+        const double r = x1 * rxc + y1 * ryc + rwc;
+        const double rx = f1 * x1 + f2 * y1 + f3;
+        const double ry = f4 * x1 + f5 * y1 + f6;
+        const double denom = rxc * rxc + ryc * ryc + rx * rx + ry * ry;
+        const double e = r * r / denom;
+
+        err_out[idx] = e;
+        if (e <= th) {
+            inliers_out[Ii] = idx;
+        }
+        score_accum_local(e, th, &Ii, &Jj);
+    }
+
+    *I = Ii;
+    *J = Jj;
+}
+
+void F_symm_count(const double *uu, int len, const double *FF, double th,
+                  unsigned *I, double *J)
+{
+    const double f1 = FF[0], f2 = FF[1], f3 = FF[2];
+    const double f4 = FF[3], f5 = FF[4], f6 = FF[5];
+    const double f7 = FF[6], f8 = FF[7], f9 = FF[8];
+    unsigned Ii = 0;
+    double Jj = 0;
+    const double *p = uu;
+    int idx;
+
+    for (idx = 0; idx < len; ++idx, p += 6) {
+        const double x1 = p[0], y1 = p[1];
+        const double x2 = p[3], y2 = p[4];
+        const double rxc = f1 * x2 + f4 * y2 + f7;
+        const double ryc = f2 * x2 + f5 * y2 + f8;
+        const double rwc = f3 * x2 + f6 * y2 + f9;
+        const double r = x1 * rxc + y1 * ryc + rwc;
+        const double rx = f1 * x1 + f2 * y1 + f3;
+        const double ry = f4 * x1 + f5 * y1 + f6;
+        const double denom_a = rxc * rxc + ryc * ryc;
+        const double denom_b = rx * rx + ry * ry;
+        const double e = r * r * (denom_a + denom_b) / (denom_a * denom_b);
+        score_accum_local(e, th, &Ii, &Jj);
+    }
+
+    *I = Ii;
+    *J = Jj;
+}
+
+void F_symm_gather(const double *uu, int len, const double *FF, double th,
+                   double *err_out, int *inliers_out,
+                   unsigned *I, double *J)
+{
+    const double f1 = FF[0], f2 = FF[1], f3 = FF[2];
+    const double f4 = FF[3], f5 = FF[4], f6 = FF[5];
+    const double f7 = FF[6], f8 = FF[7], f9 = FF[8];
+    unsigned Ii = 0;
+    double Jj = 0;
+    const double *p = uu;
+    int idx;
+
+    for (idx = 0; idx < len; ++idx, p += 6) {
+        const double x1 = p[0], y1 = p[1];
+        const double x2 = p[3], y2 = p[4];
+        const double rxc = f1 * x2 + f4 * y2 + f7;
+        const double ryc = f2 * x2 + f5 * y2 + f8;
+        const double rwc = f3 * x2 + f6 * y2 + f9;
+        const double r = x1 * rxc + y1 * ryc + rwc;
+        const double rx = f1 * x1 + f2 * y1 + f3;
+        const double ry = f4 * x1 + f5 * y1 + f6;
+        const double denom_a = rxc * rxc + ryc * ryc;
+        const double denom_b = rx * rx + ry * ry;
+        const double e = r * r * (denom_a + denom_b) / (denom_a * denom_b);
+
+        err_out[idx] = e;
+        if (e <= th) {
+            inliers_out[Ii] = idx;
+        }
+        score_accum_local(e, th, &Ii, &Jj);
+    }
+
+    *I = Ii;
+    *J = Jj;
+}
+
 void lin_fm(const double *u, double *p, const int* inl, const int len)
 {
     /* linearizes corresp. with respect to entries of fundamental matrix,
@@ -363,7 +513,6 @@ void u2f(const double *u, const int *inl, int len,
     {
         normu (u, inl, len, A1, A2);
         lin_fmN(u, Z, inl, len, A1, A2);
-
         cov_mat(V, Z, len, 9);
         lap_eig(V,D,9);
         trnm(V,9); /* lapack stores column-wise */
@@ -665,4 +814,3 @@ int nullspace_qr7x9(const double *A, double *N)
     }
     return 0;
 }
-
