@@ -122,41 +122,27 @@ def test_repeated_fundamental_calls_return_epipolar_consistency():
         assert np.max(residuals_low) < 1e-6
 
 
-def test_public_api_forwards_seed_to_low_level_bindings(monkeypatch):
-    seen = {}
-
-    def fake_find_h(pts1, pts2, px_th, conf, max_iters, error_type, symmetric_error_check, laf_coef, seed):
-        seen["h_seed"] = seed
-        return np.eye(3, dtype=np.float64), np.ones(len(pts1), dtype=bool)
-
-    def fake_find_f(
-        pts1,
-        pts2,
-        px_th,
-        conf,
-        max_iters,
-        error_type,
-        symmetric_error_check,
-        laf_coef,
-        enable_degeneracy_check,
-        seed,
-    ):
-        seen["f_seed"] = seed
-        return np.eye(3, dtype=np.float64), np.ones(len(pts1), dtype=bool)
-
-    monkeypatch.setattr(pydegensac, "findHomography_", fake_find_h)
-    monkeypatch.setattr(pydegensac, "findFundamentalMatrix_", fake_find_f)
-
+def test_public_api_seed_makes_results_deterministic():
     pts1_h, pts2_h, _ = _make_homography_points()
-    pydegensac.findHomography(pts1_h, pts2_h, max_iters=100, seed=123)
-    assert seen["h_seed"] == 123
+    h1, mask1 = pydegensac.findHomography(pts1_h, pts2_h, max_iters=100, seed=123)
+    h2, mask2 = pydegensac.findHomography(pts1_h, pts2_h, max_iters=100, seed=123)
+    np.testing.assert_array_equal(mask1, mask2)
+    np.testing.assert_allclose(h1, h2)
 
     pts1_f, pts2_f = _make_fundamental_points()
-    pydegensac.findFundamentalMatrix(
+    f1, inliers1 = pydegensac.findFundamentalMatrix(
         pts1_f,
         pts2_f,
         max_iters=1000,
         enable_degeneracy_check=False,
-        seed=456,
+        seed=123,
     )
-    assert seen["f_seed"] == 456
+    f2, inliers2 = pydegensac.findFundamentalMatrix(
+        pts1_f,
+        pts2_f,
+        max_iters=1000,
+        enable_degeneracy_check=False,
+        seed=123,
+    )
+    np.testing.assert_array_equal(inliers1, inliers2)
+    np.testing.assert_allclose(f1, f2)

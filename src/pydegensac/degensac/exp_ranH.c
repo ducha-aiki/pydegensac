@@ -27,6 +27,13 @@ static HashTable HASH_TABLE_H;
 #endif
 //#define FULL_SYMM
 
+static void reseed_rng(unsigned seed_value) {
+    srand(seed_value);
+#ifndef WIN32
+    srandom(seed_value);
+#endif
+}
+
 int HcloseToSingular(const double *h){
     double v, tol;
 
@@ -520,9 +527,9 @@ Score exp_ransacHcustomLAF (double *u, double *u_1, double *u_2,
     h = sol;
     //
     if (seed >= 0) {
-        srand((unsigned)seed);
+        reseed_rng((unsigned)seed);
     } else {
-        srand(time(NULL)); //Mishkin - randomization
+        reseed_rng((unsigned)time(NULL)); // Mishkin - randomization
     }
 
 #ifdef __HASHING__
@@ -566,7 +573,7 @@ Score exp_ransacHcustomLAF (double *u, double *u_1, double *u_2,
     while(no_sam < max_sam)
     {
         no_sam++;
-        srand(rand_seed);
+        reseed_rng(rand_seed);
         multirsampleT(Z, 9, 2, pool, 4, len, M);
         rand_seed = rand();
 

@@ -44,6 +44,13 @@ static HashTable HASH_TABLE_F;
 #define max(a,b) ((a) > (b) ? (a) : (b))
 #endif
 
+static void reseed_rng(unsigned seed_value) {
+    srand(seed_value);
+#ifndef WIN32
+    srandom(seed_value);
+#endif
+}
+
 int no_mto(double *A)
 {
     double x,y;
@@ -851,7 +858,7 @@ int exp_ransacFcustom(double *u, int len, double th, double conf, int max_sam,
     int a; //Mishkin, counter;
     double SymCheck_th =  CHECK_COEF*th;
 
-    srand(time(NULL)); //Mishkin - randomization
+    reseed_rng((unsigned)time(NULL)); // Mishkin - randomization
 
 #ifdef USE_QR
     double A[7*9], sol[2*9];
@@ -911,7 +918,7 @@ int exp_ransacFcustom(double *u, int len, double th, double conf, int max_sam,
     while(no_sam < max_sam) {
         no_sam ++;
 
-        srand(seed);
+        reseed_rng(seed);
 
         rsampleT(Z, 9, pool, 7, len, A);
         loadSample(u, samidx, 7, 6, u7);
@@ -1310,9 +1317,9 @@ int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2, int len, double th
     int *lo_intbuff, *lo_intbuff2, *lo_intbuff_best;
 
     if (seed >= 0) {
-        srand((unsigned)seed);
+        reseed_rng((unsigned)seed);
     } else {
-        srand(time(NULL)); //Mishkin - randomization
+        reseed_rng((unsigned)time(NULL)); // Mishkin - randomization
     }
 
 #ifdef USE_QR
@@ -1379,7 +1386,7 @@ int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2, int len, double th
     while(no_sam < max_sam) {
         no_sam ++;
 
-        srand(rand_seed);
+        reseed_rng(rand_seed);
 
         rsampleT(Z, 9, pool, 7, len, A);
         loadSample(u, samidx, 7, 6, u7);
