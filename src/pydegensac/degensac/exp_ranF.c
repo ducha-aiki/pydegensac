@@ -275,10 +275,6 @@ int exp_ransacF(double *u, int len, double th, double conf, int max_sam,
     unsigned non_degen_samples_count = 0; //only those with so-far-the-best model
     double jj;
     double * HDs = (double *) malloc(len*sizeof(double));
-    double *w = (double *) malloc(len * sizeof(double));
-    int *lo_intbuff = (int *) malloc(sizeof(int) * len);
-    int *lo_intbuff2 = (int *) malloc(sizeof(int) * len);
-    int *lo_intbuff_best = (int *) malloc(sizeof(int) * len);
 
     int Ihmax = 0;//Mishkin
     double Hbest[9]; //Mishkin
@@ -641,9 +637,8 @@ int exp_ransacF(double *u, int len, double th, double conf, int max_sam,
 
 /******* Custom *********/
 Score exp_iterFcustom(double *u, int len, int *inliers, int * inl2, double th, double ths, int iters,
-                      double *F, double **errs, double *buffer, int * samidx, int iterID, unsigned inlLimit, double *resids,
-                      double *w, exFDsPtr EXFDS1,FDsPtr FDS1) {
-    double *d = errs[1];
+                      double *F, double **errs, double *buffer, int * samidx, int iterID, unsigned inlLimit, double *resids, exFDsPtr EXFDS1,FDsPtr FDS1) {
+    double *d = errs[1], *w;
     double f[9], dth;
     unsigned it;
     Score S = {0,0}, Ss, maxS;
@@ -655,6 +650,7 @@ Score exp_iterFcustom(double *u, int len, int *inliers, int * inl2, double th, d
     int iterIDret;
     uint32_t hash;
 #endif //__HASHING__
+    w = (double *) malloc(len * sizeof(double));
     dth = (ths - th) / ILSQ_ITERS;
 
     /* F from the sample inliers by th */
@@ -701,6 +697,7 @@ Score exp_iterFcustom(double *u, int len, int *inliers, int * inl2, double th, d
         if (iterIDret != -1 && iterIDret != iterID) {
             S.I = 0;
             S.J = 0;
+            free(w);
             return S;
         }
         if (iterIDret == -1) {
@@ -720,6 +717,7 @@ Score exp_iterFcustom(double *u, int len, int *inliers, int * inl2, double th, d
 
         Ss = inlidxs (d, len, ths*MWM, inliers);
         if (Ss.I < 8) {
+            free(w);
             return maxS;
         }
 
@@ -762,24 +760,31 @@ Score exp_iterFcustom(double *u, int len, int *inliers, int * inl2, double th, d
         memcpy(F, f, 9*sizeof(double));
     }
 
+    free(w);
     return maxS;
 }
 
 Score exp_inFranicustom (double *u, int len, int *inliers, int ninl,
                          double th, double **errs, double *buffer,
-                         double *F, int * samidx, int * iterID, unsigned inlLimit, double *resids,
-                         int *intbuff, int *intbuff2, int *intbuff_best, double *w, exFDsPtr EXFDS1,FDsPtr FDS1) {
+                         double *F, int * samidx, int * iterID, unsigned inlLimit, double *resids,exFDsPtr EXFDS1,FDsPtr FDS1) {
     unsigned ssiz, i;
     Score S = {0, 0}, maxS = {0, 0};
     int jj;
     double *d, f[9];
     int *sample;
+    int *intbuff, * intbuff2, *intbuff_best;
+
+    intbuff = (int *) malloc(sizeof(int) * len);
+    intbuff2 = (int *) malloc(sizeof(int) * len);
+    intbuff_best = (int *) malloc(sizeof(int) * len);
 
     if (ninl < 16) {
         /*//printf("Prematurely escaped LO, not enough inliers (<16)!\n");*/
         if (resids != NULL) {
             memset(resids, 0, (RESIDS_M-2)*len*sizeof(double));
         }
+        free(intbuff);
+        free(intbuff2);
         return maxS; /*Zeros*/
     }
     ssiz = ninl / 2;
@@ -800,8 +805,7 @@ Score exp_inFranicustom (double *u, int len, int *inliers, int ninl,
         }
         errs[4] = errs[0];
 
-        S = exp_iterFcustom(u, len, intbuff, intbuff2, th, TC*th, ILSQ_ITERS, f, errs, buffer, samidx, ++*iterID, inlLimit,
-                            resids != NULL ? resids + i*6*len + len : NULL, w, EXFDS1,FDS1);
+        S = exp_iterFcustom(u, len, intbuff, intbuff2, th, TC*th, ILSQ_ITERS, f, errs, buffer, samidx, ++*iterID, inlLimit, resids != NULL ? resids + i*6*len + len : NULL,EXFDS1,FDS1);
         if (scoreLess(maxS, S)) {
             maxS = S;
             d = errs[2];
@@ -820,6 +824,9 @@ Score exp_inFranicustom (double *u, int len, int *inliers, int ninl,
     for ( jj =0; jj <maxS.I ; jj++) {
         inliers[jj] = intbuff_best[jj];
     }
+    free(intbuff);
+    free(intbuff2);
+    free(intbuff_best);
     return maxS;
 }
 
@@ -848,10 +855,6 @@ int exp_ransacFcustom(double *u, int len, double th, double conf, int max_sam,
     unsigned non_degen_samples_count = 0; //only those with so-far-the-best model
     double jj;
     double * HDs = (double *) malloc(len*sizeof(double));
-    double *w = (double *) malloc(len * sizeof(double));
-    int *lo_intbuff = (int *) malloc(sizeof(int) * len);
-    int *lo_intbuff2 = (int *) malloc(sizeof(int) * len);
-    int *lo_intbuff_best = (int *) malloc(sizeof(int) * len);
     // int bad_model = 0; //Mishkin
     int Ihmax = 0;//Mishkin
     double Hbest[9]; //Mishkin
@@ -1082,8 +1085,7 @@ int exp_ransacFcustom(double *u, int len, double th, double conf, int max_sam,
 #endif /* __LSQ_BEFORE_LO__ */
             /*******/
             S = exp_inFranicustom(u, len, inliers, S.I, th, errs, buffer, f, samidx, &iterID, inlLimit,
-                                  resids != NULL ? *resids + 2*len + (iter_cnt-1)*RESIDS_M*len : NULL,
-                                  lo_intbuff, lo_intbuff2, lo_intbuff_best, w, EXFDS1,FDS1);
+                                  resids != NULL ? *resids + 2*len + (iter_cnt-1)*RESIDS_M*len : NULL,EXFDS1,FDS1);
             /*******/
             // minimalistic LO' (just one iterations)
             /*			S = exp_iterF(u, len, inliers, bufferP, th, 16*TC*th, 10, f, errs, buffer, samidx, ++iterID, inlLimit, *resids + 2*len + (iter_cnt-1)*RESIDS_M*len);*/
@@ -1194,8 +1196,7 @@ int exp_ransacFcustom(double *u, int len, double th, double conf, int max_sam,
 #endif /* __LSQ_BEFORE_LO__ */
             /*******/
             S = exp_inFranicustom (u, len, inliers, S.I, th, errs, buffer, f, samidxBest, &iterID, inlLimit,
-                                   resids != NULL ? *resids + 2*len + (iter_cnt-1)*RESIDS_M*len : NULL,
-                                   lo_intbuff, lo_intbuff2, lo_intbuff_best, w, EXFDS1,FDS1);
+                                   resids != NULL ? *resids + 2*len + (iter_cnt-1)*RESIDS_M*len : NULL,EXFDS1,FDS1);
             /*******/
             // minimalistic LO' (just one iterations)
             /*			S = exp_iterF(u, len, inliers, bufferP, th, 16*TC*th, 10, f, errs, buffer, samidxBest, ++iterID, inlLimit, *resids + 2*len + (iter_cnt-1)*RESIDS_M*len);*/
@@ -1259,10 +1260,6 @@ int exp_ransacFcustom(double *u, int len, double th, double conf, int max_sam,
     htClear(&HASH_TABLE_F);
 #endif // __HASHING__
     free(d_check);
-    free(w);
-    free(lo_intbuff);
-    free(lo_intbuff2);
-    free(lo_intbuff_best);
     free(pool);
     free(Z);
     free(err);
@@ -1312,9 +1309,8 @@ int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2, int len, double th
     const int DO_LAF_CHECK =  laf_coef > 0;
     const double th_laf_check = laf_coef * th;
     int p1_inliers = 0;
-    double *err_laf, *w;
+    double *err_laf;
     int a;
-    int *lo_intbuff, *lo_intbuff2, *lo_intbuff_best;
 
     if (seed >= 0) {
         reseed_rng((unsigned)seed);
@@ -1356,10 +1352,6 @@ int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2, int len, double th
     errorsBest = (double *) malloc(len * sizeof(double));
     err = (double *) malloc(len * 4 * sizeof(double));
     err_laf = (double *) malloc(len * sizeof(double));
-    w = (double *) malloc(len * sizeof(double));
-    lo_intbuff = (int *) malloc(sizeof(int) * len);
-    lo_intbuff2 = (int *) malloc(sizeof(int) * len);
-    lo_intbuff_best = (int *) malloc(sizeof(int) * len);
 
     d_check = (double *) malloc(len * sizeof(double));
     for (i=0; i<4; i++)
@@ -1571,8 +1563,7 @@ int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2, int len, double th
 #endif /* __LSQ_BEFORE_LO__ */
             /*******/
             S = exp_inFranicustom(u, len, inliers, S.I, th, errs, buffer, f, samidx, &iterID, inlLimit,
-                                  resids != NULL ? *resids + 2*len + (iter_cnt-1)*RESIDS_M*len : NULL,
-                                  lo_intbuff, lo_intbuff2, lo_intbuff_best, w, EXFDS1,FDS1);
+                                  resids != NULL ? *resids + 2*len + (iter_cnt-1)*RESIDS_M*len : NULL,EXFDS1,FDS1);
             /*******/
             // minimalistic LO' (just one iterations)
             /*			S = exp_iterF(u, len, inliers, bufferP, th, 16*TC*th, 10, f, errs, buffer, samidx, ++iterID, inlLimit, *resids + 2*len + (iter_cnt-1)*RESIDS_M*len);*/
@@ -1706,8 +1697,7 @@ int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2, int len, double th
 #endif /* __LSQ_BEFORE_LO__ */
             /*******/
             S = exp_inFranicustom (u, len, inliers, S.I, th, errs, buffer, f, samidxBest, &iterID, inlLimit,
-                                   resids != NULL ? *resids + 2*len + (iter_cnt-1)*RESIDS_M*len : NULL,
-                                   lo_intbuff, lo_intbuff2, lo_intbuff_best, w, EXFDS1,FDS1);
+                                   resids != NULL ? *resids + 2*len + (iter_cnt-1)*RESIDS_M*len : NULL,EXFDS1,FDS1);
             /*******/
             // minimalistic LO' (just one iterations)
             /*			S = exp_iterF(u, len, inliers, bufferP, th, 16*TC*th, 10, f, errs, buffer, samidxBest, ++iterID, inlLimit, *resids + 2*len + (iter_cnt-1)*RESIDS_M*len);*/
@@ -1811,10 +1801,6 @@ int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2, int len, double th
 #endif // __HASHING__
     free(d_check);
     free(err_laf);
-    free(w);
-    free(lo_intbuff);
-    free(lo_intbuff2);
-    free(lo_intbuff_best);
     free(pool);
     free(Z);
     free(err);
