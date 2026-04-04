@@ -44,6 +44,13 @@ static HashTable HASH_TABLE_F;
 #define max(a,b) ((a) > (b) ? (a) : (b))
 #endif
 
+static void reseed_rng(unsigned seed_value) {
+    srand(seed_value);
+#ifndef WIN32
+    srandom(seed_value);
+#endif
+}
+
 int no_mto(double *A)
 {
     double x,y;
@@ -105,7 +112,9 @@ Score exp_iterF(double *u, int len, int *inliers, int * inl2, double th, double 
     /*iterate */
     for (it = 0; it < iters; it ++) {
         exFDs (u, f, d, w, len);
-        memcpy(resids + it*len, d, len*sizeof(double));
+        if (resids != NULL) {
+            memcpy(resids + it*len, d, len*sizeof(double));
+        }
 
         S = inlidxs(d, len, th, inliers);
 
@@ -165,7 +174,9 @@ Score exp_iterF(double *u, int len, int *inliers, int * inl2, double th, double 
     }
 
     FDs (u, f, d, len);
-    memcpy(resids + 4*len, d, len*sizeof(double));
+    if (resids != NULL) {
+        memcpy(resids + 4*len, d, len*sizeof(double));
+    }
     S = inlidxs (d, len, th, inliers);
     transformInliers(inliers, inl2, S.I, len);
     if (scoreLess(maxS, S) && CHECK_ORIG(inl2,samidx))
@@ -196,7 +207,9 @@ Score exp_inFrani (double *u, int len, int *inliers, int ninl,
 
     if (ninl < 16) {
         /*//printf("Prematurely escaped LO, not enough inliers (<16)!\n");*/
-        memset(resids, 0, (RESIDS_M-2)*len*sizeof(double));
+        if (resids != NULL) {
+            memset(resids, 0, (RESIDS_M-2)*len*sizeof(double));
+        }
         free(intbuff);
         free(intbuff2);
         return maxS; /*Zeros*/
@@ -306,7 +319,9 @@ int exp_ransacF(double *u, int len, double th, double conf, int max_sam,
 
     inliers = (int *) malloc(sizeof(int) * len);
 
-    *resids = (double *) malloc (iter_cnt * RESIDS_M * len * sizeof(double));
+    if (resids != NULL) {
+        *resids = NULL;
+    }
 
     maxS.I  = 8;
     maxSs.I = 8;
@@ -452,8 +467,10 @@ int exp_ransacF(double *u, int len, double th, double conf, int max_sam,
 
         if (do_iterate) {
             iter_cnt ++;
-            *resids = (double *) realloc(*resids, iter_cnt * RESIDS_M * len * sizeof(double));
-            memcpy(*resids + RESIDS_M*(iter_cnt - 1)*len, errs[4], len*sizeof(double));
+            if (resids != NULL) {
+                *resids = (double *) realloc(*resids, iter_cnt * RESIDS_M * len * sizeof(double));
+                memcpy(*resids + RESIDS_M*(iter_cnt - 1)*len, errs[4], len*sizeof(double));
+            }
 
 #ifdef __LSQ_BEFORE_LO__
             d = errs[0];
@@ -668,7 +685,9 @@ Score exp_iterFcustom(double *u, int len, int *inliers, int * inl2, double th, d
     /*iterate */
     for (it = 0; it < iters; it ++) {
         EXFDS1 (u, f, d, w, len);
-        memcpy(resids + it*len, d, len*sizeof(double));
+        if (resids != NULL) {
+            memcpy(resids + it*len, d, len*sizeof(double));
+        }
 
         S = inlidxs(d, len, th, inliers);
 
@@ -728,7 +747,9 @@ Score exp_iterFcustom(double *u, int len, int *inliers, int * inl2, double th, d
     }
 
     FDS1 (u, f, d, len);
-    memcpy(resids + 4*len, d, len*sizeof(double));
+    if (resids != NULL) {
+        memcpy(resids + 4*len, d, len*sizeof(double));
+    }
     S = inlidxs (d, len, th, inliers);
     transformInliers(inliers, inl2, S.I, len);
     if (scoreLess(maxS, S) && CHECK_ORIG(inl2,samidx))
@@ -759,7 +780,9 @@ Score exp_inFranicustom (double *u, int len, int *inliers, int ninl,
 
     if (ninl < 16) {
         /*//printf("Prematurely escaped LO, not enough inliers (<16)!\n");*/
-        memset(resids, 0, (RESIDS_M-2)*len*sizeof(double));
+        if (resids != NULL) {
+            memset(resids, 0, (RESIDS_M-2)*len*sizeof(double));
+        }
         free(intbuff);
         free(intbuff2);
         return maxS; /*Zeros*/
@@ -777,10 +800,12 @@ Score exp_inFranicustom (double *u, int len, int *inliers, int ninl,
         sample = randsubset(inliers, ninl, ssiz);
         u2f(u, sample, ssiz, f, buffer);
         FDS1 (u, f, errs[0], len);
-        memcpy(resids + i*6*len, errs[0], len*sizeof(double)); // pointer to resids already moved to the 3rd field of current part
+        if (resids != NULL) {
+            memcpy(resids + i*6*len, errs[0], len*sizeof(double)); // pointer to resids already moved to the 3rd field of current part
+        }
         errs[4] = errs[0];
 
-        S = exp_iterFcustom(u, len, intbuff, intbuff2, th, TC*th, ILSQ_ITERS, f, errs, buffer, samidx, ++*iterID, inlLimit, resids + i*6*len + len,EXFDS1,FDS1);
+        S = exp_iterFcustom(u, len, intbuff, intbuff2, th, TC*th, ILSQ_ITERS, f, errs, buffer, samidx, ++*iterID, inlLimit, resids != NULL ? resids + i*6*len + len : NULL,EXFDS1,FDS1);
         if (scoreLess(maxS, S)) {
             maxS = S;
             d = errs[2];
@@ -802,7 +827,6 @@ Score exp_inFranicustom (double *u, int len, int *inliers, int ninl,
     free(intbuff);
     free(intbuff2);
     free(intbuff_best);
-
     return maxS;
 }
 
@@ -837,7 +861,7 @@ int exp_ransacFcustom(double *u, int len, double th, double conf, int max_sam,
     int a; //Mishkin, counter;
     double SymCheck_th =  CHECK_COEF*th;
 
-    srand(time(NULL)); //Mishkin - randomization
+    reseed_rng((unsigned)time(NULL)); // Mishkin - randomization
 
 #ifdef USE_QR
     double A[7*9], sol[2*9];
@@ -879,7 +903,9 @@ int exp_ransacFcustom(double *u, int len, double th, double conf, int max_sam,
 
     inliers = (int *) malloc(sizeof(int) * len);
 
-    *resids = (double *) malloc (iter_cnt * RESIDS_M * len * sizeof(double));
+    if (resids != NULL) {
+        *resids = NULL;
+    }
 
     maxS.I  = 8;
     maxSs.I = 8;
@@ -895,7 +921,7 @@ int exp_ransacFcustom(double *u, int len, double th, double conf, int max_sam,
     while(no_sam < max_sam) {
         no_sam ++;
 
-        srand(seed);
+        reseed_rng(seed);
 
         rsampleT(Z, 9, pool, 7, len, A);
         loadSample(u, samidx, 7, 6, u7);
@@ -1040,8 +1066,10 @@ int exp_ransacFcustom(double *u, int len, double th, double conf, int max_sam,
 
         if (do_iterate) {
             iter_cnt ++;
-            *resids = (double *) realloc(*resids, iter_cnt * RESIDS_M * len * sizeof(double));
-            memcpy(*resids + RESIDS_M*(iter_cnt - 1)*len, errs[4], len*sizeof(double));
+            if (resids != NULL) {
+                *resids = (double *) realloc(*resids, iter_cnt * RESIDS_M * len * sizeof(double));
+                memcpy(*resids + RESIDS_M*(iter_cnt - 1)*len, errs[4], len*sizeof(double));
+            }
 
 #ifdef __LSQ_BEFORE_LO__
             d = errs[0];
@@ -1049,12 +1077,15 @@ int exp_ransacFcustom(double *u, int len, double th, double conf, int max_sam,
             u2f(u, inliers, S.I, f, buffer);
             FDS1(u, f, d, len);
             S = inlidxs(d, len, th, inliers);
-            memcpy(*resids + RESIDS_M*(iter_cnt - 1)*len + len, d, len*sizeof(double));
+            if (resids != NULL) {
+                memcpy(*resids + RESIDS_M*(iter_cnt - 1)*len + len, d, len*sizeof(double));
+            }
 #else
             S = inlidxs(errs[4], len, th, inliers);
 #endif /* __LSQ_BEFORE_LO__ */
             /*******/
-            S = exp_inFranicustom(u, len, inliers, S.I, th, errs, buffer, f, samidx, &iterID, inlLimit, *resids + 2*len + (iter_cnt-1)*RESIDS_M*len,EXFDS1,FDS1);
+            S = exp_inFranicustom(u, len, inliers, S.I, th, errs, buffer, f, samidx, &iterID, inlLimit,
+                                  resids != NULL ? *resids + 2*len + (iter_cnt-1)*RESIDS_M*len : NULL,EXFDS1,FDS1);
             /*******/
             // minimalistic LO' (just one iterations)
             /*			S = exp_iterF(u, len, inliers, bufferP, th, 16*TC*th, 10, f, errs, buffer, samidx, ++iterID, inlLimit, *resids + 2*len + (iter_cnt-1)*RESIDS_M*len);*/
@@ -1147,20 +1178,25 @@ int exp_ransacFcustom(double *u, int len, double th, double conf, int max_sam,
         } else {
             iter_cnt ++;
 
-            *resids = (double *) realloc(*resids, iter_cnt * RESIDS_M * len * sizeof(double));
-            memcpy(*resids + RESIDS_M*(iter_cnt - 1)*len, errs[4], len*sizeof(double));
+            if (resids != NULL) {
+                *resids = (double *) realloc(*resids, iter_cnt * RESIDS_M * len * sizeof(double));
+                memcpy(*resids + RESIDS_M*(iter_cnt - 1)*len, errs[4], len*sizeof(double));
+            }
 #ifdef __LSQ_BEFORE_LO__
             d = errs[0];
             S = inlidxs(errorsBest, len, TC*th*MWM, inliers);
             u2f(u, inliers, S.I, f, buffer);
             FDS1(u, f, d, len);
             S = inlidxs(d, len, th, inliers);
-            memcpy(*resids + RESIDS_M*(iter_cnt - 1)*len + len, d, len*sizeof(double));
+            if (resids != NULL) {
+                memcpy(*resids + RESIDS_M*(iter_cnt - 1)*len + len, d, len*sizeof(double));
+            }
 #else
             S = inlidxs(errorsBest, len, th, inliers);
 #endif /* __LSQ_BEFORE_LO__ */
             /*******/
-            S = exp_inFranicustom (u, len, inliers, S.I, th, errs, buffer, f, samidxBest, &iterID, inlLimit, *resids + 2*len + (iter_cnt-1)*RESIDS_M*len,EXFDS1,FDS1);
+            S = exp_inFranicustom (u, len, inliers, S.I, th, errs, buffer, f, samidxBest, &iterID, inlLimit,
+                                   resids != NULL ? *resids + 2*len + (iter_cnt-1)*RESIDS_M*len : NULL,EXFDS1,FDS1);
             /*******/
             // minimalistic LO' (just one iterations)
             /*			S = exp_iterF(u, len, inliers, bufferP, th, 16*TC*th, 10, f, errs, buffer, samidxBest, ++iterID, inlLimit, *resids + 2*len + (iter_cnt-1)*RESIDS_M*len);*/
@@ -1277,9 +1313,9 @@ int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2, int len, double th
     int a;
 
     if (seed >= 0) {
-        srand((unsigned)seed);
+        reseed_rng((unsigned)seed);
     } else {
-        srand(time(NULL)); //Mishkin - randomization
+        reseed_rng((unsigned)time(NULL)); // Mishkin - randomization
     }
 
 #ifdef USE_QR
@@ -1324,7 +1360,9 @@ int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2, int len, double th
 
     inliers = (int *) malloc(sizeof(int) * len);
 
-    *resids = (double *) malloc (iter_cnt * RESIDS_M * len * sizeof(double));
+    if (resids != NULL) {
+        *resids = NULL;
+    }
 
     maxS.I  = 8;
     maxSs.I = 8;
@@ -1340,7 +1378,7 @@ int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2, int len, double th
     while(no_sam < max_sam) {
         no_sam ++;
 
-        srand(rand_seed);
+        reseed_rng(rand_seed);
 
         rsampleT(Z, 9, pool, 7, len, A);
         loadSample(u, samidx, 7, 6, u7);
@@ -1506,8 +1544,10 @@ int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2, int len, double th
 
         if (do_iterate) {
             iter_cnt ++;
-            *resids = (double *) realloc(*resids, iter_cnt * RESIDS_M * len * sizeof(double));
-            memcpy(*resids + RESIDS_M*(iter_cnt - 1)*len, errs[4], len*sizeof(double));
+            if (resids != NULL) {
+                *resids = (double *) realloc(*resids, iter_cnt * RESIDS_M * len * sizeof(double));
+                memcpy(*resids + RESIDS_M*(iter_cnt - 1)*len, errs[4], len*sizeof(double));
+            }
 
 #ifdef __LSQ_BEFORE_LO__
             d = errs[0];
@@ -1515,12 +1555,15 @@ int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2, int len, double th
             u2f(u, inliers, S.I, f, buffer);
             FDS1(u, f, d, len);
             S = inlidxs(d, len, th, inliers);
-            memcpy(*resids + RESIDS_M*(iter_cnt - 1)*len + len, d, len*sizeof(double));
+            if (resids != NULL) {
+                memcpy(*resids + RESIDS_M*(iter_cnt - 1)*len + len, d, len*sizeof(double));
+            }
 #else
             S = inlidxs(errs[4], len, th, inliers);
 #endif /* __LSQ_BEFORE_LO__ */
             /*******/
-            S = exp_inFranicustom(u, len, inliers, S.I, th, errs, buffer, f, samidx, &iterID, inlLimit, *resids + 2*len + (iter_cnt-1)*RESIDS_M*len,EXFDS1,FDS1);
+            S = exp_inFranicustom(u, len, inliers, S.I, th, errs, buffer, f, samidx, &iterID, inlLimit,
+                                  resids != NULL ? *resids + 2*len + (iter_cnt-1)*RESIDS_M*len : NULL,EXFDS1,FDS1);
             /*******/
             // minimalistic LO' (just one iterations)
             /*			S = exp_iterF(u, len, inliers, bufferP, th, 16*TC*th, 10, f, errs, buffer, samidx, ++iterID, inlLimit, *resids + 2*len + (iter_cnt-1)*RESIDS_M*len);*/
@@ -1636,20 +1679,25 @@ int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2, int len, double th
         } else {
             iter_cnt ++;
 
-            *resids = (double *) realloc(*resids, iter_cnt * RESIDS_M * len * sizeof(double));
-            memcpy(*resids + RESIDS_M*(iter_cnt - 1)*len, errs[4], len*sizeof(double));
+            if (resids != NULL) {
+                *resids = (double *) realloc(*resids, iter_cnt * RESIDS_M * len * sizeof(double));
+                memcpy(*resids + RESIDS_M*(iter_cnt - 1)*len, errs[4], len*sizeof(double));
+            }
 #ifdef __LSQ_BEFORE_LO__
             d = errs[0];
             S = inlidxs(errorsBest, len, TC*th*MWM, inliers);
             u2f(u, inliers, S.I, f, buffer);
             FDS1(u, f, d, len);
             S = inlidxs(d, len, th, inliers);
-            memcpy(*resids + RESIDS_M*(iter_cnt - 1)*len + len, d, len*sizeof(double));
+            if (resids != NULL) {
+                memcpy(*resids + RESIDS_M*(iter_cnt - 1)*len + len, d, len*sizeof(double));
+            }
 #else
             S = inlidxs(errorsBest, len, th, inliers);
 #endif /* __LSQ_BEFORE_LO__ */
             /*******/
-            S = exp_inFranicustom (u, len, inliers, S.I, th, errs, buffer, f, samidxBest, &iterID, inlLimit, *resids + 2*len + (iter_cnt-1)*RESIDS_M*len,EXFDS1,FDS1);
+            S = exp_inFranicustom (u, len, inliers, S.I, th, errs, buffer, f, samidxBest, &iterID, inlLimit,
+                                   resids != NULL ? *resids + 2*len + (iter_cnt-1)*RESIDS_M*len : NULL,EXFDS1,FDS1);
             /*******/
             // minimalistic LO' (just one iterations)
             /*			S = exp_iterF(u, len, inliers, bufferP, th, 16*TC*th, 10, f, errs, buffer, samidxBest, ++iterID, inlLimit, *resids + 2*len + (iter_cnt-1)*RESIDS_M*len);*/

@@ -21,6 +21,11 @@ Score exp_inHrani (double *u, int len, int *inliers, int ninl,
                    double *buffer, double *H, int rep,
                    int * iterID, unsigned inlLimit, double *resids);
 
+Score exp_inHranicustom (double *u, int len, int *inliers, int ninl,
+                         double th, double *Z, double **errs,
+                         double *buffer, double *H, int rep,
+                         int * iterID, unsigned inlLimit, double *resids, int *intbuff, HDsPtr HDS1);
+
 #ifdef __cplusplus
 extern "C"
 #endif

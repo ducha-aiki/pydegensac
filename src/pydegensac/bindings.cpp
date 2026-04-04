@@ -114,9 +114,9 @@ py::tuple findHomography_(py::array_t<double>  x1y1_,
 
     // Allocate space only if needed
     int do_laf_check = laf_coef > 0;
-    double *u2Ptr_p1 = new double[do_laf_check*NUM_TENTS*6], *u2_p1;
+    double *u2Ptr_p1 = do_laf_check ? new double[NUM_TENTS*6] : nullptr, *u2_p1;
     u2_p1=u2Ptr_p1;
-    double *u2Ptr_p2 = new double[do_laf_check*NUM_TENTS*6], *u2_p2;
+    double *u2Ptr_p2 = do_laf_check ? new double[NUM_TENTS*6] : nullptr, *u2_p2;
     u2_p2=u2Ptr_p2;
 
     typedef unsigned char uchar;
@@ -199,7 +199,7 @@ py::tuple findHomography_(py::array_t<double>  x1y1_,
 
 
     int* data_out = (int *) malloc(NUM_TENTS * 18 * sizeof(int));
-    double *resids;
+    double *resids = nullptr;
 
 
     // Run the RANSAC
@@ -240,7 +240,8 @@ py::tuple findHomography_(py::array_t<double>  x1y1_,
         ptr_inliers[i] = (bool) inl[i];
 
 
-    free(resids);
+    if (resids != nullptr)
+        free(resids);
     free(data_out);
     delete [] u2;
     delete [] u2_p1;
@@ -326,9 +327,9 @@ py::tuple findFundamentalMatrix_(py::array_t<double>  x1y1_,
 
     // Allocate space only if needed
     int do_laf_check = laf_coef > 0;
-    double *u2Ptr_p1 = new double[do_laf_check*NUM_TENTS*6], *u2_p1;
+    double *u2Ptr_p1 = do_laf_check ? new double[NUM_TENTS*6] : nullptr, *u2_p1;
     u2_p1=u2Ptr_p1;
-    double *u2Ptr_p2 = new double[do_laf_check*NUM_TENTS*6], *u2_p2;
+    double *u2Ptr_p2 = do_laf_check ? new double[NUM_TENTS*6] : nullptr, *u2_p2;
     u2_p2=u2Ptr_p2;
 
     typedef unsigned char uchar;
@@ -411,7 +412,7 @@ py::tuple findFundamentalMatrix_(py::array_t<double>  x1y1_,
 
 
     int* data_out = (int *) malloc(NUM_TENTS * 18 * sizeof(int));
-    double *resids;
+    double *resids = nullptr;
     int I_H = 0;
     int *Ihptr = &I_H;
     double HinF [3*3];
@@ -457,7 +458,8 @@ py::tuple findFundamentalMatrix_(py::array_t<double>  x1y1_,
         ptr_inliers[i] = (bool) inl[i];
 
 
-    free(resids);
+    if (resids != nullptr)
+        free(resids);
     free(data_out);
     delete [] u2;
     delete [] u2_p1;

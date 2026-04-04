@@ -119,7 +119,7 @@ with open(path.join(this_directory, "README.md"), encoding="utf-8") as f:
 
 setup(
     name="pydegensac",
-    version="0.2.1",
+    version="0.2.2",
     author="Ondra Chum, Dmytro Mishkin",
     author_email="ducha.aiki@gmail.com",
     license="MIT",

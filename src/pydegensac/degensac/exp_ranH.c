@@ -27,6 +27,13 @@ static HashTable HASH_TABLE_H;
 #endif
 //#define FULL_SYMM
 
+static void reseed_rng(unsigned seed_value) {
+    srand(seed_value);
+#ifndef WIN32
+    srandom(seed_value);
+#endif
+}
+
 int HcloseToSingular(const double *h){
     double v, tol;
 
@@ -100,7 +107,9 @@ Score exp_iterH(double *u, int len, int *inliers, double th, double ths,
 #else
         HDs (Z, u, h, d, len);
 #endif
-        memcpy(resids + it*len, d, len*sizeof(double));
+        if (resids != NULL) {
+            memcpy(resids + it*len, d, len*sizeof(double));
+        }
         Ss = inlidxs(d, len, th, inliers);
 #ifdef __HASHING__
         hash = SuperFastHash((const char *)inliers, Ss.I * sizeof(*inliers));
@@ -159,7 +168,9 @@ Score exp_iterH(double *u, int len, int *inliers, double th, double ths,
 #else
     HDs (Z, u, h, d, len);
 #endif
-    memcpy(resids + 4*len, d, len*sizeof(double));
+    if (resids != NULL) {
+        memcpy(resids + 4*len, d, len*sizeof(double));
+    }
     S = inlidxs (d, len, th, inliers);
     if (scoreLess(maxS, S))
     {
@@ -188,7 +199,9 @@ Score exp_inHrani (double *u, int len, int *inliers, int ninl,
     intbuff = (int *) malloc(sizeof(int) * len);
 
     if (ninl < 8) {
-        memset(resids, 0xFF, (RESIDS_M-2)*len*sizeof(double));
+        if (resids != NULL) {
+            memset(resids, 0xFF, (RESIDS_M-2)*len*sizeof(double));
+        }
         free(intbuff);
         return maxS;
     }
@@ -342,7 +355,9 @@ Score exp_iterHcustom(double *u, int len, int *inliers, double th, double ths,
     {
         HDS1 (Z, u, h, d, len);
 
-        memcpy(resids + it*len, d, len*sizeof(double));
+        if (resids != NULL) {
+            memcpy(resids + it*len, d, len*sizeof(double));
+        }
         Ss = inlidxs(d, len, th, inliers);
 #ifdef __HASHING__
         hash = SuperFastHash((const char *)inliers, Ss.I * sizeof(*inliers));
@@ -398,7 +413,9 @@ Score exp_iterHcustom(double *u, int len, int *inliers, double th, double ths,
     }
     HDS1 (Z, u, h, d, len);
 
-    memcpy(resids + 4*len, d, len*sizeof(double));
+    if (resids != NULL) {
+        memcpy(resids + 4*len, d, len*sizeof(double));
+    }
     S = inlidxs (d, len, th, inliers);
     if (scoreLess(maxS, S))
     {
@@ -416,19 +433,17 @@ Score exp_iterHcustom(double *u, int len, int *inliers, double th, double ths,
 Score exp_inHranicustom (double *u, int len, int *inliers, int ninl,
                          double th, double *Z, double **errs,
                          double *buffer, double *H, int rep,
-                         int * iterID, unsigned inlLimit, double *resids, HDsPtr HDS1)
+                         int * iterID, unsigned inlLimit, double *resids, int *intbuff, HDsPtr HDS1)
 {
     int ssiz, i;
     Score S, maxS = {0,0};
     double *d, h[9];
     int *sample;
-    int *intbuff;
-
-    intbuff = (int *) malloc(sizeof(int) * len);
 
     if (ninl < 8) {
-        memset(resids, 0xFF, (RESIDS_M-2)*len*sizeof(double));
-        free(intbuff);
+        if (resids != NULL) {
+            memset(resids, 0xFF, (RESIDS_M-2)*len*sizeof(double));
+        }
         return maxS;
     }
     ssiz = ninl /2;
@@ -444,10 +459,13 @@ Score exp_inHranicustom (double *u, int len, int *inliers, int ninl,
         sample = randsubset(inliers, ninl, ssiz);
         u2h(u, sample, ssiz, h, buffer);
         HDS1 (Z, u, h, errs[0], len);
-        memcpy(resids + i*6*len, errs[0], len*sizeof(double)); // pointer to resids already moved to the 3rd field of current part
+        if (resids != NULL) {
+            memcpy(resids + i*6*len, errs[0], len*sizeof(double)); // pointer to resids already moved to the 3rd field of current part
+        }
         errs[4] = errs[0];
 
-        S = exp_iterHcustom(u, len, intbuff, th, TC*th, ILSQ_ITERS, h, Z, errs, buffer, ++*iterID, inlLimit, resids + i*6*len + len,HDS1);
+        S = exp_iterHcustom(u, len, intbuff, th, TC*th, ILSQ_ITERS, h, Z, errs, buffer, ++*iterID, inlLimit,
+                            resids != NULL ? resids + i*6*len + len : NULL, HDS1);
 
         if (scoreLess(maxS, S))
         {
@@ -463,7 +481,6 @@ Score exp_inHranicustom (double *u, int len, int *inliers, int ninl,
     errs[2] = errs[0];
     errs[0] = d;
 
-    free(intbuff);
     return maxS;
 }
 
@@ -490,7 +507,7 @@ Score exp_ransacHcustomLAF (double *u, double *u_1, double *u_2,
     double M[9*9], sol[9*9], *h;
     double *err, *d, *d_check;
     double *errs[5];
-    int i, j, *inliers, *inliersS;
+    int i, j, *inliers, *inliersS, *lo_intbuff;
     char do_update = 0;
     Score maxS = {0,0,0,0}, maxSs = {0,0,0,0}, S = {0,0,0,0}, Scheck= {0,0,0,0};
     unsigned rand_seed;
@@ -510,9 +527,9 @@ Score exp_ransacHcustomLAF (double *u, double *u_1, double *u_2,
     h = sol;
     //
     if (seed >= 0) {
-        srand((unsigned)seed);
+        reseed_rng((unsigned)seed);
     } else {
-        srand(time(NULL)); //Mishkin - randomization
+        reseed_rng((unsigned)time(NULL)); // Mishkin - randomization
     }
 
 #ifdef __HASHING__
@@ -539,6 +556,7 @@ Score exp_ransacHcustomLAF (double *u, double *u_1, double *u_2,
 
     inliers = (int *) malloc(sizeof(int) * len);
     inliersS = (int *) malloc(sizeof(int) * len);
+    lo_intbuff = (int *) malloc(sizeof(int) * len);
 
 
     no_sam = 0;
@@ -546,14 +564,16 @@ Score exp_ransacHcustomLAF (double *u, double *u_1, double *u_2,
 
     samidx = pool + len - 4;
 
-    *resids = (double *) malloc (iter_cnt * RESIDS_M * len * sizeof(double));
+    if (resids != NULL) {
+        *resids = NULL;
+    }
 
     /* RANSAC */
 
     while(no_sam < max_sam)
     {
         no_sam++;
-        srand(rand_seed);
+        reseed_rng(rand_seed);
         multirsampleT(Z, 9, 2, pool, 4, len, M);
         rand_seed = rand();
 
@@ -650,7 +670,9 @@ Score exp_ransacHcustomLAF (double *u, double *u_1, double *u_2,
             /* ITERATIONS */
             iter_cnt ++;
 
-            *resids = (double *) realloc(*resids, iter_cnt * RESIDS_M * len * sizeof(double));
+            if (resids != NULL) {
+                *resids = (double *) realloc(*resids, iter_cnt * RESIDS_M * len * sizeof(double));
+            }
             switch(iter_type)
             {
             case 0:
@@ -669,7 +691,8 @@ Score exp_ransacHcustomLAF (double *u, double *u_1, double *u_2,
                 }
                 break;
             case 2:
-                S = exp_iterHcustom(u, len, inliers, th, TC*th, 4, h, Z, errs, buffer, ++iterID, inlLimit, *resids + 2*len + (iter_cnt-1)*RESIDS_M*len, HDS1);
+                S = exp_iterHcustom(u, len, inliers, th, TC*th, 4, h, Z, errs, buffer, ++iterID, inlLimit,
+                                    resids != NULL ? *resids + 2*len + (iter_cnt-1)*RESIDS_M*len : NULL, HDS1);
                 break;
             case 3:
                 d = errs[0];
@@ -682,7 +705,9 @@ Score exp_ransacHcustomLAF (double *u, double *u_1, double *u_2,
                 //I = inHran (u, len, inliers, I, th, Z, errs, buffer, h, RAN_REP); //because of deleting unnecessary inHran. It MUST be back there if using case 3!!! (+once more in ALO)
                 break;
             case 4:
-                memcpy(*resids + RESIDS_M*(iter_cnt - 1)*len, errs[4], len*sizeof(double));
+                if (resids != NULL) {
+                    memcpy(*resids + RESIDS_M*(iter_cnt - 1)*len, errs[4], len*sizeof(double));
+                }
 #ifdef __LSQ_BEFORE_LO__
                 d = errs[0];
 #ifdef __LSBL_MCE__
@@ -697,11 +722,14 @@ Score exp_ransacHcustomLAF (double *u, double *u_1, double *u_2,
                 hMCEscustom(Z, u, d, samidx, len, d, th,HDSi1);
 #endif /* __IB_MCE__ */
                 S = inlidxs(d, len, th, inliers);
-                memcpy(*resids + RESIDS_M*(iter_cnt - 1)*len + len, d, len*sizeof(double));
+                if (resids != NULL) {
+                    memcpy(*resids + RESIDS_M*(iter_cnt - 1)*len + len, d, len*sizeof(double));
+                }
 #else /* __LSQ_BEFORE_LO__ */
                 S = inlidxs(errs[4], len, th, inliers);
 #endif /* __LSQ_BEFORE_LO__ */
-                S = exp_inHranicustom(u, len, inliers, S.I, th, Z, errs, buffer, h, RAN_REP, &iterID, inlLimit, *resids + 2*len + (iter_cnt-1)*RESIDS_M*len, HDS1);
+                S = exp_inHranicustom(u, len, inliers, S.I, th, Z, errs, buffer, h, RAN_REP, &iterID, inlLimit,
+                                      resids != NULL ? *resids + 2*len + (iter_cnt-1)*RESIDS_M*len : NULL, lo_intbuff, HDS1);
                 break;
             }
            // //printf("%d laf_check enabled",DO_LAF_CHECK);
@@ -765,7 +793,9 @@ Score exp_ransacHcustomLAF (double *u, double *u_1, double *u_2,
     if (iter_cnt == 0 && iter_type != 0) {
         /* ITERATIONS */
         iter_cnt ++;
-        *resids = (double *) realloc(*resids, iter_cnt * RESIDS_M * len * sizeof(double));
+        if (resids != NULL) {
+            *resids = (double *) realloc(*resids, iter_cnt * RESIDS_M * len * sizeof(double));
+        }
         switch(iter_type)
         {
         case 0:
@@ -784,7 +814,8 @@ Score exp_ransacHcustomLAF (double *u, double *u_1, double *u_2,
             }
             break;
         case 2:
-            S = exp_iterHcustom(u, len, inliers, th, TC*th, 4, h, Z, errs, buffer, ++iterID, inlLimit, *resids + 2*len + (iter_cnt-1)*RESIDS_M*len,HDS1);
+            S = exp_iterHcustom(u, len, inliers, th, TC*th, 4, h, Z, errs, buffer, ++iterID, inlLimit,
+                                resids != NULL ? *resids + 2*len + (iter_cnt-1)*RESIDS_M*len : NULL, HDS1);
             break;
         case 3:
             d = errs[0];
@@ -797,7 +828,9 @@ Score exp_ransacHcustomLAF (double *u, double *u_1, double *u_2,
             //I = inHran (u, len, inliers, I, th, Z, errs, buffer, h, RAN_REP);
             break;
         case 4:
-            memcpy(*resids + RESIDS_M*(iter_cnt - 1)*len, errs[4], len*sizeof(double));
+            if (resids != NULL) {
+                memcpy(*resids + RESIDS_M*(iter_cnt - 1)*len, errs[4], len*sizeof(double));
+            }
 #ifdef __LSQ_BEFORE_LO__
             d = errs[0];
 #ifdef __LSBL_MCE__
@@ -813,11 +846,14 @@ Score exp_ransacHcustomLAF (double *u, double *u_1, double *u_2,
             hMCEscustom(Z, u, d, bestsamidx, len, d, th,HDSi1);
 #endif /* __IB_MCE__ */
             S = inlidxs(d, len, th, inliers);
-            memcpy(*resids + RESIDS_M*(iter_cnt - 1)*len + len, d, len*sizeof(double));
+            if (resids != NULL) {
+                memcpy(*resids + RESIDS_M*(iter_cnt - 1)*len + len, d, len*sizeof(double));
+            }
 #else /* __LSQ_BEFORE_LO__ */
             S = inlidxs(errs[4], len, th, inliers);
 #endif /* __LSQ_BEFORE_LO__ */
-            S = exp_inHranicustom(u, len, inliers, S.I, th, Z, errs, buffer, h, RAN_REP, &iterID, inlLimit, *resids + 2*len + (iter_cnt-1)*RESIDS_M*len,HDS1);
+            S = exp_inHranicustom(u, len, inliers, S.I, th, Z, errs, buffer, h, RAN_REP, &iterID, inlLimit,
+                                  resids != NULL ? *resids + 2*len + (iter_cnt-1)*RESIDS_M*len : NULL, lo_intbuff, HDS1);
             break;
         }
        // //printf("after final iter %d %f %d %d \n",S.I, S.J, S.Is, S.Ilafs);
@@ -923,6 +959,8 @@ Score exp_ransacHcustomLAF (double *u, double *u_1, double *u_2,
     free(buffer);
     free(err);
     free(inliers);
+    free(inliersS);
+    free(lo_intbuff);
     free(d_check);
 
     *data_out = no_sam;
