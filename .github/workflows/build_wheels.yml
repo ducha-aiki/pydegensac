@@ -51,7 +51,7 @@ jobs:
           # numpy wheels (2.3.0 dropped manylinux_2_17); harmless for cp38-cp311,
           # which resolve older numpy anyway. Kept here too (redundant with
           # CIBW_BEFORE_TEST above) as a belt-and-braces safety net.
-          CIBW_TEST_REQUIRES: opencv-python-headless<5 pytest numpy<2.3
+          CIBW_TEST_REQUIRES: opencv-python-headless==4.* pytest numpy<2.3
           CIBW_ENVIRONMENT: PYDEGENSAC_GOLDEN_EXACT=0
 
       - uses: actions/upload-artifact@v4
@@ -98,7 +98,7 @@ jobs:
             python -m pytest {project}/tests -q &&
             python -c "import os, runpy; os.chdir(r'{project}/examples');
             runpy.run_path('simple-example.py', run_name='__main__')"
-          CIBW_TEST_REQUIRES: opencv-python-headless<5 pytest
+          CIBW_TEST_REQUIRES: opencv-python-headless==4.* pytest
           CIBW_ENVIRONMENT: PYDEGENSAC_GOLDEN_EXACT=0
 
       - uses: actions/upload-artifact@v4
@@ -145,7 +145,7 @@ jobs:
             python -m pytest {project}/tests -q &&
             python -c "import os, runpy; os.chdir(r'{project}/examples');
             runpy.run_path('simple-example.py', run_name='__main__')"
-          CIBW_TEST_REQUIRES: opencv-python-headless<5 pytest
+          CIBW_TEST_REQUIRES: opencv-python-headless==4.* pytest
           CIBW_TEST_SKIP: "cp38-macosx_*:arm64"
           CIBW_ENVIRONMENT: PYDEGENSAC_GOLDEN_EXACT=0
 
@@ -192,7 +192,7 @@ jobs:
             python -m pytest {project}/tests -q &&
             python -c "import os, runpy; os.chdir(r'{project}/examples');
             runpy.run_path('simple-example.py', run_name='__main__')"
-          CIBW_TEST_REQUIRES: opencv-python-headless<5 pytest
+          CIBW_TEST_REQUIRES: opencv-python-headless==4.* pytest
 
       - uses: actions/upload-artifact@v4
         with:
