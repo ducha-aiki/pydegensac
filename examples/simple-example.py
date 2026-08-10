@@ -3,7 +3,6 @@
 import os
 os.environ.setdefault("MPLBACKEND", "Agg")
 import numpy as np
-import matplotlib.pyplot as plt
 import cv2
 import pydegensac
 import sys
