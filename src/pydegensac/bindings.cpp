@@ -1,4 +1,5 @@
 #include <stdexcept>
+#include <string>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl_bind.h>
 #include <pybind11/numpy.h>
@@ -16,6 +17,190 @@ enum RANSAC_error_t_h {SAMPSON = 0,
 enum RANSAC_error_t_f {SAMPSON_F = 0,
     SYMM_EPI_F = 1};
 
+namespace {
+
+// Input arrays converted to the layout the C core expects, plus the C-side
+// scratch/output buffers shared by both estimators. The destructor owns all
+// cleanup, so every exit path (including exceptions) releases the memory.
+struct ConvertedInput {
+    size_t num_tents = 0;
+    double *u2 = nullptr;
+    double *u2_p1 = nullptr;
+    double *u2_p2 = nullptr;
+    unsigned char *inl = nullptr;
+    int *data_out = nullptr;
+
+    ConvertedInput() = default;
+    ConvertedInput(const ConvertedInput&) = delete;
+    ConvertedInput& operator=(const ConvertedInput&) = delete;
+    ~ConvertedInput() {
+        free(data_out);
+        delete [] u2;
+        delete [] u2_p1;
+        delete [] u2_p2;
+        delete [] inl;
+    }
+};
+
+void validate_input(const py::buffer_info &buf1, const py::buffer_info &buf1a,
+                    double laf_coef, size_t min_pts) {
+    const std::string n_ge = "n>=" + std::to_string(min_pts);
+
+    if ((buf1.ndim != 2) || (buf1a.ndim != 2)) {
+        throw std::invalid_argument( "x1y1 and x2y2 must be 2-D arrays with dims [n,2] or [n,6]" );
+    }
+
+    size_t NUM_TENTS = buf1.shape[0];
+    size_t DIM = buf1.shape[1];
+
+    if ((DIM != 2) && (DIM != 6)) {
+        throw std::invalid_argument( "x1y1 should be an array with dims [n,2], [n,6], " + n_ge );
+    }
+    if (NUM_TENTS < min_pts) {
+        throw std::invalid_argument( "x1y1 should be an array with dims [n,2], " + n_ge );
+    }
+    size_t NUM_TENTSa = buf1a.shape[0];
+    size_t DIMa = buf1a.shape[1];
+
+    if ((DIMa != 2) && (DIMa != 6)) {
+        throw std::invalid_argument( "x2y2 should be an array with dims [n,2] or [n, 6], " + n_ge );
+    }
+    if (NUM_TENTSa != NUM_TENTS) {
+        throw std::invalid_argument( "x1y1 and x2y2 should be the same size");
+    }
+    if (DIM != DIMa) {
+        throw std::invalid_argument( "x1y1 and x2y2 must have the same number of columns");
+    }
+    if ((laf_coef > 0) && (DIM == 2)) {
+        throw std::invalid_argument( "laf_coef > 0 requires [n,6] input (LAF data)");
+    }
+}
+
+// Builds the homogeneous [x1 y1 1 x2 y2 1] array (and, with LAFs, the two
+// affine-frame-shifted variants) from the Nx2/Nx6 numpy inputs.
+void convert_input(const py::buffer_info &buf1, const py::buffer_info &buf1a,
+                   double laf_coef, ConvertedInput &in) {
+    size_t NUM_TENTS = buf1.shape[0];
+    size_t DIM = buf1.shape[1];
+    double *ptr1 = (double *) buf1.ptr; // pointer to x1y1 data
+    double *ptr1a = (double *) buf1a.ptr; // pointer to x2y2 data
+
+    in.num_tents = NUM_TENTS;
+
+    double *u2Ptr = new double[NUM_TENTS*6];
+    in.u2 = u2Ptr;
+
+    // Allocate space only if needed
+    int do_laf_check = laf_coef > 0;
+    double *u2Ptr_p1 = do_laf_check ? new double[NUM_TENTS*6] : nullptr;
+    in.u2_p1 = u2Ptr_p1;
+    double *u2Ptr_p2 = do_laf_check ? new double[NUM_TENTS*6] : nullptr;
+    in.u2_p2 = u2Ptr_p2;
+
+    typedef unsigned char uchar;
+    in.inl = new uchar[NUM_TENTS];
+
+    if (do_laf_check) {
+        for (size_t i=0; i < NUM_TENTS; i++) {
+
+            //x1,y1,1
+            *u2Ptr =  ptr1[DIM*i];
+            u2Ptr++;
+            *u2Ptr =  ptr1[DIM*i+1];
+            u2Ptr++;
+            *u2Ptr =  1.;
+            u2Ptr++;
+
+            //x2,y2,1
+            *u2Ptr =  ptr1a[DIM*i];
+            u2Ptr++;
+            *u2Ptr =  ptr1a[DIM*i+1];
+            u2Ptr++;
+            *u2Ptr =  1.;
+            u2Ptr++;
+
+            //x1 + a12,y1 + a22,1
+            *u2Ptr_p1 = ptr1[DIM*i] + ptr1[DIM*i+3];
+            u2Ptr_p1++;
+            *u2Ptr_p1 = ptr1[DIM*i+1] + ptr1[DIM*i+5];
+            u2Ptr_p1++;
+            *u2Ptr_p1 =  1.;
+            u2Ptr_p1++;
+
+            //x2 + a12,y2 + a22,1
+            *u2Ptr_p1 = ptr1a[DIM*i] + ptr1a[DIM*i+3];
+            u2Ptr_p1++;
+            *u2Ptr_p1 = ptr1a[DIM*i+1] + ptr1a[DIM*i+5];
+            u2Ptr_p1++;
+            *u2Ptr_p1 =  1.;
+            u2Ptr_p1++;
+
+
+            //x1 + a11,y1 + a21,1
+            *u2Ptr_p2 = ptr1[DIM*i] + ptr1[DIM*i+2];
+            u2Ptr_p2++;
+            *u2Ptr_p2 = ptr1[DIM*i+1] + ptr1[DIM*i+4];
+            u2Ptr_p2++;
+            *u2Ptr_p2 =  1.;
+            u2Ptr_p2++;
+
+            //x2 + a11,y2 + a21,1
+            *u2Ptr_p2 = ptr1a[DIM*i] + ptr1a[DIM*i+2];
+            u2Ptr_p2++;
+            *u2Ptr_p2 = ptr1a[DIM*i+1] + ptr1a[DIM*i+4];
+            u2Ptr_p2++;
+            *u2Ptr_p2 =  1.;
+            u2Ptr_p2++;
+
+        }
+    } else {
+        for (size_t i=0; i < NUM_TENTS; i++) {
+
+            *u2Ptr =  ptr1[DIM*i];
+            u2Ptr++;
+
+            *u2Ptr =  ptr1[DIM*i+1];
+            u2Ptr++;
+            *u2Ptr =  1.;
+            u2Ptr++;
+
+            *u2Ptr =  ptr1a[DIM*i];
+            u2Ptr++;
+
+            *u2Ptr =  ptr1a[DIM*i+1];
+            u2Ptr++;
+            *u2Ptr =  1.;
+            u2Ptr++;
+        };
+    }
+
+    in.data_out = (int *) malloc(NUM_TENTS * 18 * sizeof(int));
+    if (in.data_out == nullptr) {
+        throw std::bad_alloc();
+    }
+}
+
+py::tuple pack_output(const double *model, const unsigned char *inl, size_t num_tents) {
+    //Model
+    py::array_t<double> model_out = py::array_t<double>({3,3});
+    py::buffer_info buf_model_out = model_out.request();
+    double *ptr_model_out = (double *)buf_model_out.ptr;
+
+    for (size_t i=0; i<9; i++)
+        ptr_model_out[i]=model[i];
+
+    //Inliers
+    py::array_t<bool> inliers_out = py::array_t<bool>(num_tents);
+    py::buffer_info buf_inliers = inliers_out.request();
+    bool *ptr_inliers= (bool *)buf_inliers.ptr;
+    for (size_t i = 0; i < num_tents; i++)
+        ptr_inliers[i] = (bool) inl[i];
+
+    return py::make_tuple(model_out, inliers_out);
+}
+
+} // namespace
+
 py::tuple findHomography_(py::array_t<double, py::array::c_style | py::array::forcecast>  x1y1_,
                           py::array_t<double, py::array::c_style | py::array::forcecast>   x2y2_,
                           double px_th,
@@ -29,39 +214,7 @@ py::tuple findHomography_(py::array_t<double, py::array::c_style | py::array::fo
     py::buffer_info buf1 = x1y1_.request();
     py::buffer_info buf1a = x2y2_.request();
 
-    if ((buf1.ndim != 2) || (buf1a.ndim != 2)) {
-        throw std::invalid_argument( "x1y1 and x2y2 must be 2-D arrays with dims [n,2] or [n,6]" );
-    }
-
-    size_t NUM_TENTS = buf1.shape[0];
-    size_t DIM = buf1.shape[1];
-
-    if ((DIM != 2) && (DIM != 6)) {
-        throw std::invalid_argument( "x1y1 should be an array with dims [n,2], [n,6], n>=4" );
-    }
-    if (NUM_TENTS < 4) {
-        throw std::invalid_argument( "x1y1 should be an array with dims [n,2], n>=4");
-    }
-    size_t NUM_TENTSa = buf1a.shape[0];
-    size_t DIMa = buf1a.shape[1];
-
-    if ((DIMa != 2) && (DIMa != 6)) {
-        throw std::invalid_argument( "x2y2 should be an array with dims [n,2] or [n, 6], n>=4" );
-    }
-    if (NUM_TENTSa != NUM_TENTS) {
-        throw std::invalid_argument( "x1y1 and x2y2 should be the same size");
-    }
-    if (DIM != DIMa) {
-        throw std::invalid_argument( "x1y1 and x2y2 must have the same number of columns");
-    }
-    if ((laf_coef > 0) && (DIM == 2)) {
-        throw std::invalid_argument( "laf_coef > 0 requires [n,6] input (LAF data)");
-    }
-
-    double *ptr1 = (double *) buf1.ptr; // pointer to x1y1 data
-    double *ptr1a = (double *) buf1a.ptr; // pointer to x2y2 data
-
-    // Convert the data
+    validate_input(buf1, buf1a, laf_coef, 4);
 
     int oriented_constr = 1;
     HDsPtr HDS1 = nullptr;
@@ -117,121 +270,24 @@ py::tuple findHomography_(py::array_t<double, py::array::c_style | py::array::fo
     }
     }
 
-
     double H[3*3] = {0};
 
-    double *u2Ptr = new double[NUM_TENTS*6], *u2;
-    u2=u2Ptr;
-
-    // Allocate space only if needed
-    int do_laf_check = laf_coef > 0;
-    double *u2Ptr_p1 = do_laf_check ? new double[NUM_TENTS*6] : nullptr, *u2_p1;
-    u2_p1=u2Ptr_p1;
-    double *u2Ptr_p2 = do_laf_check ? new double[NUM_TENTS*6] : nullptr, *u2_p2;
-    u2_p2=u2Ptr_p2;
-
-    typedef unsigned char uchar;
-    unsigned char *inl = new uchar[NUM_TENTS];
-
-
-    if (do_laf_check) {
-        for (size_t i=0; i < NUM_TENTS; i++) {
-
-            //x1,y1,1
-            *u2Ptr =  ptr1[DIM*i];
-            u2Ptr++;
-            *u2Ptr =  ptr1[DIM*i+1];
-            u2Ptr++;
-            *u2Ptr =  1.;
-            u2Ptr++;
-
-            //x2,y2,1
-            *u2Ptr =  ptr1a[DIM*i];
-            u2Ptr++;
-            *u2Ptr =  ptr1a[DIM*i+1];
-            u2Ptr++;
-            *u2Ptr =  1.;
-            u2Ptr++;
-
-            //x1 + a12,y1 + a22,1
-            *u2Ptr_p1 = ptr1[DIM*i] + ptr1[DIM*i+3];
-            u2Ptr_p1++;
-            *u2Ptr_p1 = ptr1[DIM*i+1] + ptr1[DIM*i+5];
-            u2Ptr_p1++;
-            *u2Ptr_p1 =  1.;
-            u2Ptr_p1++;
-
-            //x2 + a12,y2 + a22,1
-            *u2Ptr_p1 = ptr1a[DIM*i] + ptr1a[DIM*i+3];
-            u2Ptr_p1++;
-            *u2Ptr_p1 = ptr1a[DIM*i+1] + ptr1a[DIM*i+5];
-            u2Ptr_p1++;
-            *u2Ptr_p1 =  1.;
-            u2Ptr_p1++;
-
-
-            //x1 + a11,y1 + a21,1
-            *u2Ptr_p2 = ptr1[DIM*i] + ptr1[DIM*i+2];
-            u2Ptr_p2++;
-            *u2Ptr_p2 = ptr1[DIM*i+1] + ptr1[DIM*i+4];
-            u2Ptr_p2++;
-            *u2Ptr_p2 =  1.;
-            u2Ptr_p2++;
-
-            //x2 + a11,y2 + a21,1
-            *u2Ptr_p2 = ptr1a[DIM*i] + ptr1a[DIM*i+2];
-            u2Ptr_p2++;
-            *u2Ptr_p2 = ptr1a[DIM*i+1] + ptr1a[DIM*i+4];
-            u2Ptr_p2++;
-            *u2Ptr_p2 =  1.;
-            u2Ptr_p2++;
-
-        }
-    } else {
-        for (size_t i=0; i < NUM_TENTS; i++) {
-
-            *u2Ptr =  ptr1[DIM*i];
-            u2Ptr++;
-
-            *u2Ptr =  ptr1[DIM*i+1];
-            u2Ptr++;
-            *u2Ptr =  1.;
-            u2Ptr++;
-
-            *u2Ptr =  ptr1a[DIM*i];
-            u2Ptr++;
-
-            *u2Ptr =  ptr1a[DIM*i+1];
-            u2Ptr++;
-            *u2Ptr =  1.;
-            u2Ptr++;
-        };
-    }
-
-
-    int* data_out = (int *) malloc(NUM_TENTS * 18 * sizeof(int));
-    if (data_out == nullptr) {
-        delete [] u2;
-        delete [] u2_p1;
-        delete [] u2_p2;
-        delete [] inl;
-        throw std::bad_alloc();
-    }
-
+    ConvertedInput in;
+    convert_input(buf1, buf1a, laf_coef, in);
 
     // Run the RANSAC
-    exp_ransacHcustomLAF(u2,
-                         u2_p1,
-                         u2_p2,
-                         NUM_TENTS,
+    exp_ransacHcustomLAF(in.u2,
+                         in.u2_p1,
+                         in.u2_p2,
+                         in.num_tents,
                          error_threshold,
                          laf_coef,
                          conf,
                          max_iters,
                          H,
-                         inl,
+                         in.inl,
                          4,
-                         data_out,
+                         in.data_out,
                          oriented_constr,
                          0,
                          NULL,
@@ -239,32 +295,7 @@ py::tuple findHomography_(py::array_t<double, py::array::c_style | py::array::fo
                          SymCheck_th,
                          seed);
 
-
-
-    //Model
-    py::array_t<double> H_out = py::array_t<double>({3,3});
-    py::buffer_info buf_H_out = H_out.request();
-    double *ptr_H_out = (double *)buf_H_out.ptr;
-
-    for (size_t i=0; i<9; i++)
-        ptr_H_out[i]=H[i];
-
-    //Inliers
-    py::array_t<bool> inliers_out = py::array_t<bool>(NUM_TENTS);
-    py::buffer_info buf_inliers = inliers_out.request();
-    bool *ptr_inliers= (bool *)buf_inliers.ptr;
-    for (size_t i = 0; i < NUM_TENTS; i++)
-        ptr_inliers[i] = (bool) inl[i];
-
-
-    free(data_out);
-    delete [] u2;
-    delete [] u2_p1;
-    delete [] u2_p2;
-    delete [] inl;
-
-
-    return py::make_tuple(H_out, inliers_out);
+    return pack_output(H, in.inl, in.num_tents);
 }
 
 py::tuple findFundamentalMatrix_(py::array_t<double, py::array::c_style | py::array::forcecast>  x1y1_,
@@ -281,39 +312,8 @@ py::tuple findFundamentalMatrix_(py::array_t<double, py::array::c_style | py::ar
     py::buffer_info buf1 = x1y1_.request();
     py::buffer_info buf1a = x2y2_.request();
 
-    if ((buf1.ndim != 2) || (buf1a.ndim != 2)) {
-        throw std::invalid_argument( "x1y1 and x2y2 must be 2-D arrays with dims [n,2] or [n,6]" );
-    }
+    validate_input(buf1, buf1a, laf_coef, 8);
 
-    size_t NUM_TENTS = buf1.shape[0];
-    size_t DIM = buf1.shape[1];
-
-    if ((DIM != 2) && (DIM != 6)) {
-        throw std::invalid_argument( "x1y1 should be an array with dims [n,2], [n,6], n>=8" );
-    }
-    if (NUM_TENTS < 8) {
-        throw std::invalid_argument( "x1y1 should be an array with dims [n,2], n>=8");
-    }
-    size_t NUM_TENTSa = buf1a.shape[0];
-    size_t DIMa = buf1a.shape[1];
-
-    if ((DIMa != 2) && (DIMa != 6)) {
-        throw std::invalid_argument( "x2y2 should be an array with dims [n,2] or [n, 6], n>=8" );
-    }
-    if (NUM_TENTSa != NUM_TENTS) {
-        throw std::invalid_argument( "x1y1 and x2y2 should be the same size");
-    }
-    if (DIM != DIMa) {
-        throw std::invalid_argument( "x1y1 and x2y2 must have the same number of columns");
-    }
-    if ((laf_coef > 0) && (DIM == 2)) {
-        throw std::invalid_argument( "laf_coef > 0 requires [n,6] input (LAF data)");
-    }
-
-    double *ptr1 = (double *) buf1.ptr; // pointer to x1y1 data
-    double *ptr1a = (double *) buf1a.ptr; // pointer to x2y2 data
-
-    // Convert the data
     FDsPtr FDS1 = nullptr;
     exFDsPtr EXFDS1 = nullptr;
     FDsidxPtr FDSidx1 = nullptr;
@@ -345,118 +345,23 @@ py::tuple findFundamentalMatrix_(py::array_t<double, py::array::c_style | py::ar
     }
     }
 
-
     double F[3*3] = {0};
 
-    double *u2Ptr = new double[NUM_TENTS*6], *u2;
-    u2=u2Ptr;
+    ConvertedInput in;
+    convert_input(buf1, buf1a, laf_coef, in);
 
-    // Allocate space only if needed
-    int do_laf_check = laf_coef > 0;
-    double *u2Ptr_p1 = do_laf_check ? new double[NUM_TENTS*6] : nullptr, *u2_p1;
-    u2_p1=u2Ptr_p1;
-    double *u2Ptr_p2 = do_laf_check ? new double[NUM_TENTS*6] : nullptr, *u2_p2;
-    u2_p2=u2Ptr_p2;
-
-    typedef unsigned char uchar;
-    unsigned char *inl = new uchar[NUM_TENTS];
-
-
-    if (do_laf_check) {
-        for (size_t i=0; i < NUM_TENTS; i++) {
-
-            //x1,y1,1
-            *u2Ptr =  ptr1[DIM*i];
-            u2Ptr++;
-            *u2Ptr =  ptr1[DIM*i+1];
-            u2Ptr++;
-            *u2Ptr =  1.;
-            u2Ptr++;
-
-            //x2,y2,1
-            *u2Ptr =  ptr1a[DIM*i];
-            u2Ptr++;
-            *u2Ptr =  ptr1a[DIM*i+1];
-            u2Ptr++;
-            *u2Ptr =  1.;
-            u2Ptr++;
-
-            //x1 + a12,y1 + a22,1
-            *u2Ptr_p1 = ptr1[DIM*i] + ptr1[DIM*i+3];
-            u2Ptr_p1++;
-            *u2Ptr_p1 = ptr1[DIM*i+1] + ptr1[DIM*i+5];
-            u2Ptr_p1++;
-            *u2Ptr_p1 =  1.;
-            u2Ptr_p1++;
-
-            //x2 + a12,y2 + a22,1
-            *u2Ptr_p1 = ptr1a[DIM*i] + ptr1a[DIM*i+3];
-            u2Ptr_p1++;
-            *u2Ptr_p1 = ptr1a[DIM*i+1] + ptr1a[DIM*i+5];
-            u2Ptr_p1++;
-            *u2Ptr_p1 =  1.;
-            u2Ptr_p1++;
-
-
-            //x1 + a11,y1 + a21,1
-            *u2Ptr_p2 = ptr1[DIM*i] + ptr1[DIM*i+2];
-            u2Ptr_p2++;
-            *u2Ptr_p2 = ptr1[DIM*i+1] + ptr1[DIM*i+4];
-            u2Ptr_p2++;
-            *u2Ptr_p2 =  1.;
-            u2Ptr_p2++;
-
-            //x2 + a11,y2 + a21,1
-            *u2Ptr_p2 = ptr1a[DIM*i] + ptr1a[DIM*i+2];
-            u2Ptr_p2++;
-            *u2Ptr_p2 = ptr1a[DIM*i+1] + ptr1a[DIM*i+4];
-            u2Ptr_p2++;
-            *u2Ptr_p2 =  1.;
-            u2Ptr_p2++;
-
-        }
-    } else {
-        for (size_t i=0; i < NUM_TENTS; i++) {
-
-            *u2Ptr =  ptr1[DIM*i];
-            u2Ptr++;
-
-            *u2Ptr =  ptr1[DIM*i+1];
-            u2Ptr++;
-            *u2Ptr =  1.;
-            u2Ptr++;
-
-            *u2Ptr =  ptr1a[DIM*i];
-            u2Ptr++;
-
-            *u2Ptr =  ptr1a[DIM*i+1];
-            u2Ptr++;
-            *u2Ptr =  1.;
-            u2Ptr++;
-        };
-    }
-
-
-    int* data_out = (int *) malloc(NUM_TENTS * 18 * sizeof(int));
-    if (data_out == nullptr) {
-        delete [] u2;
-        delete [] u2_p1;
-        delete [] u2_p2;
-        delete [] inl;
-        throw std::bad_alloc();
-    }
     // Run the RANSAC
-    exp_ransacFcustomLAF(u2,
-                         u2_p1,
-                         u2_p2,
-                         NUM_TENTS,
+    exp_ransacFcustomLAF(in.u2,
+                         in.u2_p1,
+                         in.u2_p2,
+                         in.num_tents,
                          error_threshold,
                          laf_coef,
                          conf,
                          max_iters,
                          F,
-                         inl,
-                         data_out,
+                         in.inl,
+                         in.data_out,
                          1, 0,
                          NULL,
                          EXFDS1,FDS1,FDSidx1,
@@ -464,35 +369,7 @@ py::tuple findFundamentalMatrix_(py::array_t<double, py::array::c_style | py::ar
                          (int)enable_degeneracy_check,
                          seed);
 
-
-    // Convert and store output
-
-
-
-    //Model
-    py::array_t<double> F_out = py::array_t<double>({3,3});
-    py::buffer_info buf_F_out = F_out.request();
-    double *ptr_F_out = (double *)buf_F_out.ptr;
-
-    for (size_t i=0; i<9; i++)
-        ptr_F_out[i]=F[i];
-
-    //Inliers
-    py::array_t<bool> inliers_out = py::array_t<bool>(NUM_TENTS);
-    py::buffer_info buf_inliers = inliers_out.request();
-    bool *ptr_inliers= (bool *)buf_inliers.ptr;
-    for (size_t i = 0; i < NUM_TENTS; i++)
-        ptr_inliers[i] = (bool) inl[i];
-
-
-    free(data_out);
-    delete [] u2;
-    delete [] u2_p1;
-    delete [] u2_p2;
-    delete [] inl;
-
-
-    return py::make_tuple(F_out, inliers_out);
+    return pack_output(F, in.inl, in.num_tents);
 }
 
 
