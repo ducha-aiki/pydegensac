@@ -123,6 +123,43 @@ hand-rolled Gaussian elimination whose FP operation order defines the golden
 outputs; any reordering (or LAPACK substitution) is a numeric behavior
 change. Same for `rroots3`/`slcm`.
 
+## Addendum: candidate evaluation + cleanups (same day)
+
+The "remaining candidates" above were evaluated; measured outcomes:
+
+- **Build flags**: the C core already compiles at `-O3` everywhere (CMake
+  Release default; the `CMAKE_CXX_FLAGS` extras only ever applied to
+  bindings.cpp under GCC). Adding `-funroll-loops` to the C core measured
+  neutral for H and *worse* for F (icache pressure) — flags left unchanged.
+- **Vectorization**: clang `-Rpass=loop-vectorize` shows the hot error
+  functions (`FDs`, `HDs`, and the `HDsSym*` family) are already
+  auto-vectorized (width 2; the per-point division limits more).
+  `inlidxs` cannot vectorize due to its compress-store — inherent.
+- **`inlidxs` fusion and LO malloc hoisting: rejected.** The error array is
+  L1-resident at these problem sizes, so the "extra pass" is nearly free —
+  `inlidxs`'s real cost is the `truncQuad` division/branch, which fusion
+  cannot remove; malloc traffic measured at ~0.1%. Both changes risk
+  perturbing FP codegen (scalar-vs-vector FMA contraction) for <=1-2% gain.
+
+Conclusion: after the RNG work, the remaining runtime is genuine FP math
+(`HDs`/`FDs`/`nullspace`/`rroots3`) that cannot be touched bit-exactly.
+Further speed requires algorithmic changes (e.g. the `(IDEA:)` adaptive-LO
+evaluation), gated on measured quality, not bit-equivalence.
+
+Cleanups landed (all gate-green in exact mode):
+
+- `36d25c0` — deleted the dead H-from-degeneracy plumbing in the F
+  estimator (the `for(a=0;a<0;...)` loop, `Ihmax`/`Hbest` bookkeeping, the
+  `H_best`/`Ih` params, bindings' `HinF`/`I_H`), resolving the handoff's
+  item 3 via the bit-equivalent option.
+- `64c73a6` — bindings dedup: shared `validate_input`/`convert_input`/
+  `pack_output` + RAII buffer holder; net -123 lines; also fixes a leak
+  when output-array allocation threw.
+- `33242e4` — CI: cp314 wheels on macOS/Windows via 3.4.1 cp314-only jobs
+  (mirroring the linux split; 3.x dropped cp38), macOS release-publish
+  step added, workflow concurrency group. Untested until the next push —
+  watch the first run.
+
 ## Cross-platform note
 
 Local golden exactness is macOS-specific as before (CI stays in sanity
