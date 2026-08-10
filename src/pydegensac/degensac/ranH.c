@@ -1,11 +1,8 @@
 //#include <stdio.h>
 #include <stdlib.h>
 #include <memory.h>
-#include <limits.h>
-#include <math.h>
 
 #include "../matutls/matutl.h"
-#include "utools.h"
 #include "Htools.h"
 
 #include "ranH.h"
