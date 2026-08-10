@@ -6,7 +6,7 @@ import math
 try:
     import cv2
     OPENCV_HERE = True
-except:
+except ImportError:
     OPENCV_HERE = False
 
 import warnings
@@ -90,7 +90,7 @@ def findHomography(pts1_,
         laf_consistensy_coef = 0
     try:
         error_type_int = error_type_dict_homography[error_type.lower()]
-    except:
+    except (KeyError, AttributeError):
         raise ValueError("Error type should be on of {}. Got {} instead".format(list(error_type_dict_homography.keys()),
                                                                             error_type))
     laf_consistensy_coef = max(0, laf_consistensy_coef)
@@ -105,7 +105,7 @@ def findHomography(pts1_,
                              seed);
     if np.abs(H).sum() == 0:
         # If we haven`t found any good model, output zeros
-        mask = [False]*len(mask)
+        mask = np.zeros(n, dtype=bool)
         return H, mask
     H_out = np.linalg.inv(H.T) 
     return H_out, mask
@@ -130,7 +130,7 @@ def findFundamentalMatrix(pts1_,
         laf_consistensy_coef = 0
     try:
         error_type_int = error_type_dict_fundamental[error_type.lower()]
-    except:
+    except (KeyError, AttributeError):
         raise ValueError("Error type should be on of {}. Got {} instead".format(list(error_type_dict_fundamental.keys()),
                                                                             error_type))
     laf_consistensy_coef = max(0, laf_consistensy_coef)
@@ -146,5 +146,5 @@ def findFundamentalMatrix(pts1_,
                          seed);
     if np.abs(F).sum() == 0:
         # If we haven`t found any good model, output zeros
-        mask = [False]*n
+        mask = np.zeros(n, dtype=bool)
     return F, mask
