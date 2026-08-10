@@ -11,6 +11,23 @@
 
 typedef ptrdiff_t lapack_int;
 
+/* DGEQP3 prototype (LAPACK). Declared here (rather than in lapwrap.c, like the other
+   raw LAPACK externs) because Ftools.c calls dgeqp3_ directly and needs the
+   declaration in scope; lapwrap.h is the header Ftools.c already includes.
+   Without this, the call compiled only via implicit-int-declaration, which newer
+   compilers (e.g. GCC 14, used by the manylinux_2_28 image) reject as an error. */
+#ifdef _WIN32
+extern void dgeqp3_( lapack_int* m, lapack_int* n, double* a, lapack_int* lda,
+                     lapack_int* jpvt, double* tau, double* work, lapack_int* lwork,
+                     lapack_int* info );
+#endif
+
+#ifdef __linux__
+extern void dgeqp3_( lapack_int* m, lapack_int* n, double* a, lapack_int* lda,
+                     lapack_int* jpvt, double* tau, double* work, lapack_int* lwork,
+                     lapack_int* info );
+#endif
+
 /* Library of tools wrapping LAPACK utilities and making their usage a bit more comfortable.
    All the matrices are stored row-wise! */
 
