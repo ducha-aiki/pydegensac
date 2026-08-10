@@ -445,10 +445,6 @@ py::tuple findFundamentalMatrix_(py::array_t<double, py::array::c_style | py::ar
         delete [] inl;
         throw std::bad_alloc();
     }
-    int I_H = 0;
-    int *Ihptr = &I_H;
-    double HinF [3*3];
-
     // Run the RANSAC
     exp_ransacFcustomLAF(u2,
                          u2_p1,
@@ -463,7 +459,6 @@ py::tuple findFundamentalMatrix_(py::array_t<double, py::array::c_style | py::ar
                          data_out,
                          1, 0,
                          NULL,
-                         HinF,Ihptr,
                          EXFDS1,FDS1,FDSidx1,
                          SymCheck_th,
                          (int)enable_degeneracy_check,

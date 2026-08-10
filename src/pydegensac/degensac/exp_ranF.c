@@ -261,8 +261,7 @@ Score exp_inFranicustom (double *u, int len, int *inliers, int ninl,
 int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2, int len, double th, double laf_coef,
                          double conf, int max_sam,
                          double *F, unsigned char * inl,
-                         int * data_out, int do_lo, unsigned inlLimit, double **resids, double* H_best,
-                         int* Ih, exFDsPtr EXFDS1, FDsPtr FDS1, FDsidxPtr FDS1idx, double SymCheck_th,
+                         int * data_out, int do_lo, unsigned inlLimit, double **resids, exFDsPtr EXFDS1, FDsPtr FDS1, FDsidxPtr FDS1idx, double SymCheck_th,
                          int enable_degen_check, int seed) {
 
     int *pool, no_sam, new_sam;  double *Z, *buffer, u7[6*7], H[3*3], FBest[3*3];
@@ -282,8 +281,6 @@ int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2, int len, double th
     double jj;
     double * HDs = (double *) malloc(len*sizeof(double));
     int bad_model = 0;
-    int Ihmax = 0;
-    double Hbest[9];
     const int doSymCheck = SymCheck_th > 0;
     const int DO_LAF_CHECK =  laf_coef > 0;
     const double th_laf_check = laf_coef * th;
@@ -458,8 +455,6 @@ int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2, int len, double th
 
                     I = innerH(H, u, len, 16*th, 10, inl, bufferP, buffer); /*originally was 30 reps, lowered because of bad performance*/
 
-                    if (I > Ihmax) {Ihmax = I; for (a=0;a<9;a++) Hbest[a] = H[a];};//Mishkin
-
                     ////printf("I after innrH %u.\n", I);
 
                     ////printf("__PROFILE: AFTER  innerH: %d\n", getticks()/1000);
@@ -615,8 +610,6 @@ int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2, int len, double th
                 I = innerH(H, u, len, 16*th, 10, inl, bufferP, buffer); /*originally was 30 reps, lowered because of bad performance*/
                 ////printf("__PROFILE: AFTER  innerH: %d\n", getticks()/1000);
             }
-            if (I > Ihmax) {Ihmax = I; for (a=0;a<9;a++) Hbest[a] = H[a];};//Mishkin
-
             if (I > 6) {
                 /*[aF, v] = rFtH(u, ahi, th, aH);
                                 no_i = sum(v);
@@ -785,9 +778,6 @@ int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2, int len, double th
     data_out[1] = iter_cnt;
 
     ////printf("__PROFILE: AFTER ransac: %d\n", getticks()/1000);
-    *Ih = Ihmax;
-    for (a=0;a<0;a++)
-        H_best[a] = Hbest[a];
     return maxS.I;
 
 }
