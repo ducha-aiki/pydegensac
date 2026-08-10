@@ -43,20 +43,6 @@ D3: Detached  - use only subset of inliers (randomly chosen)
 unsigned getticks(void);
 #endif /*__linux__*/
 
-Score exp_iterF(double *u, int len, int *inliers, int * inl2, double th, double ths, int iters,
-                double *F, double **errs, double *buffer, int * samidx,
-                int iterID, unsigned inlLimit, double *resids);
-
-
-Score exp_inFrani (double *u, int len, int *inliers, int ninl,
-                   double th, double **errs, double *buffer,
-                   double *F, int * samidx, int * iterID, unsigned inlLimit, double *resids);
-#ifdef __cplusplus
-extern "C"
-#endif
-int exp_ransacF (double *u, int len, double th, double conf, int max_sam,
-                 double *F, unsigned char * inl, int * data_out, int do_lo, unsigned inlLimit, double **resids, double* H_best, int *Ih);
-
 Score exp_iterFcustom(double *u, int len, int *inliers, int * inl2, double th, double ths, int iters,
           double *F, double **errs, double *buffer, int * samidx, int iterID, unsigned inlLimit, double *resids, exFDsPtr EXFDS1,FDsPtr FDS1);
 

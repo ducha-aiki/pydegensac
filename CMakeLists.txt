@@ -8,7 +8,9 @@ if (LAPACK_FOUND)
   SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${LAPACK_CXX_FLAGS}")
 endif (LAPACK_FOUND)
 
-SET(CMAKE_BUILD_TYPE "RELEASE")
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Release)
+endif()
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -35,8 +37,6 @@ set(degensac_srcs
         src/pydegensac/degensac/Ftools.c
         src/pydegensac/degensac/hash.c
         src/pydegensac/degensac/Htools.c
-        src/pydegensac/degensac/ranF.c
-        src/pydegensac/degensac/ranH2el.c
         src/pydegensac/degensac/ranH.c
         src/pydegensac/degensac/rtools.c
         src/pydegensac/degensac/utools.c

@@ -12,15 +12,6 @@
 int HcloseToSingular(const double *h);
 
 
-Score exp_iterH(double *u, int len, int *inliers, double th, double ths,
-                int steps, double *H, double *Z, double **errs, double *buffer,
-                int iterID, unsigned inlLimit, double *resids);
-
-Score exp_inHrani (double *u, int len, int *inliers, int ninl,
-                   double th, double *Z, double **errs,
-                   double *buffer, double *H, int rep,
-                   int * iterID, unsigned inlLimit, double *resids);
-
 Score exp_inHranicustom (double *u, int len, int *inliers, int ninl,
                          double th, double *Z, double **errs,
                          double *buffer, double *H, int rep,
@@ -37,8 +28,4 @@ Score exp_ransacHcustomLAF (double *u, double *u_1, double *u_2, int len, double
                             int oriented_constraint, unsigned inlLimit, double **resids,
                             HDsPtr HDS1, HDsiPtr HDSi1, HDsidxPtr HDSidx1, double SymCheck_th,
                             int seed);
-/* Model-Change Error of homography (squared),
-        deefined as mean square error of sample points when added the point as hard constraint */
-void hMCEs(double *Z, double *u, double *d, int *samidx, int len, double * errs, double thr);
-
 #endif

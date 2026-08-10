@@ -44,3 +44,6 @@ __pycache__
 *.exe
 *.out
 *.app
+
+# Downloaded/generated golden-data source assets (see scripts/make_golden_data.py)
+.cache/
