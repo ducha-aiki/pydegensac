@@ -33,9 +33,11 @@ jobs:
             cp314-manylinux_x86_64
           CIBW_REPAIR_WHEEL_COMMAND_LINUX: "auditwheel repair -w {dest_dir} {wheel}"
           CIBW_TEST_COMMAND: >
+            python -m pytest {project}/tests -q &&
             python -c "import os, runpy; os.chdir(r'{project}/examples');
             runpy.run_path('simple-example.py', run_name='__main__')"
-          CIBW_TEST_REQUIRES: opencv-python-headless matplotlib
+          CIBW_TEST_REQUIRES: opencv-python-headless matplotlib pytest
+          CIBW_ENVIRONMENT: PYDEGENSAC_GOLDEN_EXACT=0
 
       - uses: actions/upload-artifact@v4
         with:
@@ -78,10 +80,12 @@ jobs:
             cp314-macosx_x86_64 cp314-macosx_arm64
           CIBW_REPAIR_WHEEL_COMMAND_MACOS: ""
           CIBW_TEST_COMMAND: >
+            python -m pytest {project}/tests -q &&
             python -c "import os, runpy; os.chdir(r'{project}/examples');
             runpy.run_path('simple-example.py', run_name='__main__')"
-          CIBW_TEST_REQUIRES: opencv-python-headless matplotlib
+          CIBW_TEST_REQUIRES: opencv-python-headless matplotlib pytest
           CIBW_TEST_SKIP: "cp38-macosx_*:arm64"
+          CIBW_ENVIRONMENT: PYDEGENSAC_GOLDEN_EXACT=0
 
       - uses: actions/upload-artifact@v4
         with:
@@ -121,10 +125,12 @@ jobs:
           CIBW_ENVIRONMENT_WINDOWS: >
             VCPKG_ROOT=C:/vcpkg
             CMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake
+            PYDEGENSAC_GOLDEN_EXACT=0
           CIBW_TEST_COMMAND: >
+            python -m pytest {project}/tests -q &&
             python -c "import os, runpy; os.chdir(r'{project}/examples');
             runpy.run_path('simple-example.py', run_name='__main__')"
-          CIBW_TEST_REQUIRES: opencv-python-headless matplotlib
+          CIBW_TEST_REQUIRES: opencv-python-headless matplotlib pytest
 
       - uses: actions/upload-artifact@v4
         with:
