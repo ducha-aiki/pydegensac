@@ -214,7 +214,7 @@ if __name__ == "__main__":
     make_evd_goldens()
 ```
 
-Note: if `EVDDataset` samples use different keys than `img1`/`img2` (inspect the first `pair` with `print(pair.keys())` on first failure), adapt the two access lines — the dataset API is the only part not verifiable offline. If SIFT finds too few matches on the extreme EVD pairs even at ratio 0.9, fall back to the pre-extracted EVD from https://cmp.felk.cvut.cz/wbs/ (download `EVD.zip`; `h/` holds GT homographies as text files, `1/` and `2/` the image pairs) and keep the same npz schema.
+**AMENDED after Task-2 blocker (user decision 2026-08-10):** do NOT extract SIFT on EVD images — vanilla SIFT qualifies 0/15 EVD pairs (the dataset is designed to defeat it). Instead use the MODS-generated tentative correspondences: download http://cmp.felk.cvut.cz/wbs/datasets/EVD_tentatives.zip into `.cache/`, inspect its per-pair files to learn the format (MODS output; expect per-pair correspondence arrays, take columns for x1,y1,x2,y2), and use those tentatives as `pts1`/`pts2` (float64). GT homographies come from the EVD `h/` files (or `EVDDataset`'s GT). `extract_sift`/`ratio_match` remain in the script for the IMC F-pairs (Task 3); the EVD path just loads tentatives. Keep the same npz schema, seeds, params, and sanity gate — with MODS tentatives the GT-agreement check is expected to pass.
 
 - [ ] **Step 3: Run it**
 
