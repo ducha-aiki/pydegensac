@@ -16,8 +16,8 @@ enum RANSAC_error_t_h {SAMPSON = 0,
 enum RANSAC_error_t_f {SAMPSON_F = 0,
     SYMM_EPI_F = 1};
 
-py::tuple findHomography_(py::array_t<double>  x1y1_,
-                          py::array_t<double>   x2y2_,
+py::tuple findHomography_(py::array_t<double, py::array::c_style | py::array::forcecast>  x1y1_,
+                          py::array_t<double, py::array::c_style | py::array::forcecast>   x2y2_,
                           double px_th,
                           double conf,
                           int max_iters,
@@ -27,6 +27,12 @@ py::tuple findHomography_(py::array_t<double>  x1y1_,
                           int seed) {
     // Get the data
     py::buffer_info buf1 = x1y1_.request();
+    py::buffer_info buf1a = x2y2_.request();
+
+    if ((buf1.ndim != 2) || (buf1a.ndim != 2)) {
+        throw std::invalid_argument( "x1y1 and x2y2 must be 2-D arrays with dims [n,2] or [n,6]" );
+    }
+
     size_t NUM_TENTS = buf1.shape[0];
     size_t DIM = buf1.shape[1];
 
@@ -36,7 +42,6 @@ py::tuple findHomography_(py::array_t<double>  x1y1_,
     if (NUM_TENTS < 4) {
         throw std::invalid_argument( "x1y1 should be an array with dims [n,2], n>=4");
     }
-    py::buffer_info buf1a = x2y2_.request();
     size_t NUM_TENTSa = buf1a.shape[0];
     size_t DIMa = buf1a.shape[1];
 
@@ -45,6 +50,12 @@ py::tuple findHomography_(py::array_t<double>  x1y1_,
     }
     if (NUM_TENTSa != NUM_TENTS) {
         throw std::invalid_argument( "x1y1 and x2y2 should be the same size");
+    }
+    if (DIM != DIMa) {
+        throw std::invalid_argument( "x1y1 and x2y2 must have the same number of columns");
+    }
+    if ((laf_coef > 0) && (DIM == 2)) {
+        throw std::invalid_argument( "laf_coef > 0 requires [n,6] input (LAF data)");
     }
 
     double *ptr1 = (double *) buf1.ptr; // pointer to x1y1 data
@@ -107,7 +118,7 @@ py::tuple findHomography_(py::array_t<double>  x1y1_,
     }
 
 
-    double H[3*3];
+    double H[3*3] = {0};
 
     double *u2Ptr = new double[NUM_TENTS*6], *u2;
     u2=u2Ptr;
@@ -199,6 +210,13 @@ py::tuple findHomography_(py::array_t<double>  x1y1_,
 
 
     int* data_out = (int *) malloc(NUM_TENTS * 18 * sizeof(int));
+    if (data_out == nullptr) {
+        delete [] u2;
+        delete [] u2_p1;
+        delete [] u2_p2;
+        delete [] inl;
+        throw std::bad_alloc();
+    }
     double *resids = nullptr;
 
 
@@ -252,8 +270,8 @@ py::tuple findHomography_(py::array_t<double>  x1y1_,
     return py::make_tuple(H_out, inliers_out);
 }
 
-py::tuple findFundamentalMatrix_(py::array_t<double>  x1y1_,
-                                 py::array_t<double>  x2y2_,
+py::tuple findFundamentalMatrix_(py::array_t<double, py::array::c_style | py::array::forcecast>  x1y1_,
+                                 py::array_t<double, py::array::c_style | py::array::forcecast>  x2y2_,
                                  double px_th,
                                  double conf,
                                  int max_iters,
@@ -264,6 +282,12 @@ py::tuple findFundamentalMatrix_(py::array_t<double>  x1y1_,
                                  int seed) {
     // Get the data
     py::buffer_info buf1 = x1y1_.request();
+    py::buffer_info buf1a = x2y2_.request();
+
+    if ((buf1.ndim != 2) || (buf1a.ndim != 2)) {
+        throw std::invalid_argument( "x1y1 and x2y2 must be 2-D arrays with dims [n,2] or [n,6]" );
+    }
+
     size_t NUM_TENTS = buf1.shape[0];
     size_t DIM = buf1.shape[1];
 
@@ -273,7 +297,6 @@ py::tuple findFundamentalMatrix_(py::array_t<double>  x1y1_,
     if (NUM_TENTS < 8) {
         throw std::invalid_argument( "x1y1 should be an array with dims [n,2], n>=8");
     }
-    py::buffer_info buf1a = x2y2_.request();
     size_t NUM_TENTSa = buf1a.shape[0];
     size_t DIMa = buf1a.shape[1];
 
@@ -282,6 +305,12 @@ py::tuple findFundamentalMatrix_(py::array_t<double>  x1y1_,
     }
     if (NUM_TENTSa != NUM_TENTS) {
         throw std::invalid_argument( "x1y1 and x2y2 should be the same size");
+    }
+    if (DIM != DIMa) {
+        throw std::invalid_argument( "x1y1 and x2y2 must have the same number of columns");
+    }
+    if ((laf_coef > 0) && (DIM == 2)) {
+        throw std::invalid_argument( "laf_coef > 0 requires [n,6] input (LAF data)");
     }
 
     double *ptr1 = (double *) buf1.ptr; // pointer to x1y1 data
@@ -320,7 +349,7 @@ py::tuple findFundamentalMatrix_(py::array_t<double>  x1y1_,
     }
 
 
-    double F[3*3];
+    double F[3*3] = {0};
 
     double *u2Ptr = new double[NUM_TENTS*6], *u2;
     u2=u2Ptr;
@@ -412,6 +441,13 @@ py::tuple findFundamentalMatrix_(py::array_t<double>  x1y1_,
 
 
     int* data_out = (int *) malloc(NUM_TENTS * 18 * sizeof(int));
+    if (data_out == nullptr) {
+        delete [] u2;
+        delete [] u2_p1;
+        delete [] u2_p2;
+        delete [] inl;
+        throw std::bad_alloc();
+    }
     double *resids = nullptr;
     int I_H = 0;
     int *Ihptr = &I_H;
@@ -471,8 +507,8 @@ py::tuple findFundamentalMatrix_(py::array_t<double>  x1y1_,
 }
 
 
-PYBIND11_PLUGIN(pydegensac) {
-    py::module m("pydegensac", R"doc(
+PYBIND11_MODULE(pydegensac, m) {
+    m.doc() = R"doc(
                  Python module
                  -----------------------
                  .. currentmodule:: pydegensac
@@ -482,7 +518,7 @@ PYBIND11_PLUGIN(pydegensac) {
                  findHomography_,
                  findFundamentalMatrix_
 
-                 )doc");
+                 )doc";
 
 
     m.def("findHomography_", &findHomography_, R"doc(some doc)doc",
@@ -507,6 +543,4 @@ PYBIND11_PLUGIN(pydegensac) {
           py::arg("laf_coef") = 0,
           py::arg("enable_degeneracy_check") = 1,
           py::arg("seed") = -1);
-
-    return m.ptr();
 }
