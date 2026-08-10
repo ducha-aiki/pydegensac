@@ -35,8 +35,6 @@ set(degensac_srcs
         src/pydegensac/degensac/Ftools.c
         src/pydegensac/degensac/hash.c
         src/pydegensac/degensac/Htools.c
-        src/pydegensac/degensac/ranF.c
-        src/pydegensac/degensac/ranH2el.c
         src/pydegensac/degensac/ranH.c
         src/pydegensac/degensac/rtools.c
         src/pydegensac/degensac/utools.c
