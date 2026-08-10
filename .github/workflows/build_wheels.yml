@@ -23,6 +23,9 @@ jobs:
         run: .venv/bin/python -m cibuildwheel --output-dir wheelhouse
         env:
           CIBW_BEFORE_ALL_LINUX: yum install -y lapack-devel blas-devel gcc-gfortran
+          # cp314 is built separately in build_wheels_linux_2_28: numpy publishes no
+          # manylinux2014/manylinux_2_17 wheel for cp314 (only manylinux_2_28+), so it
+          # can't be test-installed in this manylinux2014-based job.
           CIBW_BUILD: >
             cp38-manylinux_x86_64
             cp39-manylinux_x86_64
@@ -30,6 +33,52 @@ jobs:
             cp311-manylinux_x86_64
             cp312-manylinux_x86_64
             cp313-manylinux_x86_64
+          CIBW_REPAIR_WHEEL_COMMAND_LINUX: "auditwheel repair -w {dest_dir} {wheel}"
+          CIBW_TEST_COMMAND: >
+            python -m pytest {project}/tests -q &&
+            python -c "import os, runpy; os.chdir(r'{project}/examples');
+            runpy.run_path('simple-example.py', run_name='__main__')"
+          # numpy<2.3 pin keeps cp312/cp313 test venvs on manylinux2014-compatible
+          # numpy wheels (2.3.0 dropped manylinux_2_17); harmless for cp38-cp311,
+          # which resolve older numpy anyway.
+          CIBW_TEST_REQUIRES: opencv-python-headless<5 pytest numpy<2.3
+          CIBW_ENVIRONMENT: PYDEGENSAC_GOLDEN_EXACT=0
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheels-linux
+          path: wheelhouse/*.whl
+
+      - name: Publish wheels to GitHub release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: wheelhouse/*.whl
+
+  build_wheels_linux_2_28:
+    name: Build wheels on linux (manylinux_2_28)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+
+      - name: Create virtualenv
+        run: python3 -m venv .venv
+
+      - name: Install cibuildwheel
+        run: .venv/bin/python -m pip install cibuildwheel==2.21.2
+
+      - name: Build wheels
+        run: .venv/bin/python -m cibuildwheel --output-dir wheelhouse
+        env:
+          CIBW_MANYLINUX_X86_64_IMAGE: manylinux_2_28
+          CIBW_BEFORE_ALL_LINUX: yum install -y lapack-devel blas-devel gcc-gfortran
+          # cp314-only: numpy has no manylinux2014/manylinux_2_17 wheel for cp314,
+          # so it needs the newer manylinux_2_28 image (numpy wheels exist there).
+          CIBW_BUILD: >
             cp314-manylinux_x86_64
           CIBW_REPAIR_WHEEL_COMMAND_LINUX: "auditwheel repair -w {dest_dir} {wheel}"
           CIBW_TEST_COMMAND: >
@@ -41,7 +90,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: wheels-linux
+          name: wheels-linux-2_28
           path: wheelhouse/*.whl
 
       - name: Publish wheels to GitHub release
