@@ -264,7 +264,6 @@ int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2, int len, double th
                          int * data_out, int do_lo, unsigned inlLimit, double **resids, double* H_best,
                          int* Ih, exFDsPtr EXFDS1, FDsPtr FDS1, FDsidxPtr FDS1idx, double SymCheck_th,
                          int enable_degen_check, int seed) {
-    unsigned rand_seed;
 
     int *pool, no_sam, new_sam;  double *Z, *buffer, u7[6*7], H[3*3], FBest[3*3];
     int * bufferP;
@@ -352,19 +351,12 @@ int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2, int len, double th
     f1 = sol;
     f2 = sol+9;
 
-    rand_seed = rand();
-
     /*  srand(RAND_SEED++); */
     while(no_sam < max_sam) {
         no_sam ++;
 
-        reseed_rng(rand_seed);
-
         rsampleT(Z, 9, pool, 7, len, A);
         loadSample(u, samidx, 7, 6, u7);
-
-        rand_seed = rand();
-        ////printf("Seed: %d\n",seed);
 
 
 #if USE_QR
