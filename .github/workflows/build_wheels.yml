@@ -36,7 +36,7 @@ jobs:
             python -m pytest {project}/tests -q &&
             python -c "import os, runpy; os.chdir(r'{project}/examples');
             runpy.run_path('simple-example.py', run_name='__main__')"
-          CIBW_TEST_REQUIRES: opencv-python-headless matplotlib pytest
+          CIBW_TEST_REQUIRES: opencv-python-headless<5 matplotlib pytest
           CIBW_ENVIRONMENT: PYDEGENSAC_GOLDEN_EXACT=0
 
       - uses: actions/upload-artifact@v4
@@ -83,7 +83,7 @@ jobs:
             python -m pytest {project}/tests -q &&
             python -c "import os, runpy; os.chdir(r'{project}/examples');
             runpy.run_path('simple-example.py', run_name='__main__')"
-          CIBW_TEST_REQUIRES: opencv-python-headless matplotlib pytest
+          CIBW_TEST_REQUIRES: opencv-python-headless<5 matplotlib pytest
           CIBW_TEST_SKIP: "cp38-macosx_*:arm64"
           CIBW_ENVIRONMENT: PYDEGENSAC_GOLDEN_EXACT=0
 
@@ -130,7 +130,7 @@ jobs:
             python -m pytest {project}/tests -q &&
             python -c "import os, runpy; os.chdir(r'{project}/examples');
             runpy.run_path('simple-example.py', run_name='__main__')"
-          CIBW_TEST_REQUIRES: opencv-python-headless matplotlib pytest
+          CIBW_TEST_REQUIRES: opencv-python-headless<5 matplotlib pytest
 
       - uses: actions/upload-artifact@v4
         with:
