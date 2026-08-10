@@ -31,6 +31,7 @@ include_directories(
 src/pydegensac
 src/pydegensac/degensac)
 set(degensac_srcs
+        src/pydegensac/degensac/bsd_random.c
         src/pydegensac/degensac/DegUtils.c
         src/pydegensac/degensac/exp_ranF.c
         src/pydegensac/degensac/exp_ranH.c

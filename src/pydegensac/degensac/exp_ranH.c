@@ -9,6 +9,7 @@
 #include "lapwrap.h"
 #include "rtools.h"
 #include "hash.h"
+#include "bsd_random.h"
 
 
 static HashTable HASH_TABLE_H;
@@ -30,7 +31,7 @@ static HashTable HASH_TABLE_H;
 static void reseed_rng(unsigned seed_value) {
     srand(seed_value);
 #ifndef WIN32
-    srandom(seed_value);
+    degensac_srandom(seed_value);
 #endif
 }
 

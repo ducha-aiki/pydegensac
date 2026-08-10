@@ -12,6 +12,7 @@ static HashTable HASH_TABLE_F;
 #include "Ftools.h"
 #include "rtools.h"
 #include "utools.h"
+#include "bsd_random.h"
 #include "../matutls/matutl.h"
 #include <time.h>
 //#include <mex.h>
@@ -47,7 +48,7 @@ static HashTable HASH_TABLE_F;
 static void reseed_rng(unsigned seed_value) {
     srand(seed_value);
 #ifndef WIN32
-    srandom(seed_value);
+    degensac_srandom(seed_value);
 #endif
 }
 
