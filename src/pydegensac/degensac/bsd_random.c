@@ -18,11 +18,13 @@ static int rptr_idx = 0;
    matrix times the seeded words -- 961 independent multiply-adds the
    compiler can vectorize, instead of a 310-step serial dependency chain. */
 static uint32_t warm_mat[RAND_DEG][RAND_DEG];
-static int warm_mat_ready = 0;
+static uint32_t pow16807[RAND_DEG];  /* 16807^i mod 2^31-1 */
+static int tables_ready = 0;
 
-static void init_warm_mat(void)
+static void init_tables(void)
 {
     static uint32_t v[RAND_DEG + WARMUP][RAND_DEG];
+    uint64_t p;
     int n, k;
 
     for (k = 0; k < RAND_DEG; k++)
@@ -35,7 +37,13 @@ static void init_warm_mat(void)
     for (n = WARMUP - RAND_DEG; n < WARMUP; n++)
         for (k = 0; k < RAND_DEG; k++)
             warm_mat[(RAND_SEP + n) % RAND_DEG][k] = v[RAND_DEG + n][k];
-    warm_mat_ready = 1;
+
+    p = 1;
+    for (n = 0; n < RAND_DEG; n++) {
+        pow16807[n] = (uint32_t) p;
+        p = (p * 16807) % 2147483647u;
+    }
+    tables_ready = 1;
 }
 
 /* Park-Miller step via Schrage's trick; FreeBSD substitutes 123459876 for a
@@ -72,12 +80,28 @@ void degensac_srandom(unsigned seed)
     uint32_t init[RAND_DEG], x[RAND_DEG];
     int i, j, k;
 
-    if (!warm_mat_ready)
-        init_warm_mat();
+    if (!tables_ready)
+        init_tables();
 
-    init[0] = (uint32_t) seed;
-    for (i = 1; i < RAND_DEG; i++)
-        init[i] = (uint32_t) good_rand((int32_t) init[i - 1]);
+    if ((int32_t) seed > 0 && seed < 2147483647u) {
+        /* seeding LCG is Park-Miller, so init[i] = 16807^i * seed mod
+           2^31-1: independent per word (vectorizable) instead of a 30-step
+           serial chain; reduction by Mersenne-prime folding */
+        for (i = 0; i < RAND_DEG; i++) {
+            uint64_t m = (uint64_t) seed * pow16807[i];
+            uint64_t v = (m & 0x7fffffff) + (m >> 31);
+            v = (v & 0x7fffffff) + (v >> 31);
+            if (v == 2147483647u)  /* wrap; v stays nonzero for seed > 0 */
+                v = 0;
+            init[i] = (uint32_t) v;
+        }
+    } else {
+        /* seed 0 or with the top bit set: libc runs the LCG on the raw
+           int32 (with the good_rand zero substitution) -- follow it */
+        init[0] = (uint32_t) seed;
+        for (i = 1; i < RAND_DEG; i++)
+            init[i] = (uint32_t) good_rand((int32_t) init[i - 1]);
+    }
     /* the warm-up recurrence visits the seeded slots rotated by RAND_SEP */
     for (k = 0; k < RAND_DEG; k++)
         x[k] = init[(k + RAND_SEP) % RAND_DEG];
