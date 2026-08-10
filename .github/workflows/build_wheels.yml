@@ -69,7 +69,11 @@ jobs:
         run: python3 -m venv .venv
 
       - name: Install cibuildwheel
-        run: .venv/bin/python -m pip install cibuildwheel==2.21.2
+        # 2.21.2 (Oct 2024, used by the other jobs) predates CPython 3.14 and has no
+        # cp314 build identifiers at all ("No build identifiers selected"). 3.4.1 is
+        # the newest 3.x release and has shipped cp314 as a default (non-prerelease)
+        # target since 3.1.0 (Jul 2025), so no CIBW_PRERELEASE_PYTHONS is needed.
+        run: .venv/bin/python -m pip install cibuildwheel==3.4.1
 
       - name: Build wheels
         run: .venv/bin/python -m cibuildwheel --output-dir wheelhouse
@@ -78,8 +82,7 @@ jobs:
           CIBW_BEFORE_ALL_LINUX: yum install -y lapack-devel blas-devel gcc-gfortran
           # cp314-only: numpy has no manylinux2014/manylinux_2_17 wheel for cp314,
           # so it needs the newer manylinux_2_28 image (numpy wheels exist there).
-          CIBW_BUILD: >
-            cp314-manylinux_x86_64
+          CIBW_BUILD: cp314-manylinux_x86_64
           CIBW_REPAIR_WHEEL_COMMAND_LINUX: "auditwheel repair -w {dest_dir} {wheel}"
           CIBW_TEST_COMMAND: >
             python -m pytest {project}/tests -q &&
