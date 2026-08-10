@@ -217,7 +217,6 @@ py::tuple findHomography_(py::array_t<double, py::array::c_style | py::array::fo
         delete [] inl;
         throw std::bad_alloc();
     }
-    double *resids = nullptr;
 
 
     // Run the RANSAC
@@ -235,7 +234,7 @@ py::tuple findHomography_(py::array_t<double, py::array::c_style | py::array::fo
                          data_out,
                          oriented_constr,
                          0,
-                         &resids,
+                         NULL,
                          HDS1,HDSi1,HDSidx1,
                          SymCheck_th,
                          seed);
@@ -258,8 +257,6 @@ py::tuple findHomography_(py::array_t<double, py::array::c_style | py::array::fo
         ptr_inliers[i] = (bool) inl[i];
 
 
-    if (resids != nullptr)
-        free(resids);
     free(data_out);
     delete [] u2;
     delete [] u2_p1;
@@ -448,7 +445,6 @@ py::tuple findFundamentalMatrix_(py::array_t<double, py::array::c_style | py::ar
         delete [] inl;
         throw std::bad_alloc();
     }
-    double *resids = nullptr;
     int I_H = 0;
     int *Ihptr = &I_H;
     double HinF [3*3];
@@ -466,7 +462,7 @@ py::tuple findFundamentalMatrix_(py::array_t<double, py::array::c_style | py::ar
                          inl,
                          data_out,
                          1, 0,
-                         &resids,
+                         NULL,
                          HinF,Ihptr,
                          EXFDS1,FDS1,FDSidx1,
                          SymCheck_th,
@@ -494,8 +490,6 @@ py::tuple findFundamentalMatrix_(py::array_t<double, py::array::c_style | py::ar
         ptr_inliers[i] = (bool) inl[i];
 
 
-    if (resids != nullptr)
-        free(resids);
     free(data_out);
     delete [] u2;
     delete [] u2_p1;
