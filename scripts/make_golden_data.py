@@ -35,7 +35,7 @@ CACHE_DIR = REPO / ".cache"
 IMC_SIMPLE = Path("/Users/oldufo/dev/imc-2021-simple")
 sys.path.insert(0, str(IMC_SIMPLE / "examples"))
 sys.path.insert(0, str(IMC_SIMPLE))
-from sift_eval import extract_sift  # noqa: E402
+from sift_eval import extract_sift, _find_image as find_image  # noqa: E402
 
 import pydegensac  # noqa: E402
 
@@ -167,6 +167,121 @@ def make_evd_goldens(max_pairs=5):
     assert saved >= 3, f"only {saved} EVD pairs qualified out of {len(dset)}"
 
 
+def f_from_krt(c1, c2):
+    """GT fundamental matrix from two calibrations (world->cam: x = R X + T)."""
+    R = c2["R"] @ c1["R"].T
+    t = (c2["T"].flatten() - R @ c1["T"].flatten())
+    tx = np.array([[0, -t[2], t[1]],
+                   [t[2], 0, -t[0]],
+                   [-t[1], t[0], 0]])
+    E = tx @ R
+    F = np.linalg.inv(c2["K"]).T @ E @ np.linalg.inv(c1["K"])
+    return F / F[2, 2] if abs(F[2, 2]) > 1e-12 else F
+
+
+def run_f(pts1, pts2, seed):
+    F, mask = pydegensac.findFundamentalMatrix(pts1, pts2, seed=seed, **F_PARAMS)
+    mask = np.asarray(mask, dtype=bool)
+    # determinism check: capture must be reproducible before it is golden
+    F2, mask2 = pydegensac.findFundamentalMatrix(pts1, pts2, seed=seed, **F_PARAMS)
+    assert np.array_equal(F, F2) and np.array_equal(mask, np.asarray(mask2, dtype=bool))
+    return F, mask
+
+
+def f_sanity(F, mask, pts1, pts2, c1, c2, max_deg=15.0):
+    """Pose recovered from F must agree with GT calibration within max_deg."""
+    from imc2021.metrics import pose_error
+    if mask.sum() < 30:
+        return False
+    err = pose_error(F, pts1[mask], pts2[mask], c1, c2)
+    return err["max_err"] < max_deg
+
+
+def _ensure_phototourism_extracted(dest, dataset="phototourism", split="val"):
+    """Work around a py311 incompatibility in imc2021.download.download_dataset:
+    it calls ``TarFile.extractall(path=dest, filter="fully_trusted")``, but the
+    ``filter`` kwarg was only added to extractall in Python 3.12 (PEP 706) --
+    this raises TypeError on the active py311 env. If the tarball is already
+    downloaded (as ensured by this script) but not yet extracted, extract it
+    ourselves and write the same sentinel file download_dataset() checks
+    (same path, same "<scene>\\n..." content), so its own call becomes a
+    no-op (sentinel present -> returns immediately, buggy extractall never
+    runs). No changes to the imc-2021-simple package itself."""
+    import tarfile
+    from imc2021.download import _CHECKSUMS, _scene_names_from_tar
+
+    dest = Path(dest)
+    out_dir = dest / dataset
+    sentinel = out_dir / f".{split}.done"
+    if sentinel.exists():
+        return
+    filename, _ = _CHECKSUMS[(dataset, split)]
+    tarball_path = dest / filename
+    if not tarball_path.exists():
+        return  # not downloaded yet -- let download_dataset() do its normal thing
+    print(f"Extracting {tarball_path} (py311 workaround for extractall(filter=...))")
+    with tarfile.open(tarball_path, "r:gz") as tar:
+        scene_names = _scene_names_from_tar(tar, dataset)
+        tar.extractall(path=dest)
+    if not out_dir.exists():
+        raise RuntimeError(f"Extraction did not produce expected directory {out_dir}")
+    sentinel.write_text("\n".join(scene_names) + "\n")
+
+
+def make_imc_goldens(max_pairs=5, scene="reichstag"):
+    from imc2021.download import download_dataset
+    from imc2021.io import load_calibration
+    imc_dest = REPO / ".cache" / "imc"
+    _ensure_phototourism_extracted(imc_dest)
+    root = Path(download_dataset("phototourism", "val", dest=str(imc_dest)))
+    scene_dir = root / scene / "set_100"
+    calib = load_calibration(scene_dir)
+    names = sorted(calib.keys())
+    images_dir = scene_dir / "images"
+    feats = {}
+    saved = 0
+    # walk consecutive-ish pairs until enough qualify
+    for i in range(0, len(names) - 1):
+        a, b = names[i], names[i + 1]
+        for n in (a, b):
+            if n not in feats:
+                img_path = find_image(images_dir, n)
+                feats[n] = extract_sift(img_path, n_features=N_FEATURES,
+                                        relax_det_th=True)
+        pts1, pts2 = ratio_match(*feats[a], *feats[b])
+        if pts1 is None or len(pts1) < 100:
+            continue
+        F_gt = f_from_krt(calib[a], calib[b])
+        results = {}
+        ok = True
+        for seed in SEEDS:
+            F, mask = run_f(pts1, pts2, seed)
+            if not f_sanity(F, mask, pts1, pts2, calib[a], calib[b]):
+                ok = False
+                break
+            results[f"F_seed{seed}"] = F
+            results[f"mask_seed{seed}"] = mask
+        if not ok:
+            print(f"skip {a}-{b}: sanity check failed")
+            continue
+        out = DATA_DIR / f"golden_f_{scene}_{a}_{b}.npz"
+        np.savez_compressed(
+            out, pts1=pts1, pts2=pts2, F_gt=F_gt,
+            K1=calib[a]["K"], R1=calib[a]["R"], T1=calib[a]["T"],
+            K2=calib[b]["K"], R2=calib[b]["R"], T2=calib[b]["T"],
+            baseline_commit=np.bytes_(BASELINE_COMMIT.encode()),
+            **{k: np.float64(v) if not isinstance(v, int) else np.int64(v)
+               for k, v in F_PARAMS.items()},
+            **results)
+        print(f"saved {out.name}: {len(pts1)} matches, "
+              f"{results['mask_seed42'].sum()} inliers")
+        saved += 1
+        if saved >= max_pairs:
+            break
+    assert saved >= 3, f"only {saved} IMC pairs qualified; widen the pair walk or try another scene"
+
+
 if __name__ == "__main__":
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     make_evd_goldens()
+    make_imc_goldens()
