@@ -5,10 +5,8 @@ import sys
 import platform
 import subprocess
 
-from distutils.version import LooseVersion
 from setuptools import setup, Extension, find_packages
 from setuptools.command.build_ext import build_ext
-from shutil import copyfile, copymode
 
 
 class CMakeExtension(Extension):
@@ -28,10 +26,9 @@ class CMakeBuild(build_ext):
             ) from e
 
         if platform.system() == "Windows":
-            cmake_version = LooseVersion(
-                re.search(r"version\s*([\d.]+)", out.decode()).group(1)
-            )
-            if cmake_version < "3.1.0":
+            m = re.search(r"version\s*([\d.]+)", out.decode())
+            ver = tuple(int(x) for x in m.group(1).split(".")[:3]) if m else (0,)
+            if ver < (3, 1):
                 raise RuntimeError("CMake >= 3.1.0 is required on Windows")
 
         for ext in self.extensions:
@@ -94,21 +91,6 @@ class CMakeBuild(build_ext):
 
         print()  # Add an empty line for cleaner output
 
-    def copy_test_file(self, src_file):
-        """
-        Copy ``src_file`` to ``dest_file`` ensuring parent directory exists.
-        Adapted from scikit-build.
-        """
-        dest_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tests", "bin")
-        if dest_dir and not os.path.exists(dest_dir):
-            print(f"creating directory {dest_dir}")
-            os.makedirs(dest_dir)
-
-        dest_file = os.path.join(dest_dir, os.path.basename(src_file))
-        print(f"copying {src_file} -> {dest_file}")
-        copyfile(src_file, dest_file)
-        copymode(src_file, dest_file)
-
 
 requirements = ["numpy"]
 
@@ -124,7 +106,6 @@ setup(
     author_email="ducha.aiki@gmail.com",
     license="MIT",
     url="https://github.com/ducha-aiki/pydegensac",
-    download_url="https://github.com/ducha-aiki/pydegensac/archive/v_0.12.tar.gz",
     description="Advanced RANSAC (DEGENSAC) with bells and whistles for H and F estimation",
     long_description=long_description,
     long_description_content_type="text/markdown",
