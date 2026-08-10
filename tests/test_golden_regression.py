@@ -18,6 +18,22 @@ SEEDS = (42, 2024)
 EXACT = os.environ.get("PYDEGENSAC_GOLDEN_EXACT", "1") == "1"
 
 
+def _h_gt_error(d, mask):
+    p1 = np.concatenate([d["pts1"][mask], np.ones((mask.sum(), 1))], axis=1)
+    proj = (d["H_gt"] @ p1.T).T
+    err = np.linalg.norm(proj[:, :2] / proj[:, 2:3] - d["pts2"][mask], axis=1)
+    return np.median(err)
+
+
+def _f_gt_error(d, mask):
+    p1 = np.concatenate([d["pts1"][mask], np.ones((mask.sum(), 1))], axis=1)
+    p2 = np.concatenate([d["pts2"][mask], np.ones((mask.sum(), 1))], axis=1)
+    Fx1 = (d["F_gt"] @ p1.T).T
+    num = np.abs(np.sum(p2 * Fx1, axis=1))
+    den = np.sqrt(Fx1[:, 0] ** 2 + Fx1[:, 1] ** 2)
+    return np.median(num / den)
+
+
 def _assert_matches_golden(model, mask, d, model_key, mask_key, rerun):
     mask = np.asarray(mask, dtype=bool)
     if EXACT:
@@ -29,6 +45,14 @@ def _assert_matches_golden(model, mask, d, model_key, mask_key, rerun):
         np.testing.assert_array_equal(model, model2)
         np.testing.assert_array_equal(mask, np.asarray(mask2, dtype=bool))
         assert mask.sum() >= max(10, 0.5 * d[mask_key].sum())
+        # GT-agreement sanity: the freshly computed model+mask must still be
+        # geometrically consistent with ground truth, not just internally
+        # reproducible.
+        if mask.sum() >= 10:
+            if "H_gt" in d:
+                assert _h_gt_error(d, mask) < 10.0
+            else:
+                assert _f_gt_error(d, mask) < 5.0
 
 
 def test_golden_data_exists():

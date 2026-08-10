@@ -1,7 +1,5 @@
 #!/usr/bin/env python
 # coding: utf-8
-import os
-os.environ.setdefault("MPLBACKEND", "Agg")
 import numpy as np
 import cv2
 import pydegensac

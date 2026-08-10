@@ -82,7 +82,7 @@ def run_h(pts1, pts2, seed):
     return H, mask
 
 
-def h_sanity(H, mask, pts1, pts2, H_gt, th=10.0):
+def h_sanity(mask, pts1, pts2, H_gt, th=10.0):
     """At least half of the found inliers must agree with GT H within th px."""
     if mask.sum() < 10:
         return False
@@ -144,7 +144,7 @@ def make_evd_goldens(max_pairs=5):
         ok = True
         for seed in SEEDS:
             H, mask = run_h(pts1, pts2, seed)
-            if not h_sanity(H, mask, pts1, pts2, H_gt):
+            if not h_sanity(mask, pts1, pts2, H_gt):
                 ok = False
                 break
             results[f"H_seed{seed}"] = H
