@@ -34,13 +34,23 @@ jobs:
             cp312-manylinux_x86_64
             cp313-manylinux_x86_64
           CIBW_REPAIR_WHEEL_COMMAND_LINUX: "auditwheel repair -w {dest_dir} {wheel}"
+          # cibuildwheel installs the built wheel BEFORE installing CIBW_TEST_REQUIRES,
+          # so the numpy<2.3 pin below never got a chance to apply: `pip install
+          # <wheel>` resolves pydegensac's unconstrained `numpy` dependency first,
+          # picking whatever is newest (e.g. 2.5.2 for cp312), which has no
+          # manylinux2014 wheel and fails to build from source (needs GCC>=10.3, this
+          # image ships 10.2.1). CIBW_BEFORE_TEST runs before the wheel install, so
+          # pre-installing the pin here makes `pip install <wheel>` see numpy already
+          # satisfied and skip reinstalling it.
+          CIBW_BEFORE_TEST: pip install "numpy<2.3"
           CIBW_TEST_COMMAND: >
             python -m pytest {project}/tests -q &&
             python -c "import os, runpy; os.chdir(r'{project}/examples');
             runpy.run_path('simple-example.py', run_name='__main__')"
           # numpy<2.3 pin keeps cp312/cp313 test venvs on manylinux2014-compatible
           # numpy wheels (2.3.0 dropped manylinux_2_17); harmless for cp38-cp311,
-          # which resolve older numpy anyway.
+          # which resolve older numpy anyway. Kept here too (redundant with
+          # CIBW_BEFORE_TEST above) as a belt-and-braces safety net.
           CIBW_TEST_REQUIRES: opencv-python-headless<5 pytest numpy<2.3
           CIBW_ENVIRONMENT: PYDEGENSAC_GOLDEN_EXACT=0
 
