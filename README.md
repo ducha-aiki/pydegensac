@@ -27,24 +27,17 @@ For homography, pydegensac is worse than newest OpenCV MAGSAC++ (`cv2.USAC_MAGSA
 fundamental matrix on IMC-2020 PhotoTourism val (600 pairs of
 `st_peters_square`, pose mAA 1-10°), homography on EVD + HPatchesSeq (the
 CVPR-2020 RANSAC tutorial data, reprojection mAA 1-20 px). Every method runs at
-its own tuned thresholds, over an iteration-budget sweep.
+its own tuned thresholds; each point on a curve is one iteration budget.
 
 ![F time-mAA](benchmarks/results/time_maa_f.png)
 
-Best point per method (F, `st_peters_square`, 600 pairs):
+![H time-mAA](benchmarks/results/time_maa_h.png)
 
-| method | mAA | ms/pair | vs. best (paired 95% CI) |
-|---|---|---|---|
-| poselib | 0.4392 | 39.1 | leader |
-| poselib-prosac | 0.4363 | 106.4 | -0.003 (-0.028, +0.021) |
-| **pydegensac** | 0.4297 | 111.9 | -0.010 (-0.033, +0.016) |
-| cv2-magsac | 0.3762 | 28.4 | -0.063 (-0.089, -0.037) ✗ |
-| cv2-ransac | 0.3403 | 282.6 | -0.099 (-0.127, -0.071) ✗ |
-
-pydegensac's accuracy is statistically indistinguishable from poselib's, the
-leader, and clearly ahead of both OpenCV estimators — but it needs ~3x poselib's
-time to get there. On homography, `cv2.USAC_MAGSAC` leads both on accuracy and
-cost, consistent with the 2023 benchmark above.
+On F, pydegensac's accuracy is statistically indistinguishable from poselib's,
+the leader, and clearly ahead of both OpenCV estimators — but it sits ~3x
+further right on the time axis to get there. On homography `cv2.USAC_MAGSAC`
+leads on both axes, consistent with the 2023 benchmark above. (EVD's 8 test
+pairs cannot separate methods — hence the confidence bands swamping that panel.)
 
 Full results, protocol, and the caveats that matter (run-to-run scatter,
 threshold-transfer failure between scenes):

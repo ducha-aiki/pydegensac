@@ -134,6 +134,23 @@ Both show up directly in the data: the speedup is ~1.0x at 125 iterations,
 where per-call overheads dominate, and reaches 1.22x only at 50k, where the
 per-iteration term is essentially the whole runtime.
 
+`benchmarks/rng_cost.c` measures the removed cost directly, and confirms the
+mechanism quantitatively. On this machine (x86-64, glibc):
+
+| | before (libc reseed + draws) | after (local draws only) | saved |
+|---|---|---|---|
+| F, 7 draws/iteration | 418.0 ns | 11.8 ns | 406.1 ns (35x) |
+| H, 4 draws/iteration | 372.6 ns | 6.8 ns | 365.9 ns (55x) |
+
+406 ns/iteration predicts **20.3 ms** saved over 50k F iterations; the
+benchmark measured **25.2 ms** (137.1 -> 111.9). The residual is the rejection
+sampling that draws more than 7 values per iteration, plus the LO loops — the
+model accounts for ~80% of the observed saving from first principles.
+
+Run the same binary on an M-series mac to settle platform vs. ISA: if the
+per-iteration saving there is several times 406 ns, the macOS libc explains the
+gap and ARM has nothing to do with it.
+
 This does not diminish the change — 15-20% free on Linux, more on macOS, at an
 unchanged output distribution — but the 4.2x / 2.2x figures should be quoted as
 macOS golden-pair numbers, not as a general speedup.

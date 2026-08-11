@@ -55,3 +55,6 @@ benchmarks/results/*.jsonl
 # run transcripts (noise); the tuning logs are kept as evidence
 benchmarks/results/ab.log
 benchmarks/results/repeat.log
+
+# Benchmark microbenchmark binary
+benchmarks/rng_cost

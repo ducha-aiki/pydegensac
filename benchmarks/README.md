@@ -91,6 +91,23 @@ Re-derive either with `python run.py tune f` / `tune h`; the full grid lands in
 `tuned_config.json`. Running `tune f` for every method also cross-checks the
 borrowed reichstag values against this scene.
 
+## Where did the speed-up go? (`rng_cost.c`)
+
+The branch's win is a per-iteration fixed cost removed from the RANSAC loops.
+`rng_cost.c` times exactly that — libc reseed plus minimal-sample draws against
+the local generator — so you can tell whether a platform's speed-up is small
+because of its libc or because of problem size:
+
+```bash
+cc -O3 -I../src/pydegensac/degensac rng_cost.c \
+   ../src/pydegensac/degensac/bsd_random.c -o rng_cost && ./rng_cost
+```
+
+On x86-64/glibc it reports ~406 ns saved per F iteration, which predicts 20 ms
+over a 50k-iteration budget — against 25 ms actually measured, so the model
+accounts for most of the observed saving. macOS should report a substantially
+larger number, since its `srandom()` takes a lock.
+
 ## Protocol notes
 
 - Timing covers the estimator call only, single-threaded (`OMP_NUM_THREADS=1`,
