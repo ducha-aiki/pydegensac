@@ -107,6 +107,8 @@ Use GCC instead of Clang. The most recent version on my machine (installed via b
 CC=gcc-8 python3 ./setup.py build
 ```
 
+*(Note, 2026: this hint dates from 2020. Current Clang builds pydegensac fine and is the recommended compiler on macOS — prefer the platform default unless you hit an actual failure.)*
+
 3. Compiling on Ubuntu 18.04
 You need LAPACK and a few other libraries and I always forget those specific package names. Take a look at my pydegensac Dockerfile to see the exact packages you need to apt install on an Ubuntu 18.04 system (https://github.com/quantombone/pydegensac-dockerfile/blob/master/Dockerfile)
 

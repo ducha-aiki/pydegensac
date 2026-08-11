@@ -8,7 +8,7 @@ Python wrapper (via pybind11) around the original C implementation of LO-RANSAC 
 
 ## Build & test commands
 
-Building requires CMake, LAPACK/BLAS, and a C++11 compiler. On macOS, GCC may be needed instead of Clang (`CC=gcc-XX python3 setup.py build`).
+Building requires CMake, LAPACK/BLAS, and a C++11 compiler. Use the platform default compiler — Clang on macOS. (The README's `CC=gcc-8` hint is a 2020 third-party note; current Clang builds fine, the 2026-08 profiling work was done under Clang, and the golden bit-exactness baselines were captured with it, so switching compilers risks perturbing FP codegen.)
 
 ```bash
 pip install .                  # build + install (CMake is driven by setup.py)
