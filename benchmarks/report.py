@@ -53,8 +53,73 @@ def load(paths):
     return rows, metas
 
 
+#: Bootstrap resamples for the mAA confidence interval.
+N_BOOT = 2000
+BOOT_SEED = 0
+
+
+def maa_ci(errs, problem, n_boot=N_BOOT):
+    """Percentile bootstrap 95% CI of mAA over pairs.
+
+    Backends are unseeded and the pair sets are small, so differences of a
+    couple of points are not readable without this: two runs of the identical
+    configuration can differ by more than the gap between two methods.
+    """
+    errs = np.asarray(errs, float)
+    ths = metrics.F_THRESHOLDS if problem == "f" else metrics.H_THRESHOLDS
+    strict = problem == "f"
+    if errs.size == 0:
+        return 0.0, 0.0
+    idx = np.random.default_rng(BOOT_SEED).integers(
+        0, errs.size, size=(n_boot, errs.size))
+    sample = errs[idx]
+    hits = [(sample < t).mean(1) if strict else (sample <= t).mean(1)
+            for t in ths]
+    boot = np.mean(hits, axis=0)
+    return float(np.percentile(boot, 2.5)), float(np.percentile(boot, 97.5))
+
+
+def _maa_over(sample, problem):
+    """mAA per bootstrap row of an (n_boot, n_pairs) error sample."""
+    ths = metrics.F_THRESHOLDS if problem == "f" else metrics.H_THRESHOLDS
+    strict = problem == "f"
+    return np.mean([(sample < t).mean(1) if strict else (sample <= t).mean(1)
+                    for t in ths], axis=0)
+
+
+def per_pair_errors(rows):
+    """-> {(subset, curve, budget): {pair_name: error}}"""
+    out = defaultdict(dict)
+    for r in rows:
+        err = metrics.FAIL_ERR if r["err"] is None else r["err"]
+        out[(r["subset"], r["curve"], r["budget"])][r["pair"]] = err
+    return out
+
+
+def paired_delta_ci(errs_a, errs_b, problem, n_boot=N_BOOT):
+    """95% CI of mAA(a) - mAA(b), resampling *pairs* jointly.
+
+    Every configuration is scored on the same pairs, so the comparison is
+    paired: resampling the pair set jointly cancels the shared difficulty
+    that makes the marginal CIs so wide, and is what decides whether a
+    difference between two configurations is real.
+    """
+    common = sorted(set(errs_a) & set(errs_b))
+    if not common:
+        return 0.0, 0.0, 0.0
+    a = np.array([errs_a[k] for k in common], float)
+    b = np.array([errs_b[k] for k in common], float)
+    idx = np.random.default_rng(BOOT_SEED).integers(
+        0, len(common), size=(n_boot, len(common)))
+    delta = _maa_over(a[idx], problem) - _maa_over(b[idx], problem)
+    return (float(np.percentile(delta, 2.5)),
+            float(np.percentile(delta, 97.5)),
+            float(np.mean(delta)))
+
+
 def curves(rows, problem):
-    """-> {subset: {curve: [(mean_s, median_s, maa, budget, n_fail), ...]}}"""
+    """-> {subset: {curve: [(mean_s, median_s, maa, budget, n_fail, n,
+    ci_lo, ci_hi), ...]}}"""
     maa_fn = metrics.maa_f if problem == "f" else metrics.maa_h
     groups = defaultdict(list)
     for r in rows:
@@ -65,9 +130,11 @@ def curves(rows, problem):
         errs = [metrics.FAIL_ERR if r["err"] is None else r["err"]
                 for r in recs]
         times = np.array([r["time"] for r in recs])
+        lo, hi = maa_ci(errs, problem)
         out[subset][curve].append((
             float(times.mean()), float(np.median(times)), maa_fn(errs),
-            budget, sum(e == metrics.FAIL_ERR for e in errs), len(recs)))
+            budget, sum(e == metrics.FAIL_ERR for e in errs), len(recs),
+            lo, hi))
     for subset in out:
         for curve in out[subset]:
             out[subset][curve].sort(key=lambda t: t[3])
@@ -77,36 +144,49 @@ def curves(rows, problem):
 def table(subset, data, unit_ms=True):
     scale = 1000.0 if unit_ms else 1.0
     lines = [f"\n### {subset}\n",
-             "| method | budget | mAA | mean ms/pair | median ms/pair | failures |",
-             "|---|---|---|---|---|---|"]
+             "| method | budget | mAA | 95% CI | mean ms/pair | "
+             "median ms/pair | failures |",
+             "|---|---|---|---|---|---|---|"]
     for curve in sorted(data):
-        for mean_t, med_t, maa, budget, n_fail, n in data[curve]:
+        for mean_t, med_t, maa, budget, n_fail, n, lo, hi in data[curve]:
             lines.append(f"| {curve} | {budget} | {maa:.4f} | "
-                         f"{mean_t * scale:.2f} | {med_t * scale:.2f} | "
-                         f"{n_fail}/{n} |")
+                         f"{lo:.4f}-{hi:.4f} | {mean_t * scale:.2f} | "
+                         f"{med_t * scale:.2f} | {n_fail}/{n} |")
     return "\n".join(lines)
 
 
-def best_table(subset, data):
-    """Peak mAA per curve, and the cheapest budget within 0.002 mAA of it."""
+def best_table(subset, data, per_pair, problem):
+    """Peak mAA per method, each compared against the leader with a paired
+    bootstrap. The marginal CI says how well the peak itself is pinned down;
+    the paired column says whether the gap to the leader is real, which the
+    (much wider) marginal CIs cannot answer."""
+    rank = sorted(((max(pts, key=lambda t: t[2]), curve)
+                   for curve, pts in data.items()),
+                  key=lambda t: -t[0][2])
+    leader_best, leader = rank[0]
+    leader_errs = per_pair[(subset, leader, leader_best[3])]
+
     lines = [f"\n### {subset} — best per method\n",
-             "| method | best mAA | at budget | mean ms/pair | "
-             "cheapest within 0.002 mAA | ms there |",
+             f"| method | best mAA | 95% CI | at budget | mean ms/pair | "
+             f"d mAA vs {leader} (paired) |",
              "|---|---|---|---|---|---|"]
-    rank = []
-    for curve, pts in data.items():
-        best = max(pts, key=lambda t: t[2])
-        near = min((p for p in pts if p[2] >= best[2] - 0.002),
-                   key=lambda t: t[0])
-        rank.append((best[2], curve, best, near))
-    for maa, curve, best, near in sorted(rank, reverse=True):
-        lines.append(f"| {curve} | {maa:.4f} | {best[3]} | "
-                     f"{best[0] * 1000:.2f} | {near[3]} | "
-                     f"{near[0] * 1000:.2f} |")
+    for best, curve in rank:
+        if curve == leader:
+            gap = "leader"
+        else:
+            lo, hi, mid = paired_delta_ci(
+                per_pair[(subset, curve, best[3])], leader_errs, problem)
+            gap = (f"{mid:+.4f} ({lo:+.4f}, {hi:+.4f})"
+                   + ("" if lo <= 0 <= hi else " *"))
+        lines.append(f"| {curve} | {best[2]:.4f} | "
+                     f"{best[6]:.4f}-{best[7]:.4f} | {best[3]} | "
+                     f"{best[0] * 1000:.2f} | {gap} |")
+    lines.append("\n`*` = paired CI excludes zero. Each method is taken at its "
+                 "own best budget, which flatters every method equally.")
     return "\n".join(lines)
 
 
-def speedup_table(data):
+def speedup_table(subset, data, per_pair, problem):
     """Branch vs base pydegensac at equal iteration budget."""
     base = {p[3]: p for p in data.get("pydegensac (base)", [])}
     branch = {p[3]: p for p in data.get("pydegensac (branch)", [])}
@@ -114,15 +194,22 @@ def speedup_table(data):
     if not shared:
         return ""
     lines = ["\n#### pydegensac: base vs branch, same budget\n",
-             "| budget | mAA base | mAA branch | ms base | ms branch | speedup |",
-             "|---|---|---|---|---|---|"]
+             "| budget | mAA base | mAA branch | d mAA (95% CI, paired) | "
+             "ms base | ms branch | speedup |",
+             "|---|---|---|---|---|---|---|"]
     for b in shared:
         a, c = base[b], branch[b]
-        lines.append(f"| {b} | {a[2]:.4f} | {c[2]:.4f} | {a[0] * 1000:.2f} | "
-                     f"{c[0] * 1000:.2f} | {a[0] / c[0]:.2f}x |")
+        lo, hi, mid = paired_delta_ci(
+            per_pair[(subset, "pydegensac (branch)", b)],
+            per_pair[(subset, "pydegensac (base)", b)], problem)
+        sig = "" if lo <= 0 <= hi else " *"
+        lines.append(f"| {b} | {a[2]:.4f} | {c[2]:.4f} | "
+                     f"{mid:+.4f} ({lo:+.4f}, {hi:+.4f}){sig} | "
+                     f"{a[0] * 1000:.2f} | {c[0] * 1000:.2f} | "
+                     f"{a[0] / c[0]:.2f}x |")
     tot_a = sum(base[b][0] for b in shared)
     tot_c = sum(branch[b][0] for b in shared)
-    lines.append(f"| **all** | | | {tot_a * 1000:.2f} | {tot_c * 1000:.2f} | "
+    lines.append(f"| **all** | | | | {tot_a * 1000:.2f} | {tot_c * 1000:.2f} | "
                  f"**{tot_a / tot_c:.2f}x** |")
     return "\n".join(lines)
 
@@ -142,7 +229,12 @@ def plot(all_curves, problem, out_path):
         ax.set_xscale("log")
         for curve, pts in sorted(all_curves[subset].items()):
             xy = np.array([(p[0] * 1000, p[2]) for p in pts])
-            ax.plot(xy[:, 0], xy[:, 1], "-o", color=COLORS.get(curve, MUTED),
+            color = COLORS.get(curve, MUTED)
+            # Bootstrap band: without it the curves look far better separated
+            # than the pair counts support.
+            ax.fill_between(xy[:, 0], [p[6] for p in pts], [p[7] for p in pts],
+                            color=color, alpha=0.12, linewidth=0, zorder=2)
+            ax.plot(xy[:, 0], xy[:, 1], "-o", color=color,
                     linewidth=2, markersize=6, label=curve, zorder=3,
                     markeredgecolor=SURFACE, markeredgewidth=1.2)
         ax.set_title(subset, color=INK, fontsize=10.5)
@@ -159,12 +251,21 @@ def plot(all_curves, problem, out_path):
     # One legend below the panels: curves converge in the lower right, which
     # is exactly where an in-axes legend would sit.
     handles, labels = axes[0][0].get_legend_handles_labels()
-    fig.legend(handles, labels, loc="lower center", ncol=len(labels),
+    ncol = min(3 * len(subsets), len(labels))
+    nrow = -(-len(labels) // ncol)
+    fig.legend(handles, labels, loc="lower center", ncol=ncol,
                fontsize=8.5, frameon=False, labelcolor=INK2,
                bbox_to_anchor=(0.5, 0.0))
     fig.suptitle(("Fundamental matrix" if problem == "f" else "Homography")
-                 + ": accuracy vs. compute budget", color=INK, fontsize=12.5)
-    fig.tight_layout(rect=(0, 0.06, 1, 0.97))
+                 + ": accuracy vs. compute budget", color=INK, fontsize=12.5,
+                 y=0.985)
+    # The bands are marginal CIs — they show how loosely each curve is pinned
+    # down, but overlapping bands do NOT mean two methods are tied. That is a
+    # paired question, answered in the tables.
+    fig.text(0.5, 0.925, "bands: marginal 95% bootstrap CI over pairs — "
+             "differences between methods are tested paired, in the tables",
+             ha="center", fontsize=8, color=MUTED)
+    fig.tight_layout(rect=(0, 0.055 * nrow, 1, 0.905))
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out_path, dpi=200)
@@ -183,6 +284,7 @@ def main():
 
     rows, metas = load(args.results)
     all_curves = curves(rows, args.problem)
+    per_pair = per_pair_errors(rows)
 
     print(f"# {'Fundamental' if args.problem == 'f' else 'Homography'} "
           f"time-mAA\n")
@@ -196,8 +298,8 @@ def main():
             print(f"  - config: `{json.dumps(m['config'])}`")
 
     for subset in sorted(all_curves):
-        print(best_table(subset, all_curves[subset]))
-        print(speedup_table(all_curves[subset]))
+        print(best_table(subset, all_curves[subset], per_pair, args.problem))
+        print(speedup_table(subset, all_curves[subset], per_pair, args.problem))
         if args.full:
             print(table(subset, all_curves[subset]))
 

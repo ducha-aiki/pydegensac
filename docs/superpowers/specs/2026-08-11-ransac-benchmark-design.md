@@ -82,11 +82,19 @@ Port of the `time_maa` sweep in ds-sac (`bench/time_maa.py`, `bench/report.py`).
 - **Splits**: tune on `val` (145 + 7 pairs), report on `test` (145 + 8) —
   the tutorial's own protocol
   (`tune_hyperparameters_and_create_test_H_submission.py`).
-- **Per method**: `tune` sweeps `px ∈ {0.25, 0.5, 0.75, 1, 1.5, 2, 4}` on val
-  and pins one threshold per method; test runs that threshold across the
+- **Per method**: `tune` sweeps `px ∈ {0.25 … 64}` on val and pins one
+  threshold per method **per dataset**; test runs that threshold across the
   budget ladder `max_iters ∈ {10, 25, 100, 400, 1600, 6400, 25000}`.
   Correspondences are used as shipped (already SNN ≈ 0.85 pre-filtered), so
   unlike F there is no ratio knob.
+
+  Two deviations from the reference grids, both forced by what tuning found:
+  the grid runs to 64 px rather than ds-sac's 4 (four of five methods were
+  still improving at 4 px on HPatches, so the reference cap would have
+  favoured whichever method peaked inside it), and thresholds are per dataset
+  rather than shared (EVD and HPatchesSeq optima differ by 4-16x, and a shared
+  threshold ranked on a pooled or averaged score lets EVD's 7 val pairs decide
+  what runs on HPatches' 145).
 - **Metric**: the tutorial's `get_visible_part_mean_absolute_reprojection_error`
   — reproject image-1 pixel grid under `H_gt` and `H`, average the Euclidean
   residual over the mask of jointly visible pixels; mAA over 10 log-spaced
@@ -116,12 +124,22 @@ returns no model, or fewer than the minimum inliers, scores as a failure
 
 Only the pydegensac import differs between the two arms, so:
 
-- `run_ab.sh` creates a git worktree at `master`, builds it into venv A, builds
-  the current branch into venv B.
-- Venv B runs **all** methods; venv A runs `--methods pydegensac` only. Halves
-  the runtime, and cv2/poselib are byte-identical across the two venvs anyway.
-- Each jsonl record carries `pydegensac_version` + repo SHA; `report.py` labels
-  the two arms `pydegensac (main)` / `pydegensac (speed-up3)`.
+- `run_ab.sh` creates a git worktree at `master` and installs both versions
+  with `pip --target` into separate directories, selected per run with
+  `PYTHONPATH`. One interpreter and one set of cv2/poselib wheels serve both
+  arms, so nothing but pydegensac varies — and neither arm needs rebuilding to
+  re-run.
+- The branch arm runs **all** methods; the base arm runs `--methods pydegensac`
+  only. Halves the runtime, and the other backends are literally the same
+  objects in both arms.
+- Each result file's meta line carries the backend versions and the pydegensac
+  install path (both builds report 0.3.0, so the path is what distinguishes
+  them); `report.py` labels the two arms `pydegensac (base)` /
+  `pydegensac (branch)`.
+
+Note this machine had neither CMake nor LAPACK, so `pip install .` could not
+build the extension at all; `benchmarks/README.md` documents the conda prefix
+that supplies both.
 
 ## Layout
 
@@ -137,7 +155,9 @@ benchmarks/
   report.py          jsonl -> markdown tables + time-mAA figure
   run_ab.sh          two-venv main-vs-branch driver
   data/              downloads (gitignored)
-  results/           jsonl + figures (jsonl committed, it is small)
+  .ab/               worktree + the two pydegensac builds (gitignored)
+  results/           tuning JSONs and figures (committed); raw per-pair jsonl
+                     is gitignored — the F sweep alone is ~27k rows per arm
 ```
 
 `benchmarks/` is not part of the installed package and is not imported by it;

@@ -37,9 +37,20 @@ HERE = Path(__file__).resolve().parent
 RESULTS = HERE / "results"
 CONFIG_PATH = HERE / "tuned_config.json"
 
-#: Tuning grids, matching the reference studies.
-PX_GRID = (0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 4.0)
-RATIO_GRID = (0.6, 0.65, 0.7, 0.75, 0.8, 0.85)
+#: Tuning grids. Both extend the reference grids, because on these scenes
+#: every method's optimum sat at a boundary of the original ones:
+#:
+#: - F: the imc2021-simple grid (px 0.25-4, ratio 0.6-0.85) put all five
+#:   methods at ratio 0.85, its loose edge — st_peters_square wants far less
+#:   ratio filtering than the reichstag pools it was tuned on. The ratio grid
+#:   now runs to 1.0 (no filtering). px is narrowed to <=1.0 to pay for it:
+#:   px >= 1.5 was dominated for all five methods at every ratio
+#:   (results/tune_f_stage1.log).
+#: - H: ds-sac stopped at 4 px and the tutorial at 2; four of five methods
+#:   were still improving at 4 px on HPatches, so the grid runs to 64.
+PX_GRID_F = (0.25, 0.5, 0.75, 1.0)
+PX_GRID_H = (0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0)
+RATIO_GRID = (0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0)
 
 #: Pair counts for the F scene: disjoint tuning and evaluation subsets.
 F_N_TUNE = 300
@@ -129,10 +140,10 @@ def cmd_tune(args):
         keys, _ = data.split_keys(data.pair_keys_f(), F_N_TUNE, F_N_EVAL,
                                   F_SEED)
         pairs = list(data.iter_pairs_f(keys=keys))
-        grid = list(itertools.product(PX_GRID, RATIO_GRID))
+        grid = list(itertools.product(PX_GRID_F, RATIO_GRID))
         subsets = {"st_peters_square": pairs}
     else:
-        grid = [(px, None) for px in PX_GRID]
+        grid = [(px, None) for px in PX_GRID_H]
         subsets = {ds: list(data.iter_pairs_h(ds, "val"))
                    for ds in data.H_DATASETS}
 
@@ -140,30 +151,31 @@ def cmd_tune(args):
           + ", ".join(f"{k}: {len(v)} pairs" for k, v in subsets.items())
           + f" at max_iters={top_budget}")
 
-    out = {}
+    # Thresholds are picked per dataset. EVD (7 val pairs) and HPatchesSeq
+    # (145) are different regimes and want different thresholds; ranking on a
+    # pooled or averaged score would let EVD's handful of pairs decide the
+    # threshold used on HPatches.
+    maa_fn = metrics.maa_f if problem == "f" else metrics.maa_h
+    out = {subset: {} for subset in subsets}
     for name in names:
         fn = registry[name]
-        best = None
+        best = {subset: None for subset in subsets}
         for px_th, ratio_th in grid:
             scores = {}
             for subset, pairs in subsets.items():
                 warmup(problem, fn, pairs[0], px_th, ratio_th)
                 errs = [evaluate(problem, p, fn, px_th, ratio_th, top_budget)[0]
                         for p in pairs]
-                scores[subset] = (metrics.maa_f(errs) if problem == "f"
-                                  else metrics.maa_h(errs))
-            # One config per method: rank on the mean over subsets so a method
-            # cannot be tuned separately per dataset while others are not.
-            mean = float(np.mean(list(scores.values())))
+                scores[subset] = maa_fn(errs)
+                if best[subset] is None or scores[subset] > best[subset]["maa"]:
+                    best[subset] = {"px_th": px_th, "ratio_th": ratio_th,
+                                    "maa": scores[subset]}
             print(f"  {name:16s} px={px_th:<5} ratio={ratio_th} "
-                  + " ".join(f"{k}={v:.4f}" for k, v in scores.items())
-                  + f" mean={mean:.4f}", flush=True)
-            if best is None or mean > best["maa"]:
-                best = {"px_th": px_th, "maa": mean, "per_subset": scores}
-                if ratio_th is not None:
-                    best["ratio_th"] = ratio_th
-        out[name] = best
-        print(f"  -> {name}: {best}", flush=True)
+                  + " ".join(f"{k}={v:.4f}" for k, v in scores.items()),
+                  flush=True)
+        for subset in subsets:
+            out[subset][name] = best[subset]
+            print(f"  -> {name} / {subset}: {best[subset]}", flush=True)
 
     dest = RESULTS / f"tuning_{problem}.json"
     dest.parent.mkdir(parents=True, exist_ok=True)
@@ -171,7 +183,7 @@ def cmd_tune(args):
         {"meta": meta(args.label, {"problem": problem, "grid": grid,
                                    "max_iters": top_budget}),
          "best": out}, indent=1))
-    print(f"wrote {dest}")
+    print(f"wrote {dest} — copy `best` into {CONFIG_PATH.name} to use it")
 
 
 # --------------------------------------------------------------------------
@@ -179,8 +191,11 @@ def cmd_tune(args):
 # --------------------------------------------------------------------------
 
 def _sweep(problem, subsets, names, config, budgets, out_path, label):
+    """``config`` is {subset: {method: {px_th, ratio_th}}} — thresholds are
+    tuned per dataset, so each subset carries its own plan."""
     registry = methods.registry(problem)
-    missing = [n for n in names if config.get(n, {}).get("px_th") is None]
+    missing = [(s, n) for s in subsets for n in names
+               if config.get(s, {}).get(n, {}).get("px_th") is None]
     if missing:
         raise SystemExit(
             f"no tuned threshold for {missing} in {CONFIG_PATH.name} — "
@@ -188,17 +203,18 @@ def _sweep(problem, subsets, names, config, budgets, out_path, label):
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     n_total = sum(len(p) for p in subsets.values())
+    plans = {s: [(n, registry[n], config[s][n]["px_th"],
+                  config[s][n].get("ratio_th")) for n in names]
+             for s in subsets}
     with open(out_path, "w") as fh:
         fh.write(json.dumps(meta(label, {
             "problem": problem, "budgets": list(budgets),
-            "config": {n: config[n] for n in names},
+            "config": {s: {n: config[s][n] for n in names} for s in subsets},
             "subsets": {k: len(v) for k, v in subsets.items()}})) + "\n")
 
-        plan = [(name, registry[name], config[name]["px_th"],
-                 config[name].get("ratio_th")) for name in names]
-        for name, fn, px_th, ratio_th in plan:
-            for pairs in subsets.values():
-                warmup(problem, fn, pairs[0], px_th, ratio_th)
+        for subset, plan in plans.items():
+            for _, fn, px_th, ratio_th in plan:
+                warmup(problem, fn, subsets[subset][0], px_th, ratio_th)
 
         done = 0
         t_start = time.perf_counter()
@@ -206,7 +222,7 @@ def _sweep(problem, subsets, names, config, budgets, out_path, label):
         # drift over the run cannot favour whichever method ran first.
         for subset, pairs in subsets.items():
             for pair in pairs:
-                for name, fn, px_th, ratio_th in plan:
+                for name, fn, px_th, ratio_th in plans[subset]:
                     for budget in budgets:
                         err, dt, n_in = evaluate(problem, pair, fn, px_th,
                                                  ratio_th, budget)
@@ -225,7 +241,7 @@ def _sweep(problem, subsets, names, config, budgets, out_path, label):
 
 
 def cmd_f(args):
-    config = load_config()["f"]
+    config = load_config()["f"]  # {subset: {method: {...}}}
     names = args.methods or list(methods.METHOD_NAMES)
     _, keys = data.split_keys(data.pair_keys_f(), F_N_TUNE, F_N_EVAL, F_SEED)
     if args.limit:

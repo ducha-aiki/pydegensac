@@ -52,4 +52,6 @@ __pycache__
 benchmarks/data
 benchmarks/.ab
 benchmarks/results/*.jsonl
-benchmarks/results/*.log
+# run transcripts (noise); the tuning logs are kept as evidence
+benchmarks/results/ab.log
+benchmarks/results/repeat.log

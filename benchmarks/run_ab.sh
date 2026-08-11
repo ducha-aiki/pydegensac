@@ -26,10 +26,15 @@ AB="$PWD/.ab"
 WORKTREE="$AB/worktree-base"
 mkdir -p "$AB"
 
+# CMake and LAPACK often live in the interpreter's own prefix (conda), which
+# is not on PATH unless the environment is activated — put it there for the
+# build so `pip install .` finds both.
+PY_PREFIX="$("$PYTHON" -c 'import sys; print(sys.prefix)')"
 build() {  # name source_dir
     local name="$1" src="$2"
     rm -rf "$AB/pkg-$name"
-    "$PYTHON" -m pip install -q --no-deps --target "$AB/pkg-$name" "$src"
+    PATH="$PY_PREFIX/bin:$PATH" CMAKE_PREFIX_PATH="$PY_PREFIX" \
+        "$PYTHON" -m pip install -q --no-deps --target "$AB/pkg-$name" "$src"
 }
 
 # The base arm builds from a detached worktree, so the working tree is never

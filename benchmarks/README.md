@@ -67,7 +67,9 @@ PYTHON=$PWD/.ab/env/bin/python ./run_ab.sh
 ## Thresholds
 
 `tuned_config.json` holds one inlier threshold (and, for F, one SNN ratio
-threshold) per method.
+threshold) per method **per dataset** — EVD and HPatchesSeq are different
+enough that a shared threshold would let EVD's 7 val pairs decide what runs on
+HPatches' 145.
 
 - **F** values are taken verbatim from the imc2021-simple tuning study, which
   grid-searched them on 300 **reichstag** pairs of the same feature pools.
@@ -79,9 +81,15 @@ threshold) per method.
   the tutorial's own protocol. HPatches' val and test sequence sets are
   disjoint (29 sequences each, no overlap).
 
+The H grid runs to 64 px, well past the reference grids (ds-sac stopped at 4,
+the tutorial at 2). Most methods are still improving at 4 px on HPatches, so
+the reference caps would have handed an advantage to whichever method happened
+to peak inside them.
+
 Re-derive either with `python run.py tune f` / `tune h`; the full grid lands in
-`results/tuning_{f,h}.json`. Running `tune f` for every method also
-cross-checks the borrowed reichstag values against this scene.
+`results/tuning_{f,h}.json`, whose `best` block is copied into
+`tuned_config.json`. Running `tune f` for every method also cross-checks the
+borrowed reichstag values against this scene.
 
 ## Protocol notes
 
