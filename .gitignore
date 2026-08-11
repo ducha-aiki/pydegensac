@@ -47,3 +47,6 @@ __pycache__
 
 # Downloaded/generated golden-data source assets (see scripts/make_golden_data.py)
 .cache/
+
+# Benchmark data and results
+benchmarks/data
