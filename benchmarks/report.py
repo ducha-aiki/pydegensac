@@ -25,6 +25,14 @@ COLORS = {
     "cv2-magsac": "#eda100",
     "poselib": "#2a78d6",
     "poselib-prosac": "#7a4fd1",
+    # release comparison (run_releases.sh): published wheels cool, local
+    # builds of the same code warm, so a wheel-vs-source gap is visible.
+    "pydegensac (pypi-0.1.2)": "#9fb6c9",
+    "pydegensac (pypi-0.2.1)": "#5b8db8",
+    "pydegensac (pypi-0.2.2)": "#2a78d6",
+    "pydegensac (local-0.2.2)": "#eda100",
+    "pydegensac (local-master)": "#f0a35e",
+    "pydegensac (local-branch)": "#d1462f",
 }
 SURFACE, PAGE = "#fcfcfb", "#f9f9f7"
 INK, INK2, MUTED, GRID, BASELINE = "#0b0b0b", "#52514e", "#898781", "#e1e0d9", "#c3c2b7"
@@ -251,7 +259,9 @@ def plot(all_curves, problem, out_path):
     # One legend below the panels: curves converge in the lower right, which
     # is exactly where an in-axes legend would sit.
     handles, labels = axes[0][0].get_legend_handles_labels()
-    ncol = min(3 * len(subsets), len(labels))
+    # Give every legend column ~2.7in; release comparisons have six long
+    # labels that overrun a fixed column count on a single-panel figure.
+    ncol = max(1, min(len(labels), int(6.0 * len(subsets) / 2.7)))
     nrow = -(-len(labels) // ncol)
     fig.legend(handles, labels, loc="lower center", ncol=ncol,
                fontsize=8.5, frameon=False, labelcolor=INK2,
@@ -262,9 +272,8 @@ def plot(all_curves, problem, out_path):
     # The bands are marginal CIs — they show how loosely each curve is pinned
     # down, but overlapping bands do NOT mean two methods are tied. That is a
     # paired question, answered in the tables.
-    fig.text(0.5, 0.925, "bands: marginal 95% bootstrap CI over pairs — "
-             "differences between methods are tested paired, in the tables",
-             ha="center", fontsize=8, color=MUTED)
+    fig.text(0.5, 0.925, "bands: marginal 95% bootstrap CI; method gaps are "
+             "tested paired (tables)", ha="center", fontsize=8, color=MUTED)
     fig.tight_layout(rect=(0, 0.055 * nrow, 1, 0.905))
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)

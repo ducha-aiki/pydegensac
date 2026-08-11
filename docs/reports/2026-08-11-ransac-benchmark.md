@@ -19,9 +19,9 @@ builds is significant at any budget on either problem (paired bootstrap over
 pairs, 95% CI, all intervals contain zero).
 
 In context: on F, pydegensac's accuracy is **statistically tied with poselib's**
-— but it needs 2.9x the time to get there. On H it is measurably *behind*
-cv2's MAGSAC while costing 5x more. The speed-up narrows pydegensac's cost gap;
-it does not put it on the efficient frontier.
+— but it needs 2.9x the time to get there. On H it is measurably *behind* the
+leading three while costing 5x what cv2's MAGSAC does. The speed-up narrows
+pydegensac's cost gap; it does not put it on the efficient frontier.
 
 ## How to read the numbers
 
@@ -91,20 +91,23 @@ visible area. Thresholds tuned per dataset on `val`, reported on `test`.
 
 HPatchesSeq:
 
-| method | best mAA | at budget | mean ms/pair | d mAA vs cv2-magsac (paired) |
+| method | best mAA | at budget | mean ms/pair | d mAA vs poselib-prosac (paired) |
 |---|---|---|---|---|
-| cv2-magsac | 0.9269 | 25000 | 0.90 | leader |
-| poselib | 0.9262 | 25000 | 5.39 | -0.0007 (-0.0193, +0.0145) |
-| poselib-prosac | 0.9166 | 25000 | 3.91 | -0.0104 (-0.0262, +0.0014) |
-| pydegensac (branch) | 0.9124 | 25000 | 4.57 | -0.0144 (-0.0262, -0.0028) `*` |
-| cv2-ransac | 0.9103 | 25000 | 22.55 | -0.0165 (-0.0262, -0.0083) `*` |
-| pydegensac (base) | 0.9007 | 25000 | 6.35 | -0.0259 (-0.0483, -0.0062) `*` |
+| poselib-prosac | 0.9297 | 1600 | 7.74 | leader |
+| cv2-magsac | 0.9269 | 25000 | 0.91 | -0.0027 (-0.0124, +0.0076) |
+| poselib | 0.9262 | 25000 | 5.42 | -0.0034 (-0.0214, +0.0097) |
+| pydegensac (branch) | 0.9172 | 25000 | 4.53 | -0.0124 (-0.0186, -0.0062) `*` |
+| cv2-ransac | 0.9103 | 25000 | 22.65 | -0.0192 (-0.0297, -0.0090) `*` |
+| pydegensac (base) | 0.9103 | 25000 | 6.29 | -0.0194 (-0.0290, -0.0110) `*` |
 
-- **cv2-magsac dominates outright**: best accuracy at 0.9 ms/pair, 5x cheaper
-  than anything else near it. pydegensac is measurably behind it and 5x its
-  cost.
-- base vs branch: 1.03-1.06x at small budgets rising to **1.39x at 25000**,
-  1.16x aggregate — the same budget-dependent shape as F. No per-budget
+- **The top three are statistically tied; cv2-magsac wins on cost by a mile**
+  — 0.91 ms/pair against poselib-prosac's 7.7 and poselib's 5.4, for a
+  difference in mAA that the paired test cannot distinguish from zero.
+- **pydegensac is measurably behind all three** (-0.012 vs the leader, CI
+  excludes zero) at 5x cv2-magsac's cost. The branch does lift it clear of
+  master (-0.012 vs -0.019 against the leader).
+- base vs branch: 1.05x at small budgets rising to **1.39x at 25000**,
+  1.20x aggregate — the same budget-dependent shape as F. No per-budget
   accuracy difference is significant.
 - pydegensac is the only method whose HPatches optimum is a tight threshold
   (4 px); every other method wanted 16-64 px, and pydegensac degrades sharply
@@ -154,6 +157,101 @@ gap and ARM has nothing to do with it.
 This does not diminish the change — 15-20% free on Linux, more on macOS, at an
 unchanged output distribution — but the 4.2x / 2.2x figures should be quoted as
 macOS golden-pair numbers, not as a general speedup.
+
+## Did anything get lost on Linux along the way? (published releases)
+
+`benchmarks/run_releases.sh` runs pydegensac alone across published PyPI wheels
+and local builds of the same code, all on one pinned numpy-1.26 interpreter.
+A wheel differs from a local build in *two* ways at once — source and build
+environment — so the `v_0.2.2` tag is also built here as the control.
+
+![releases, H](../../benchmarks/results/releases_h.png)
+
+The three cool curves are PyPI wheels, the three warm ones local builds. On
+HPatchesSeq they trace the same accuracy at visibly different cost.
+
+Total mean ms/pair summed over the budget ladder:
+
+| arm | F `st_peters_square` | H `HPatchesSeq` |
+|---|---|---|
+| pypi 0.1.2 (wheel, 2020) | 315.5 | 26.8 |
+| pypi 0.2.1 (wheel) | 319.9 | 26.4 |
+| pypi 0.2.2 (wheel, latest) | 338.2 | 27.9 |
+| local build, tag `v_0.2.2` | 306.5 | 20.9 |
+| local build, `master` | 311.2 | 21.5 |
+| local build, this branch | **265.4** | **18.1** |
+
+**No regression across releases.** Every published version is within a few
+percent of every other on both problems, `master` matches the `v_0.2.2` tag
+built the same way, and all six arms are statistically identical in accuracy
+(no paired CI excludes zero). Nothing was lost between 0.1.2 and master.
+
+**But the published Linux wheels are slower than the same source built
+locally** — 1.10x on F, 1.30-1.34x on H. That is not a regression; it is a
+standing property of how the wheels are built. Verified by interleaved
+re-measurement (wheel 27.6 / 28.5 / 27.9 ms against local 21.4 / 21.2 /
+20.9 ms), so it is not run ordering.
+
+Partially explained. CI builds Linux wheels in manylinux2014 against
+`yum lapack-devel`, and auditwheel vendors the result — a **reference
+LAPACK/BLAS 3.4.2 from 2012**, against `libgfortran.so.3`. Forcing a local
+build to use exactly those bundled libraries via `LD_PRELOAD` costs 1.8 ms of
+the 7.0 ms H gap:
+
+| H, 0.2.2 source | ms |
+|---|---|
+| local build + OpenBLAS | 20.87 |
+| local build + Ubuntu reference LAPACK | 21.31 |
+| local build + the wheel's bundled LAPACK 3.4.2 | 22.64 |
+| the PyPI wheel itself | 27.91 |
+
+so ~25% of the gap is the vendored LAPACK, and the rest is still unexplained.
+Ruled out by measurement, not assumption: **compiler version** (master built
+locally with gcc 10.4 runs at 21.7 ms, indistinguishable from gcc 13.3's
+21.5 — so manylinux's gcc 10.2 is not the cause), **assertions** (`NDEBUG` is
+set in both, no `__assert_fail`), **hardening flags** (identical `__stack_chk`
+usage, no fortify symbols), and **codegen** (both binaries are essentially
+all-scalar with near-identical instruction mixes: 59,915 vs 60,779).
+
+Worth pursuing separately from this PR: a newer manylinux image, or linking
+OpenBLAS instead of reference LAPACK, looks like free double-digit percent for
+every Linux `pip install` user. The residual needs its own investigation.
+
+**Unrelated hazard found on the way**: `pydegensac==0.1.2` silently returns
+*every* correspondence as an inlier under numpy 2.x — 300/300 on a synthetic
+set with 150 planted outliers, where the same wheel under numpy 1.26 correctly
+returns 150. This is the old-pybind11 problem that `0.2` was yanked for, but
+**0.1.2 is not yanked**, and it is the version pinned by anything installed
+before 2026. It fails silently, which is the worst way to fail.
+
+## The tutorial archives disagree about which way `match_conf` points
+
+PROSAC needs correspondences ordered best-first, so the benchmark has to know
+whether a dataset's per-match score is "lower is better" (an SNN ratio) or the
+opposite. The CVPR-2020 tutorial data does not answer this consistently, and
+assuming the SNN convention throughout produced a poselib-prosac curve on
+HPatchesSeq that was worse at low budgets than uniform sampling — the tell that
+it was sampling worst-first.
+
+Measured against ground truth (`benchmarks/check_scores.py`, AUC of "low score
+ranks GT inliers first", 3 px):
+
+| data | raw AUC | pairs agreeing | stored convention |
+|---|---|---|---|
+| F `st_peters_square` | 0.777 | 200/200 | lower is better |
+| H EVD | 0.768 | 8/8 | lower is better |
+| H HPatchesSeq | **0.128** | **1%** | **higher is better** |
+
+`data.py` now normalises orientation at load (`H_SCORE_ASCENDING`), so every
+consumer can assume lower-is-better, and `check_scores.py` re-derives the table
+from ground truth so the flag cannot silently rot. Only the PROSAC backends
+read scores, which is what makes this class of bug dangerous: nothing fails,
+the estimator just samples badly.
+
+Effect of the fix on HPatchesSeq: poselib-prosac's tuned threshold moved 32 ->
+16 px, its val mAA 0.9352 -> 0.9441, and on test it went from fourth place
+(0.9166) to the top of the table (0.9297). No other method reads scores, and
+the F and EVD orientations were already correct, so nothing else moved.
 
 ## Thresholds: the imc21 values do not transfer to this scene
 

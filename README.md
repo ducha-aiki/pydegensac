@@ -35,9 +35,11 @@ its own tuned thresholds; each point on a curve is one iteration budget.
 
 On F, pydegensac's accuracy is statistically indistinguishable from poselib's,
 the leader, and clearly ahead of both OpenCV estimators — but it sits ~3x
-further right on the time axis to get there. On homography `cv2.USAC_MAGSAC`
-leads on both axes, consistent with the 2023 benchmark above. (EVD's 8 test
-pairs cannot separate methods — hence the confidence bands swamping that panel.)
+further right on the time axis to get there. On homography the top three
+(poselib-prosac, `cv2.USAC_MAGSAC`, poselib) are statistically tied and
+pydegensac is measurably behind them, with `cv2.USAC_MAGSAC` winning on cost by
+5-8x — consistent with the 2023 benchmark above. (EVD's 8 test pairs cannot
+separate methods — hence the confidence bands swamping that panel.)
 
 Full results, protocol, and the caveats that matter (run-to-run scatter,
 threshold-transfer failure between scenes):

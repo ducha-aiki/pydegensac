@@ -64,7 +64,7 @@
    "poselib-prosac": {
     "px_th": 4.0,
     "ratio_th": null,
-    "source": "run.py tune h (val)"
+    "source": "run.py tune h (val), after score-orientation fix"
    },
    "pydegensac": {
     "px_th": 1.0,
@@ -89,9 +89,9 @@
     "source": "run.py tune h (val)"
    },
    "poselib-prosac": {
-    "px_th": 32.0,
+    "px_th": 16.0,
     "ratio_th": null,
-    "source": "run.py tune h (val)"
+    "source": "run.py tune h (val), after score-orientation fix"
    },
    "pydegensac": {
     "px_th": 4.0,

@@ -7,10 +7,12 @@ F: one PhotoTourism validation scene. Each pair carries RootSIFT-8k mutual-NN
 correspondences, their SNN ratios (``match_conf``, lower = better) and the
 ground-truth calibration of both images.
 
-H: EVD and HPatchesSeq. Correspondences come pre-filtered at SNN ~0.85, so
-``scores`` are the surviving ratios. Each row of ``matches.h5[key]`` is
-``[x1, y1, x2, y2]``; ``Hgt.h5[key]`` maps image-1 pixels to image-2 pixels
-(not inverted).
+H: EVD and HPatchesSeq. Correspondences come pre-filtered at SNN ~0.85. Each
+row of ``matches.h5[key]`` is ``[x1, y1, x2, y2]``; ``Hgt.h5[key]`` maps
+image-1 pixels to image-2 pixels (not inverted).
+
+The ``scores`` every iterator yields are normalised to "lower is better",
+which is *not* how they are all stored — see ``H_SCORE_ASCENDING``.
 """
 from pathlib import Path
 
@@ -23,6 +25,28 @@ DATA = Path(__file__).resolve().parent / "data"
 F_SCENES = ("st_peters_square",)
 H_DATASETS = ("EVD", "HPatchesSeq")
 H_SPLITS = ("val", "test")
+
+#: Which way each dataset's ``match_conf`` points. True = "lower is better"
+#: (an SNN ratio), so ascending order is best-first.
+#:
+#: **The tutorial archives do not agree with each other.** Measured against
+#: ground truth by ``check_scores.py`` (AUC of "low score ranks GT inliers
+#: first", 3 px):
+#:
+#:   F st_peters_square  AUC 0.777, 200/200 pairs  -> lower is better
+#:   H EVD               AUC 0.768,   8/8   pairs  -> lower is better
+#:   H HPatchesSeq       AUC 0.122,   0/141 pairs  -> HIGHER is better
+#:
+#: ``iter_pairs_*`` negates the reversed ones, so every consumer can assume
+#: lower = better. Getting this wrong is silent: only the PROSAC backends read
+#: scores, and they merely sample badly rather than failing.
+F_SCORE_ASCENDING = True
+H_SCORE_ASCENDING = {"EVD": True, "HPatchesSeq": False}
+
+
+def _oriented(scores, ascending):
+    """Return scores in "lower is better" orientation (see H_SCORE_ASCENDING)."""
+    return scores if ascending else -scores
 
 
 def _load_h5(path):
@@ -63,7 +87,9 @@ def iter_pairs_f(scene=F_SCENES[0], keys=None):
                 "name": name,
                 "pts1": np.ascontiguousarray(m[:, :2]),
                 "pts2": np.ascontiguousarray(m[:, 2:4]),
-                "scores": np.asarray(cf[name][()], np.float64).reshape(-1),
+                "scores": _oriented(
+                    np.asarray(cf[name][()], np.float64).reshape(-1),
+                    F_SCORE_ASCENDING),
                 "K1": np.asarray(K1_K2[name][0][0], np.float64),
                 "K2": np.asarray(K1_K2[name][0][1], np.float64),
                 "R1": np.asarray(R[id1], np.float64),
@@ -115,7 +141,8 @@ def iter_pairs_h(dataset, split="test"):
             "name": key,
             "pts1": np.ascontiguousarray(m[:, :2]),
             "pts2": np.ascontiguousarray(m[:, 2:4]),
-            "scores": np.asarray(conf[key], np.float64).reshape(-1),
+            "scores": _oriented(np.asarray(conf[key], np.float64).reshape(-1),
+                                H_SCORE_ASCENDING[dataset]),
             "H_gt": np.asarray(hgt[key], np.float64),
             "shape1": shape1,
             "shape2": shape2,

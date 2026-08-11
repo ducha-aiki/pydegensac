@@ -59,7 +59,8 @@
     null
    ]
   ],
-  "max_iters": 25000
+  "max_iters": 25000,
+  "note": "poselib-prosac re-tuned after the HPatchesSeq score orientation fix; other methods ignore scores"
  },
  "best": {
   "EVD": {
@@ -106,9 +107,9 @@
     "maa": 0.9406896551724138
    },
    "poselib-prosac": {
-    "px_th": 32.0,
+    "px_th": 16.0,
     "ratio_th": null,
-    "maa": 0.9351724137931037
+    "maa": 0.9441379310344828
    },
    "pydegensac": {
     "px_th": 4.0,

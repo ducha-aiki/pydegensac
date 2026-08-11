@@ -58,3 +58,5 @@ benchmarks/results/repeat.log
 
 # Benchmark microbenchmark binary
 benchmarks/rng_cost
+benchmarks/results/releases.log
+benchmarks/results/h_rerun.log
