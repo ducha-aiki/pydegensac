@@ -169,15 +169,36 @@ Score inlidxs (const double * err, int len, double th, int * inl) {
      the flag is loop-invariant, so the branch hoists out. */
   const int score_j = (th != 0);
   const double inv = score_j ? 1/(th*9/4) : 0;
-  /* Branchless compress store: the write always happens, the index only
+  /* Four partial sums rather than one: the gain accumulator was a serial FP
+     dependency chain over every correspondence, running at add latency when
+     the work is trivially parallel. Reassociation changes rounding.
+     Branchless compress store: the write always happens, the index only
      advances for inliers. Every caller allocates `inl` at `len` entries, so
      the speculative write at s.I is in bounds. */
-  for (i = 0; i < len; ++i) {
-      if (score_j) {
-          s.J += truncQuadInv(err[i], inv);
+  double j0 = 0, j1 = 0, j2 = 0, j3 = 0;
+  int n4 = len & ~3;
+  if (score_j) {
+      for (i = 0; i < n4; i += 4) {
+          j0 += truncQuadInv(err[i],   inv);
+          j1 += truncQuadInv(err[i+1], inv);
+          j2 += truncQuadInv(err[i+2], inv);
+          j3 += truncQuadInv(err[i+3], inv);
+          inl[s.I] = i;     s.I += (err[i]   <= th);
+          inl[s.I] = i+1;   s.I += (err[i+1] <= th);
+          inl[s.I] = i+2;   s.I += (err[i+2] <= th);
+          inl[s.I] = i+3;   s.I += (err[i+3] <= th);
         }
-      inl[s.I] = i;
-      s.I += (err[i] <= th);
+      for (i = n4; i < len; ++i) {
+          j0 += truncQuadInv(err[i], inv);
+          inl[s.I] = i;
+          s.I += (err[i] <= th);
+        }
+      s.J = (j0 + j1) + (j2 + j3);
+    } else {
+      for (i = 0; i < len; ++i) {
+          inl[s.I] = i;
+          s.I += (err[i] <= th);
+        }
     }
   return s;
 }
