@@ -132,11 +132,21 @@ evaluation includes it, not because it separates anything.
 ## Why the golden-pair numbers don't transfer
 
 The session report's 4.2x / 2.2x summed per-pair medians over five golden pairs
-on macOS. **The platform is the whole story.** The optimisation replaced libc
-`srandom()`/`random()`; on macOS each `srandom()` re-derives the 31-word TYPE_3
-state and discards 310 warm-up draws *behind a lock* (~3.5 us/iteration,
-profiled at 77% of H runtime), while glibc runs the same algorithm without the
-lock. The cost being removed here is roughly an order of magnitude smaller.
+on macOS. Two things separate that from the numbers here, and the second was
+only found later.
+
+**The platform.** The optimisation replaced libc `srandom()`/`random()`; on
+macOS each `srandom()` re-derives the 31-word TYPE_3 state and discards 310
+warm-up draws *behind a lock* (~3.5 us/iteration, profiled at 77% of H
+runtime), while glibc runs the same algorithm without the lock. The cost being
+removed here is roughly an order of magnitude smaller.
+
+**The dead LAPACK.** Those macOS measurements were taken on a build where every
+LAPACK call was preprocessed away (see below), so local optimisation was not
+running and the RNG was a far larger share of a far smaller runtime. The 77%
+figure is a property of that build, not of macOS. Re-measured on M1 with the
+calls restored, the same change is worth 1.35x (F) / 1.18x (H) — see the M1
+section.
 
 It is *not* problem size, which was the other candidate: after each method's
 tuned ratio filter the estimators see a few hundred correspondences (median 272
@@ -160,13 +170,14 @@ benchmark measured **25.2 ms** (137.1 -> 111.9). The residual is the rejection
 sampling that draws more than 7 values per iteration, plus the LO loops — the
 model accounts for ~80% of the observed saving from first principles.
 
-Run the same binary on an M-series mac to settle platform vs. ISA: if the
-per-iteration saving there is several times 406 ns, the macOS libc explains the
-gap and ARM has nothing to do with it.
+**Settled by running the same binary on an M1**: 1093 ns saved per F iteration
+and 1079 ns per H iteration, against 406 / 366 here. 2.7x the glibc saving, so
+the macOS libc is the platform difference and ARM has nothing to do with it.
 
-This does not diminish the change — 15-20% free on Linux, more on macOS, at an
+This does not diminish the change — 15-20% free on Linux, ~35% on macOS, at an
 unchanged output distribution — but the 4.2x / 2.2x figures should be quoted as
-macOS golden-pair numbers, not as a general speedup.
+macOS golden-pair numbers measured against a build with no LAPACK in it, not as
+a general speedup.
 
 ## Did anything get lost on Linux along the way? (published releases)
 

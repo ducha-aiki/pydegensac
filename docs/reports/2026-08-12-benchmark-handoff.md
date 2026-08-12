@@ -47,12 +47,17 @@ is still open.
 
 ## Open decisions (maintainer's call, deliberately not made)
 
-- **PR title** still claims 4.2x / 2.2x. Those numbers are real only for the
-  macOS no-LAPACK build.
-- **macOS golden baselines** encode the broken behaviour. Every golden test on
-  macOS will fail until regenerated, and the regeneration should be reviewed by
-  a human rather than rubber-stamped — the new outputs should be *better*, and
-  that is worth confirming pair by pair.
+- ~~**PR title** still claims 4.2x / 2.2x~~ — retitled 2026-08-12 to lead with
+  the LAPACK fix and the measured 1.2-1.4x.
+- ~~**macOS golden baselines** encode the broken behaviour~~ — regenerated on
+  M1 against the fixed build (`edabc68`); the gate is green in exact mode
+  (33 passed). Reviewed pair by pair as asked: inlier counts rise on 17 of 18
+  (seed, pair) cases — 99 -> 128 on `adam`, 61 -> 115 on `face`, 60 -> 71 on
+  the first reichstag pair — with GT error flat or better on H and within
+  0.02 px on F. The one exception (`05534141-05545431`, seed 2024) is
+  357 -> 354 inliers and +0.001 px, i.e. noise. `05466646-05534141` no longer
+  passes capture sanity with LO restored and is replaced by
+  `06373813-06639257`.
 - **glibc floor**: moving Linux wheels to manylinux_2_28 drops CentOS 7 /
   Ubuntu 18.04. Reversible by deleting one line
   (`CIBW_MANYLINUX_X86_64_IMAGE`).
@@ -91,19 +96,28 @@ in `f349a6c` is worth ~30% to every Linux `pip install` user rather than the
 both are slow, the image move buys only the LAPACK share and something else is
 going on.
 
-### 2. macOS/M1 re-benchmark
+### 2. macOS/M1 re-benchmark — DONE (`6b11a8f`)
 
-An M1 run was started against `899af7f`, i.e. *before* the LAPACK fix — those
-numbers describe the crippled build and should be discarded or relabelled. Worth
-re-running after `f349a6c`. Check which build you have with:
+Re-run on M1 against `f349a6c`, three arms (`master`, `master` + the fixed
+`lapwrap.c`, branch), full roster on both problems. Results in the M1 section
+of `2026-08-11-ransac-benchmark.md`. Summary:
+
+- **1.35x (F) / 1.18x (H HPatchesSeq) at equal correctness** — that is the
+  macOS number, replacing 4.2x / 2.2x.
+- The pre-fix M1 run (against `899af7f`) reproduced the crippled build natively
+  and matched the Linux `-U__linux__` simulation closely: F best mAA 0.3133 vs
+  0.3272 simulated, H 0.6924 vs 0.7021. The bug cost macOS 0.11 / 0.21 mAA.
+- `rng_cost` on M1: **1093 ns saved per F iteration, 1079 ns per H**, against
+  406 / 366 on glibc. 2.7x, so the libc lock is confirmed as the platform
+  difference and ARM is not a factor.
+
+Check which build you have with:
 
 ```bash
 nm -u $(python -c "import pydegensac,glob,os;print(glob.glob(os.path.dirname(pydegensac.__file__)+'/*.so')[0])") | grep -E 'dgesvd|dsyev'
 ```
 
-Empty output = the crippled build. Also worth running `rng_cost` there: it
-should report a per-iteration saving several times the 406 ns measured on
-glibc, which is the claim that the 4.2x/2.2x is a macOS-libc artefact.
+Empty output = the crippled build.
 
 ### 3. Smaller items
 
