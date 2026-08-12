@@ -27,8 +27,10 @@ not put pydegensac on the efficient frontier.
 calls were never compiled in at all** — see the section below. Everything in
 this report is Linux, where they are, except the M1 section added on
 2026-08-12, which re-runs the whole benchmark on Apple silicon against the
-fixed build: 1.35x (F) / 1.18x (H) there, and the bug was costing macOS 0.11
-mAA on F and 0.21 on H.
+fixed build. That section also carries a second optimisation pass, guided by
+the post-fix profile: **2.29x (F) / 2.91x (H) at equal correctness on M1**,
+which moves pydegensac onto the F frontier and makes it the second-cheapest
+homography estimator in the roster.
 
 ## How to read the numbers
 
@@ -145,8 +147,8 @@ removed here is roughly an order of magnitude smaller.
 LAPACK call was preprocessed away (see below), so local optimisation was not
 running and the RNG was a far larger share of a far smaller runtime. The 77%
 figure is a property of that build, not of macOS. Re-measured on M1 with the
-calls restored, the same change is worth 1.35x (F) / 1.18x (H) — see the M1
-section.
+calls restored, the RNG change alone is worth 1.35x (F) / 1.18x (H) on M1, and
+the full optimisation pass 2.29x / 2.91x — see the M1 section.
 
 It is *not* problem size, which was the other candidate: after each method's
 tuned ratio filter the estimators see a few hundred correspondences (median 272
@@ -468,44 +470,63 @@ macOS users **0.11 mAA on F and 0.21 on H**.
 
 ### The speed-up, at equal correctness
 
-`branch` vs `basefix` — both arms call LAPACK, so the only difference is the
-RNG/loop work this branch is actually about:
+`branch` vs `basefix` — both arms call LAPACK, so the difference is the RNG
+work plus the second optimisation pass (below), and nothing else:
 
 | | aggregate | at the largest budget |
 |---|---|---|
-| F | **1.35x** | 1.43x @ 50k |
-| H `HPatchesSeq` | **1.18x** | 1.57x @ 25k |
-| H `EVD` | 2.67x | 3.16x @ 25k |
+| F | **2.29x** | 2.78x @ 50k |
+| H `HPatchesSeq` | **2.91x** | 3.30x @ 25k |
+| H `EVD` | 3.32x | 4.02x @ 25k |
 
-Accuracy is unaffected: every paired CI contains zero except F at budget 500
-(-0.024), which is one marginal result out of 16 and inside the run-to-run
-scatter quantified above.
+Accuracy is unaffected. Every paired CI on F contains zero. On HPatchesSeq two
+budgets (6400, 25000) show the branch *ahead* by 0.010-0.017 with the CI
+excluding zero — that is inside the 0.037 run-to-run scatter measured for this
+dataset, so it is scatter that happened to land one-sided, not an accuracy
+gain. Nothing here should be read as the optimisation improving results.
 
-**These are the macOS numbers, and they replace the 4.2x / 2.2x golden-pair
-figures**, which were measured on the LAPACK-dead build. Comparing `branch`
-against `master` as-shipped on macOS is not a speed comparison at all — the
-branch is 11x *slower* there because it is the arm that computes the local
-optimisation.
+**These replace the 4.2x / 2.2x golden-pair figures**, which were measured on
+the LAPACK-dead build. Comparing `branch` against `master` as-shipped on macOS
+is not a speed comparison at all — that arm skips the local optimisation.
 
-M1 comes out ahead of Linux's 1.19x / 1.16x, in the direction `rng_cost.c`
-predicts: it reports **1093 ns saved per F iteration and 1079 ns per H
-iteration** on M1 (63x / 110x), against 406 ns on x86-64/glibc. The macOS
-`srandom()` lock is worth ~2.7x the glibc saving, which is the part of the
-original macOS-vs-Linux gap that was real; the rest of it was the dead LAPACK.
+The first pass (RNG) was worth 1.35x / 1.18x here. The second pass, once the
+LAPACK fix moved the profile, found the real hot spots: `cov_mat` making 45
+strided passes where one does (60% of H), `inlidxs` paying a cross-TU call and
+a division per correspondence (46% of F), eight divisions per point inside
+`pinvJ`, serial accumulators in `inlidxs` and `normu`, strided loads in the F
+error evaluation, and LTO. Details in
+`docs/superpowers/specs/2026-08-12-covmat-inlidxs-perf-design.md`.
+
+Estimator calls per second on M1, start to finish: **F 19.2 -> 36 (1.88x),
+H 250 -> 621 (2.49x)**.
 
 ### Where pydegensac sits on M1
 
 | | best mAA | mean ms/pair | leader |
 |---|---|---|---|
-| F `st_peters_square` | 0.4218 | 96.1 | poselib-prosac 0.4570 @ 50.7 ms |
-| H `HPatchesSeq` | 0.9062 | 5.2 | poselib-prosac 0.9297 @ 7.8 ms |
-| H `EVD` | 0.3625 | 4.1 | poselib-prosac 0.4500 @ 0.8 ms |
+| F `st_peters_square` | 0.4358 | 50.0 | poselib-prosac 0.4570 @ 51.8 ms |
+| H `HPatchesSeq` | 0.9200 | 2.6 | poselib-prosac 0.9297 @ 8.0 ms |
+| H `EVD` | 0.4125 | 7.8 | poselib-prosac 0.4500 @ 0.8 ms |
 
-Same qualitative placement as Linux: competitive on F accuracy at roughly 2x
-the leader's cost, behind `cv2.USAC_MAGSAC` on homography on both axes. Curves
-in `benchmarks/results/time_maa_{f,h}_m1.png`; the equal-correctness pair is in
-`time_maa_{f,h}_m1_equalcorrectness.png`, tables alongside as
-`report_{f,h}_m1*.md`.
+**This is where the placement changed.** Before the optimisation pass
+pydegensac was behind on both axes on both problems. Now:
+
+- On **F** it is level with the field on cost — 50.0 ms against poselib's 49.8
+  and poselib-prosac's 51.8 — and its gap to the leader is **no longer
+  statistically significant** (-0.021, CI -0.044 to +0.002). It was -0.035 with
+  the CI excluding zero before the pass.
+- On **H** it is now the second-cheapest method in the roster at 2.6 ms,
+  undercutting poselib (5.2) and poselib-prosac (8.0), with only
+  `cv2.USAC_MAGSAC` cheaper at 0.96 ms. The accuracy gap to the leader remains
+  small but real (-0.0095, CI excludes zero).
+
+So the honest summary is no longer "narrows the cost gap but does not reach the
+frontier": on F it reaches it, and on H it trades a ~0.01 mAA deficit for less
+than half poselib's runtime. `cv2.USAC_MAGSAC` still wins homography outright
+on cost.
+
+Curves in `benchmarks/results/time_maa_{f,h}_m1.png` (field plus both
+pydegensac arms), tables alongside as `report_{f,h}_m1.md`.
 
 ### Golden baselines
 
