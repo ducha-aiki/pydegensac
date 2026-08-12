@@ -25,7 +25,10 @@ not put pydegensac on the efficient frontier.
 
 **Separately, and much more importantly for macOS users: on macOS the LAPACK
 calls were never compiled in at all** — see the section below. Everything in
-this report is Linux, where they are.
+this report is Linux, where they are, except the M1 section added on
+2026-08-12, which re-runs the whole benchmark on Apple silicon against the
+fixed build: 1.35x (F) / 1.18x (H) there, and the bug was costing macOS 0.11
+mAA on F and 0.21 on H.
 
 ## How to read the numbers
 
@@ -318,6 +321,101 @@ be a speed-up and **is not** — 18.4 ms before and after on H, 267.6 vs 267.8 o
 F. The LAPACK path is simply not hot enough on Linux for it to show. It is kept
 because it is tidier and removes an allocation from an inner loop, not because
 it buys anything measurable.
+
+## The same benchmark on M1, after the fix (2026-08-12)
+
+Everything above is Linux. The whole benchmark was re-run natively on Apple
+silicon once the LAPACK fix landed — first because the bug above was found
+there independently, and second because the session's headline speed-ups were
+macOS numbers and needed restating against a build that does the work.
+
+Machine: M1 MacBook Air, macOS, single-threaded, conda python 3.13,
+cv2 4.13.0, poselib 2.0.5 — same data, same thresholds, same protocol.
+Three pydegensac arms, because on macOS the branch now differs from `master`
+in *two* ways at once:
+
+| arm | build | LAPACK symbols in the `.so` |
+|---|---|---|
+| `base` | `master@08464ca` | 0 |
+| `basefix` | `master` + `f349a6c`'s `lapwrap.c` | 2 |
+| `branch` | `f349a6c` | 2 |
+
+**The Linux `-U__linux__` simulation of the bug was accurate.** Measured
+natively, on the real macOS build rather than a simulation of it:
+
+| | Linux, simulated (`-U__linux__`) | M1, native (`master`) |
+|---|---|---|
+| F best mAA | 0.3272 | 0.3133 |
+| H `HPatchesSeq` best mAA | 0.7021 | 0.6924 |
+
+Against `branch` on the same M1 run — F 0.4218, H 0.9062 — the bug was costing
+macOS users **0.11 mAA on F and 0.21 on H**.
+
+### The speed-up, at equal correctness
+
+`branch` vs `basefix` — both arms call LAPACK, so the only difference is the
+RNG/loop work this branch is actually about:
+
+| | aggregate | at the largest budget |
+|---|---|---|
+| F | **1.35x** | 1.43x @ 50k |
+| H `HPatchesSeq` | **1.18x** | 1.57x @ 25k |
+| H `EVD` | 2.67x | 3.16x @ 25k |
+
+Accuracy is unaffected: every paired CI contains zero except F at budget 500
+(-0.024), which is one marginal result out of 16 and inside the run-to-run
+scatter quantified above.
+
+**These are the macOS numbers, and they replace the 4.2x / 2.2x golden-pair
+figures**, which were measured on the LAPACK-dead build. Comparing `branch`
+against `master` as-shipped on macOS is not a speed comparison at all — the
+branch is 11x *slower* there because it is the arm that computes the local
+optimisation.
+
+M1 comes out ahead of Linux's 1.19x / 1.16x, in the direction `rng_cost.c`
+predicts: it reports **1093 ns saved per F iteration and 1079 ns per H
+iteration** on M1 (63x / 110x), against 406 ns on x86-64/glibc. The macOS
+`srandom()` lock is worth ~2.7x the glibc saving, which is the part of the
+original macOS-vs-Linux gap that was real; the rest of it was the dead LAPACK.
+
+### Where pydegensac sits on M1
+
+| | best mAA | mean ms/pair | leader |
+|---|---|---|---|
+| F `st_peters_square` | 0.4218 | 96.1 | poselib-prosac 0.4570 @ 50.7 ms |
+| H `HPatchesSeq` | 0.9062 | 5.2 | poselib-prosac 0.9297 @ 7.8 ms |
+| H `EVD` | 0.3625 | 4.1 | poselib-prosac 0.4500 @ 0.8 ms |
+
+Same qualitative placement as Linux: competitive on F accuracy at roughly 2x
+the leader's cost, behind `cv2.USAC_MAGSAC` on homography on both axes. Curves
+in `benchmarks/results/time_maa_{f,h}_m1.png`; the equal-correctness pair is in
+`time_maa_{f,h}_m1_equalcorrectness.png`, tables alongside as
+`report_{f,h}_m1*.md`.
+
+### Golden baselines
+
+Regenerated on M1 with the fixed build (`scripts/make_golden_data.py`); the
+gate is green again in exact mode (33 passed). The qualifying pair set moved:
+`05466646-05534141` no longer passes capture sanity with local optimisation
+restored, and `06373813-06639257` takes its place. Restoring LO changes which
+pairs land on the right side of the sanity threshold, so this is expected
+rather than a red flag — but it does mean the macOS baselines before and after
+this branch describe different code, not just different numbers.
+
+### Reproducing
+
+`setup_data.py` then `run_ab.sh` covers the two-arm case. The third arm was
+built by checking `f349a6c`'s `lapwrap.c` into a `master` worktree:
+
+```bash
+git -C <master-worktree> checkout f349a6c -- src/pydegensac/degensac/lapwrap.c
+pip install --no-deps --target .ab/pkg-basefix <master-worktree>
+PYTHONPATH=.ab/pkg-basefix python run.py f --methods pydegensac \
+    --label base:m1-master+lapackfix --out f_m1_basefix.jsonl
+```
+
+Once this branch is merged the third arm stops being necessary — `master` will
+have the fix.
 
 ## The tutorial archives disagree about which way `match_conf` points
 
