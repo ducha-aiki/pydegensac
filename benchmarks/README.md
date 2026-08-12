@@ -108,6 +108,15 @@ over a 50k-iteration budget — against 25 ms actually measured, so the model
 accounts for most of the observed saving. macOS should report a substantially
 larger number, since its `srandom()` takes a lock.
 
+## Which toolchain built this wheel? (`toolchain/`)
+
+A separate harness for a separate question: why published Linux wheels ran
+slower than the same source built locally. It rebuilds one git ref inside each
+manylinux image and times the resulting `.so` against a local build, with
+LAPACK held constant so the compiler is the only variable. See
+`toolchain/README.md`; the answer is in
+`docs/reports/2026-08-11-ransac-benchmark.md`.
+
 ## Protocol notes
 
 - Timing covers the estimator call only, single-threaded (`OMP_NUM_THREADS=1`,

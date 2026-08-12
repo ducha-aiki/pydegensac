@@ -213,20 +213,14 @@ standing property of how the wheels are built. Verified by interleaved
 re-measurement (wheel 27.6 / 28.5 / 27.9 ms against local 21.4 / 21.2 /
 20.9 ms), so it is not run ordering.
 
-Partially explained. CI builds Linux wheels in manylinux2014 against
-`yum lapack-devel`, and auditwheel vendors the result — a **reference
-LAPACK/BLAS 3.4.2 from 2012**, against `libgfortran.so.3`. Forcing a local
-build to use exactly those bundled libraries via `LD_PRELOAD` costs 1.8 ms of
-the 7.0 ms H gap:
-
-| H, 0.2.2 source | ms |
-|---|---|
-| local build + OpenBLAS | 20.87 |
-| local build + Ubuntu reference LAPACK | 21.31 |
-| local build + the wheel's bundled LAPACK 3.4.2 | 22.64 |
-| the PyPI wheel itself | 27.91 |
-
-so ~25% of the gap is the vendored LAPACK.
+Two things about the wheels are candidates: the LAPACK auditwheel vendors into
+them (CI builds in manylinux2014 against `yum lapack-devel`, so that is a
+**reference LAPACK/BLAS 3.4.2 from 2012** against `libgfortran.so.3`), and the
+compiler that image ships. The profile below narrowed it to the compiler, and
+rebuilding inside the images themselves settled it: **it is the compiler, and
+the whole of it is one function.** See "The wheel gap is `pinvJ`" below for the
+finished answer; the two subsections in between are the trail that got there
+and are kept for the experiments they rule out.
 
 ### Where the rest goes: a perf profile
 
@@ -258,16 +252,126 @@ What that is *not*, each ruled out by direct experiment rather than argument:
   `__stack_chk`, no fortify symbols), **instruction mix** (59,915 vs 60,779,
   both essentially all-scalar).
 
-The one difference not yet isolated: the wheel records `GCC 10.2.1`, which is
-RedHat's *devtoolset* build, whereas the gcc-10 control above was conda's
-10.4.0 — a different build of GCC with different defaults and a CentOS 7
-baseline. Testing that needs the manylinux image itself, i.e. Docker, which is
-not available on this machine. (Incidentally the 0.1.2 wheel records two
-compilers, GCC 8.5.0 and 12.1.1.)
+The one difference not isolated at that point: the wheel records `GCC 10.2.1`,
+which is RedHat's *devtoolset* build, whereas the gcc-10 control above was
+conda's 10.4.0 — a different build of GCC with different defaults and a
+CentOS 7 baseline. Testing that needs the manylinux image itself, i.e. Docker.
+(Incidentally the 0.1.2 wheel records two compilers, GCC 8.5.0 and 12.1.1.)
 
-So the CI change below is worth the ~25% of the gap that is LAPACK; the
-remaining ~75% is a real, reproducible property of the manylinux toolchain that
-wants a Docker-equipped machine to finish off.
+That test is the next section, and the devtoolset hypothesis is the one that
+survives. Note in passing that the conda-gcc-10 control was the weakest
+experiment in the list — conda's compiler wrappers inject their own `CFLAGS`
+(`-march=nocona -mtune=haswell -O2 …`), so "gcc 10 is not slow" rested on a
+build whose flags nothing else shared.
+
+### The wheel gap is `pinvJ`
+
+Rebuilt the same source inside the manylinux images and copied the bare,
+**un-repaired** `.so` out to run on this host. Un-repaired matters: auditwheel
+vendors the image's LAPACK into the wheel, which is the second variable.
+Installing `openblas-devel` in the image first (as CI already does) makes every
+arm link `libopenblas.so.0` and pick up *this machine's* OpenBLAS at run time,
+so LAPACK is held constant and the compiler is the only thing left moving.
+
+Timed interleaved on one P-core with a fixed seed, so every arm does
+bit-identical work — the inlier checksum is the same for all of them, 142801 on
+H and 11576 on F. Median of 5-7 interleaved rounds, `v_0.2.2` source:
+
+| arm | H ms/pair | vs local | F ms/pair | vs local |
+|---|---|---|---|---|
+| local, gcc 13.3 | 6.20 | 1.00x | 33.13 | 1.00x |
+| manylinux_2_28, gcc 14.2.1 | 6.51 | 1.05x | 33.07 | 1.00x |
+| manylinux2014, gcc 10.2.1 | 8.09 | **1.31x** | 34.80 | 1.05x |
+| the published PyPI wheel | 8.16 | 1.32x | 36.43 | 1.10x |
+
+**manylinux2014 reproduces the wheel; manylinux_2_28 does not.** The wheel is
+now fully accounted for, with nothing left over: rebuilding in manylinux2014
+lands within 1% of the published wheel on H, and `LD_PRELOAD`-ing the wheel's
+own vendored LAPACK into that rebuild closes the rest on both problems
+(H 8.09 -> 8.19 against the wheel's 8.20; F 34.80 -> 36.65 against 36.43).
+
+An earlier `LD_PRELOAD` estimate had put ~25% of the gap on the vendored
+LAPACK, by forcing a *local* build to use the wheel's bundled libraries — which
+also swaps optimised OpenBLAS for reference BLAS everywhere, so it overstates
+the in-situ effect. Comparing the wheel against its own rebuild instead, the
+split is:
+
+| | H | F |
+|---|---|---|
+| manylinux2014 toolchain | +30% | +5% |
+| vendored LAPACK 3.4.2 | +1% | +5% |
+
+On the branch source the toolchain penalty is larger still — 1.41x on H
+(4.63 -> 6.52 ms/pair), because the branch made everything *else* faster.
+
+**One function, `pinvJ`.** Profiling the two builds by symbol:
+
+| | manylinux2014 | manylinux_2_28 |
+|---|---|---|
+| `pinvJ` | 1473 samples | 547 |
+| `HDs` | 960 | 1068 |
+| `cov_mat` | 411 | 377 |
+
+`pinvJ` is 2.7x slower; every other symbol is a wash, and the 926-sample
+difference in `pinvJ` is the entire 921-sample difference in the process. The
+reason is the last dozen instructions of the function. `pinvJ` ends by
+normalising its 8-element output, `for (i=0; i<8; i++) pJ[i] /= N`, which both
+compilers vectorise to four `divpd`. GCC 14 still has the values in registers
+and issues the four divides back-to-back into *independent* registers, so they
+overlap in the divider, with the stores trailing behind:
+
+```
+divpd %xmm1,%xmm11 ; divpd %xmm1,%xmm10 ; movups %xmm11,(%rdi)
+divpd %xmm1,%xmm4  ; divpd %xmm1,%xmm0  ; movups %xmm10,0x10(%rdi) ...
+```
+
+GCC 10.2.1 writes the values out to `pJ` first, then reads them back a pair at
+a time — store -> load -> divide -> store, four times, all through the same
+`%xmm1`:
+
+```
+divpd %xmm0,%xmm1 ; movups %xmm1,(%rdi)     ; movupd 0x10(%rdi),%xmm1
+divpd %xmm0,%xmm1 ; movups %xmm1,0x10(%rdi) ; movupd 0x20(%rdi),%xmm1 ...
+```
+
+Each divide waits on a load from the buffer the previous stores just wrote, so
+four ~14-cycle divides serialise behind memory round-trips instead of
+overlapping. Comparable instruction count (79 vs 86), the same four `divpd`,
+and neither version touches its own stack frame — the difference is purely
+whether the values stay in registers.
+
+This also explains, independently, the H-vs-F asymmetry that the wheel
+measurements showed: **`pinvJ` lives in `Htools.c` and is called only from
+there** (three call sites, all per-correspondence). F never touches it, which is
+why F loses 5% to the toolchain where H loses 30%.
+
+Two hypotheses tested and rejected on the way, so nobody re-runs them:
+
+- **Symbol visibility.** The manylinux2014 build exports 425 dynamic symbols
+  against manylinux_2_28's 125 and the local build's 121 — a correlation that
+  tracks the slowness exactly. It is not causal: rebuilding in manylinux2014
+  with `-fvisibility=hidden -fno-semantic-interposition` (425 -> 310) bought
+  1.6%, 6.53 -> 6.43 ms/pair. Consistent with the earlier 5% local result.
+- **Vendored LAPACK as the main term.** Only ~1% of the H gap, per the
+  `LD_PRELOAD` closure above.
+
+A source-level fix — hoisting `1.0/N` and multiplying — would make `pinvJ`
+compiler-proof, but reciprocal-multiply is not bit-identical to division and
+would invalidate every golden baseline. Not worth it now that CI has moved off
+the image; noted in case the image ever has to move back.
+
+**The image move is worth much more than the ~8% its CI comment claimed**: for
+a Linux user installing from PyPI it is ~1.25x on homography and ~1.10x on
+fundamental matrix, i.e. essentially the whole wheel-vs-source gap.
+
+**And it is only possible on this branch.** `v_0.2.2` and `master` do not
+compile in manylinux_2_28 at all: `Ftools.c` calls `dgeqp3_` with no prototype
+in scope, which GCC 10 warns about and GCC 14 rejects outright
+(`-Werror=implicit-function-declaration`). The declaration added to
+`lapwrap.h` in the LAPACK fix is what makes the image move viable; the two
+changes have to ship together. (The `v_0.2.2` arm above was built with
+`-Wno-error=implicit-function-declaration`, a diagnostic setting with no effect
+on code generation, purely so the old source could be measured.)
 
 **Unrelated hazard found on the way**: `pydegensac==0.1.2` silently returns
 *every* correspondence as an inlier under numpy 2.x — 300/300 on a synthetic

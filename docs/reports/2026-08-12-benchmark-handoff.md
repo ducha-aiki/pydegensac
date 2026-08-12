@@ -67,34 +67,43 @@ is still open.
 
 ## Open threads
 
-### 1. The unexplained 75% of the wheel gap (next experiment, needs Docker)
+### 1. The wheel gap — CLOSED 2026-08-12, it is `pinvJ`
 
-Published Linux wheels are **1.10x (F) / 1.30x (H) slower than the same source
-built locally**. Reproduced interleaved, three times each. perf says the extra
-time is inside pydegensac's own compiled code (0.456 s vs 0.312 s isolated,
-1.46x), not libc and not LAPACK.
+Docker was available after all. Ran the experiment: rebuilt the same source in
+both manylinux images, copied the bare un-repaired `.so` out, timed all arms
+interleaved on one P-core against the host's OpenBLAS so LAPACK is constant.
 
-Ruled out by direct experiment — **do not re-test these**: LAPACK
-implementation (2%), optimisation level (`-O2` 0.44 s vs `-O3` 0.43 s), GCC
-major version (conda gcc 10.4 ≈ gcc 13.3), symbol visibility (wheel exports 425
-symbols vs 121 locally, but hiding them buys 5%), assertions, hardening flags,
-instruction mix (59,915 vs 60,779, both all-scalar).
+**manylinux2014 reproduces the wheel; manylinux_2_28 does not.** The image move
+in `f349a6c` is worth **~1.25x on H and ~1.10x on F** to every Linux `pip
+install` user — essentially the whole gap, not the ~8% previously claimed.
+Nothing is left unexplained: manylinux2014 + the wheel's own vendored LAPACK
+reproduces the published wheel to within 1%.
 
-Not yet isolated: the wheel records `GCC 10.2.1`, RedHat's **devtoolset** build,
-while the gcc-10 control was conda's 10.4.0 — a different GCC with different
-defaults and a CentOS 7 baseline. The experiment, once Docker is available:
+Root cause is a single function. GCC 10.2.1 (CentOS 7 devtoolset) spills
+`pinvJ`'s `pJ[i] /= N` loop to memory and serialises its four `divpd` behind
+load/store round-trips; GCC 14 keeps it in registers and overlaps them.
+`pinvJ` is 2.7x slower and accounts for the *entire* process-level difference
+(926 of 921 net samples). It lives in `Htools.c` and is called only from there,
+which independently explains why H loses 30% and F only 5%.
 
-```bash
-# in each of quay.io/pypa/manylinux2014_x86_64 and manylinux_2_28_x86_64:
-#   build tag v_0.2.2, copy the .so out, time it with the isolated driver
-#   against the local gcc 13.3 build, threads pinned
-```
+Also rejected, on top of the earlier list: symbol visibility, despite the 425
+vs 125 exported-symbol correlation (`-fvisibility=hidden
+-fno-semantic-interposition` in manylinux2014 buys 1.6%).
 
-If manylinux2014 reproduces 0.71 s and manylinux_2_28 does not, the image move
-in `f349a6c` is worth ~30% to every Linux `pip install` user rather than the
-~8% currently claimed, and the report and PR should be updated to say so. If
-both are slow, the image move buys only the LAPACK share and something else is
-going on.
+Full write-up, tables and disassembly: "The wheel gap is `pinvJ`" in
+`2026-08-11-ransac-benchmark.md`. The harness is checked in at
+`benchmarks/toolchain/` with its own README — `build_in_image.sh` builds a ref
+inside an image, `iso_bench.py` is the estimator-only fixed-seed driver,
+`run_arms.sh` interleaves arms, `summarize.py` prints medians and verifies the
+arms agree on inliers. Build outputs land in the disposable `benchmarks/.ab/`.
+
+**Fell out of this, and it matters for CI:** `v_0.2.2` and `master` *cannot
+build* in manylinux_2_28 — `Ftools.c` calls `dgeqp3_` with no prototype and
+gcc 14 makes that an error. The `lapwrap.h` declaration on this branch is what
+makes the image move viable, so `f349a6c`'s two halves have to ship together.
+The macOS half of the same gap (declaration and calls both `#ifdef`-guarded
+away, so `dgeqp3_` never ran there either) was closed independently in
+`614e2e0` while this was being measured.
 
 ### 2. macOS/M1 re-benchmark — DONE (`6b11a8f`)
 
