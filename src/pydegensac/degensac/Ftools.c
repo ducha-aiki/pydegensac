@@ -665,16 +665,19 @@ int nullspace_qr7x9(const double *A, double *N)
     double T[rows*cols];
     double tau[cols];
     double work[3*cols+1];
-    lapack_int p[cols];
+    int p[cols];
 #else
     double T[7*9];
     double tau[9];
     double work[3*9+1];
-    lapack_int p[9];
+    int p[9];
 #endif
 
     lapack_int work_size = 3*cols+1;
-    lapack_int info;
+    /* Zero-initialised because the vendor writes only the low half of it:
+       lapack_int is ptrdiff_t here, LAPACK's integer is 32 bits. Reading an
+       uninitialised high half made this function report failure at random. */
+    lapack_int info = 0;
     // assume underdetermined system with full possible rank...
     int null_size = cols - rows;
     lapack_int k,r,c;
@@ -696,7 +699,11 @@ int nullspace_qr7x9(const double *A, double *N)
        uninitialised. Dormant rather than harmful, because USE_QR is not
        defined and the caller takes the LU path, but the same bug as the one
        f349a6c fixed in lapwrap.c. */
-    dgeqp3_(&r, &c, T, &r, p, tau, work, &work_size, &info);
+    /* jpvt is an ARRAY of the vendor's integers, so the ptrdiff_t convention
+       used elsewhere in this library cannot work for it: LAPACK writes 32-bit
+       elements at 32-bit stride, and reading them back as ptrdiff_t produced
+       out-of-bounds pivots (SIGBUS). Pass the vendor's width. */
+    dgeqp3_(&r, &c, T, &r, (lapack_int *)p, tau, work, &work_size, &info);
     if (info!=0)
         return -1;
 

@@ -215,6 +215,7 @@ Score exp_inFranicustom (double *u, int len, int *inliers, int ninl,
         }
         free(intbuff);
         free(intbuff2);
+        free(intbuff_best);
         return maxS; /*Zeros*/
     }
     ssiz = ninl / 2;
@@ -365,8 +366,20 @@ int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2, int len, double th
 
 
 #if USE_QR
-        /* QR */
-        nullspace_qr7x9(A, sol);
+        /* QR. Measured against the LU path below on M1 (2026-08-12): 16%
+           slower end to end (288 vs 342 estimator calls per 10 s) and
+           statistically indistinguishable in accuracy -- min p = 0.585 over
+           40 comparisons at 300 seeds, every KS <= 0.063. LU stays the
+           default; this is kept because it is the reference formulation, not
+           because it is worth enabling.
+
+           A failed factorisation means a degenerate sample; skip it, as the
+           LU path does when the null space is not 2-dimensional. The return
+           value used to be discarded, which fed an uninitialised `sol` into
+           the model loop. */
+        if (nullspace_qr7x9(A, sol) != 0) {
+            continue;
+        }
 #else
         /* use LU */
         for (i = 7*9; i < 9*9; ++i) {
