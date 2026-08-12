@@ -137,6 +137,79 @@ Empty output = the crippled build.
   interior, but `cv2-magsac` on HPatchesSeq was still creeping upward at 64 px
   (0.9324 -> 0.9331). Immaterial, but it is the one boundary left.
 
+## For the Linux side: what landed on M1 and what needs checking there
+
+A second optimisation pass landed on 2026-08-12 after the LAPACK fix, because
+the profile that guided the original RNG work had been taken on the build where
+LO was dead and pointed at the wrong functions. On M1 the series is worth
+**F 1.88x, H 2.49x** (19.2 -> 36 and 250 -> 621 estimator calls per second).
+Commits `8648752` through `15445ef`.
+
+Everything below is measured on M1 only. Four things want Linux eyes, in
+priority order.
+
+### 1. LTO under the wheel toolchains (`d9cb2a4`) -- blocking for the wheels
+
+CMakeLists now enables `CMAKE_INTERPROCEDURAL_OPTIMIZATION` when
+`check_ipo_supported()` says yes, with `-fno-strict-aliasing` alongside it.
+Worth 5% on F here and bit-exact.
+
+**The risk is specific**: LTO under manylinux2014's devtoolset gcc 10.2.1 is
+exactly the configuration `a3b4d4e` found miscompiling `pinvJ`. Build the wheel
+matrix, and if anything looks wrong set `PYDEGENSAC_NO_LTO=1` to bisect --
+that switch exists for this. The `-fno-strict-aliasing` is load-bearing, not
+decoration: this C core predates the rule and the C++ half already suppresses
+the warning.
+
+### 2. Does the wheel gap survive `pinvJ_sqsum`? (`8648752`)
+
+`a3b4d4e` pinned the entire published-wheel slowdown on gcc 10.2.1 spilling
+`pinvJ`'s `pJ[i] /= N` loop to memory and serialising four `divpd`. **That loop
+and that array are gone** -- the eight divisions factor into one, and nothing
+is written to memory to be spilled.
+
+Re-run `benchmarks/toolchain/run_arms.sh` against `15445ef`. If the two images
+converge, the manylinux_2_28 move becomes optional rather than load-bearing,
+and the CentOS 7 / Ubuntu 18.04 glibc floor can be kept. That is a real
+decision that this change may have taken off the table.
+
+### 3. Re-measure the series on Linux
+
+The M1 numbers will not transfer -- the two biggest wins were `cov_mat`
+(strided passes) and `inlidxs` (a division per correspondence), both of which
+are ISA- and compiler-sensitive. `benchmarks/` runs as before; the
+equal-correctness arm (`master` + the fixed `lapwrap.c`) is no longer needed
+now that the fix is in the branch's history -- compare `08464ca` against
+`15445ef` directly.
+
+### 4. Verify output-preservation on Linux
+
+`scripts/stat_ab.py` is now a committed tool rather than an ad hoc script: two
+`pip --target` builds in, KS tests out, over inlier count, GT error, GT
+precision **and** `model_err` (the returned model scored against ground truth).
+Use it the way `f349a6c` was verified. Two things it learned the hard way, both
+documented in the file: the first three metrics are functions of the inlier
+mask alone and are blind to a model that moves without the mask moving, and the
+samples are heavily tied, so values are quantised to nine significant digits
+before the KS test -- without that, a 1e-13 shift reads as KS 0.86.
+
+### Traps worth inheriting
+
+- **`PYDEGENSAC_CMAKE_ARGS` persists in the CMake cache.** It silently produced
+  a QR-vs-QR comparison here before being caught. `rm -rf build/temp.*` between
+  arms -- this applies directly to `benchmarks/toolchain/`, which varies flags
+  per arm.
+- **The `-O3 -ftree-vectorize -funroll-loops` line in CMakeLists is inert.** It
+  sets `CMAKE_CXX_FLAGS` under `CMAKE_COMPILER_IS_GNUCXX`, so it reaches
+  `bindings.cpp` on GCC only and has never touched the C core. Measuring those
+  flags on the C core showed nothing on M1, so it was left alone -- but do not
+  assume the C core has ever been unrolled or vectorised by request.
+- **The QR null-space path (`USE_QR`) is repaired but still off.** It was
+  unusable: uninitialised `info`, and a `ptrdiff_t[9]` pivot array that LAPACK
+  fills with `int32`s, which took the process down with SIGBUS. Fixed in
+  `d388f6d` and measured -- 16% slower than the LU path, accuracy tied -- so
+  the default is unchanged. Do not spend time re-testing it.
+
 ## Working with the harness
 
 `benchmarks/README.md` is the reference. Things a fresh session will trip over:
