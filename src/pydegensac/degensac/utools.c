@@ -167,21 +167,38 @@ int nullspace(double *matrix, double *nullspace, int n, int * buffer) /* Expects
 }
 
 
+/* Cv = Z^T Z for Z of shape len x siz, row-major; both triangles filled.
+
+   One pass over the points, accumulating every unique entry at once. The
+   previous form ran one pass per entry -- 45 of them at siz=9 -- and each was
+   a single serial FP accumulation chain, so it was latency-bound rather than
+   throughput-bound. The hot caller is exp_ranH's per-iteration MCE solve
+   (len=10), which runs this on every RANSAC iteration: ~45 dependent chains
+   against ~45 independent accumulators.
+
+   Summation over points still runs in ascending order; what changes is that
+   the partial sums live in a different order of operations, so rounding can
+   differ in the last bits. Deliberate -- see docs/superpowers/specs/
+   2026-08-12-covmat-inlidxs-perf-design.md. */
 void cov_mat(double *Cv, const double * Z, int len, int siz)
 {
    int i, j, k, lenM = len * siz;
-   double val;
+
+   for (i=0; i<siz*siz; i++)
+      Cv[i] = 0;
+
+   for (k=0; k<lenM; k+=siz)
+      for (i=0; i<siz; i++)
+      {
+         const double zi = Z[k+i];
+         for (j=0; j<=i; j++)
+            Cv[siz*i + j] += zi * Z[k+j];
+      }
 
    for (i=0; i<siz; i++)
-      for (j=0; j<=i; j++)
-      {
-         val = 0;
-         for (k=0; k< lenM; k+=siz)
-            val += Z[k+i] * Z[k+j];
-         Cv[siz*i + j] = val;
-         Cv[i + siz*j] = val;
-      }
-} 
+      for (j=0; j<i; j++)
+         Cv[i + siz*j] = Cv[siz*i + j];
+}
 
 
 void crossprod_st(double *out, const double *a, const double *b, int st)
