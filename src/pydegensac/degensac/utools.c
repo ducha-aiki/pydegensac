@@ -3,6 +3,23 @@
 //#include <stdio.h>
 
 #include "utools.h"
+#include "lapwrap.h"
+
+/* Length from which cov_mat hands Z^T Z to BLAS dsyrk instead of doing it
+   itself. In isolation dsyrk already wins at len=10 (M1/Accelerate, siz=9, ns
+   per call: len 8 -- 213 by hand vs 216 dsyrk; 10 -- 257 vs 164; 64 -- 1543 vs
+   244; 256 -- 6519 vs 516), but in the estimators a threshold that low costs
+   F 3% while gaining H 25%, because F's small-len calls pay the call overhead
+   more often than they save. Measured end to end, estimator calls per 10 s:
+
+     threshold      F      H
+     no dsyrk     297   3880
+     >= 10        288   4860
+     >= 32        306   5394
+     >= 64        306   5346
+
+   32 is the only setting that wins on both. */
+#define COV_BLAS_MIN 32
 
 void normu (const double *u, const int * inl, int len, 
            double *A1, double *A2)
@@ -29,7 +46,32 @@ void normu (const double *u, const int * inl, int len,
         A1[i] /= len; A2[i] /= len;
       }
 
-  for (j = 0; j < len; j++)
+  /* Two partial sums per image rather than one: each mean-distance
+     accumulator was a serial chain with a square root in it, so the loop ran
+     at sqrt-plus-add latency on work that is independent per correspondence.
+     Reassociation changes rounding. */
+  {
+    double s1a = 0, s1b = 0, s2a = 0, s2b = 0;
+    int n2 = len & ~1;
+    for (j = 0; j < n2; j += 2)
+      {
+        const double *q = p + 6*inl[j];
+        const double *w = p + 6*inl[j+1];
+        double qa = q[0] - A1[1], qb = q[1] - A1[2];
+        double wa = w[0] - A1[1], wb = w[1] - A1[2];
+        s1a += sqrt(qa*qa + qb*qb);
+        s1b += sqrt(wa*wa + wb*wb);
+        qa = q[3] - A2[1]; qb = q[4] - A2[2];
+        wa = w[3] - A2[1]; wb = w[4] - A2[2];
+        s2a += sqrt(qa*qa + qb*qb);
+        s2b += sqrt(wa*wa + wb*wb);
+      }
+    A1[0] = s1a + s1b;
+    A2[0] = s2a + s2b;
+    j = n2;
+  }
+
+  for (; j < len; j++)
     {
       u = p+ 6*inl[j];
       a = u[0] - A1[1];
@@ -167,21 +209,57 @@ int nullspace(double *matrix, double *nullspace, int n, int * buffer) /* Expects
 }
 
 
+/* Cv = Z^T Z for Z of shape len x siz, row-major; both triangles filled.
+
+   One pass over the points, accumulating every unique entry at once. The
+   previous form ran one pass per entry -- 45 of them at siz=9 -- and each was
+   a single serial FP accumulation chain, so it was latency-bound rather than
+   throughput-bound. The hot caller is exp_ranH's per-iteration MCE solve
+   (len=10), which runs this on every RANSAC iteration: ~45 dependent chains
+   against ~45 independent accumulators.
+
+   Summation over points still runs in ascending order; what changes is that
+   the partial sums live in a different order of operations, so rounding can
+   differ in the last bits. Deliberate -- see docs/superpowers/specs/
+   2026-08-12-covmat-inlidxs-perf-design.md. */
 void cov_mat(double *Cv, const double * Z, int len, int siz)
 {
    int i, j, k, lenM = len * siz;
-   double val;
+
+   for (i=0; i<siz*siz; i++)
+      Cv[i] = 0;
+
+   if (len >= COV_BLAS_MIN)
+   {
+      /* Fortran reads the row-major len x siz array Z as a column-major
+         siz x len matrix A, so A*A^T ("N", no transpose) is the Z^T Z we
+         want. The result is symmetric, so the row-major/column-major
+         distinction does not matter for Cv -- but dsyrk writes only one
+         triangle, hence the mirror below. Integer widths follow the rest of
+         this library: lapack_int is ptrdiff_t and the vendor BLAS reads the
+         low half, which is correct for these small positive values on any
+         little-endian target. */
+      lapack_int n = siz, kk = len, lda = siz, ldc = siz;
+      double alpha = 1.0, beta = 0.0;
+      dsyrk_("L", "N", &n, &kk, &alpha, (double *) Z, &lda, &beta, Cv, &ldc);
+      for (i=0; i<siz; i++)
+         for (j=0; j<i; j++)
+            Cv[siz*i + j] = Cv[i + siz*j];
+      return;
+   }
+
+   for (k=0; k<lenM; k+=siz)
+      for (i=0; i<siz; i++)
+      {
+         const double zi = Z[k+i];
+         for (j=0; j<=i; j++)
+            Cv[siz*i + j] += zi * Z[k+j];
+      }
 
    for (i=0; i<siz; i++)
-      for (j=0; j<=i; j++)
-      {
-         val = 0;
-         for (k=0; k< lenM; k+=siz)
-            val += Z[k+i] * Z[k+j];
-         Cv[siz*i + j] = val;
-         Cv[i + siz*j] = val;
-      }
-} 
+      for (j=0; j<i; j++)
+         Cv[i + siz*j] = Cv[siz*i + j];
+}
 
 
 void crossprod_st(double *out, const double *a, const double *b, int st)

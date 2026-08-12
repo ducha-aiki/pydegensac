@@ -1,6 +1,8 @@
 #ifndef __RTOOLS_H__
 #define __RTOOLS_H__
 
+#include <math.h>
+
 #define DEGENSAC_EPS 2.2204e-16
 #define MAX_SAMPLES 1000000
 #define CONFIDENCE 0.95
@@ -71,7 +73,30 @@ int inlidxso (const double * err, const double * sgn, int len, double th,
 /*Number of samples to ensure given confidence*/
 int nsamples(int ninl, int ptNum, int samsiz, double conf);
 
-double truncQuad(double epsilon, double thr);
+/* Truncated-quadratic gain. Defined here rather than in rtools.c so that it
+   inlines: inlidxs calls it once per correspondence, and that loop is the
+   single hottest thing in F (46% of self time), so a cross-TU call in it was
+   measurable. */
+static inline double truncQuad(double epsilon, double thr) {
+  if (thr == 0) {
+      return 0;
+    }
+  if ( epsilon >= thr*9/4 ) {
+      return 0;
+    }
+  return 1 - (epsilon/(thr*9/4));
+}
+
+/* truncQuad with the reciprocal supplied by the caller: inv = 1/(thr*9/4).
+   Equivalent in exact arithmetic -- truncQuad returns 0 exactly where
+   1 - epsilon*inv <= 0 -- but x*(1/y) does not round like x/y, so this is a
+   deliberate numerics change. The point is to hoist a division out of a loop
+   that runs once per correspondence. Callers must handle thr == 0 themselves;
+   1/0 is not a usable reciprocal.
+   See docs/superpowers/specs/2026-08-12-covmat-inlidxs-perf-design.md. */
+static inline double truncQuadInv(double epsilon, double inv) {
+  return fmax(0.0, 1 - epsilon*inv);
+}
 
 /* Score comparator */
 int scoreLess(const Score s1, const Score s2);

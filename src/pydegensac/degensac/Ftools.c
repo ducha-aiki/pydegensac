@@ -100,6 +100,73 @@ void FDs (const double *u, const double *F, double *p, int len)
     }
 }
 
+/* SoA counterparts of FDs / FDsSym.
+
+   Same arithmetic in the same order -- bit-identical results -- but reading
+   four contiguous coordinate arrays instead of gathering x1,y1,x2,y2 out of a
+   six-double stride. `s` points at a packed block laid out as
+
+       x1[len] y1[len] x2[len] y2[len]
+
+   which exp_ransacFcustomLAF builds once per estimator call (see soa_pack).
+   The signature matches FDsPtr so these drop into the same slot. Measured on
+   M1: 1.14x at len=272, 1.44x at len=51, against the strided form. */
+void FDs_soa (const double *s, const double *F, double *p, int len)
+{
+    const double *x1 = s, *y1 = s + len, *x2 = s + 2*len, *y2 = s + 3*len;
+    double rx, ry, rwc, ryc, rxc, r, a1, a2, b1, b2;
+    int i;
+
+    for (i=0; i<len; i++)
+    {
+        a1 = x1[i]; a2 = y1[i]; b1 = x2[i]; b2 = y2[i];
+        rxc = _f1 * b1 + _f4 * b2 + _f7;
+        ryc = _f2 * b1 + _f5 * b2 + _f8;
+        rwc = _f3 * b1 + _f6 * b2 + _f9;
+        r =(a1 * rxc + a2 * ryc + rwc);
+        rx = _f1 * a1 + _f2 * a2 + _f3;
+        ry = _f4 * a1 + _f5 * a2 + _f6;
+        p[i] = r*r / (rxc*rxc + ryc*ryc + rx*rx + ry*ry); //original, Sampson`s error
+    }
+}
+
+void FDsSym_soa (const double *s, const double *F, double *p, int len)
+{
+    const double *x1 = s, *y1 = s + len, *x2 = s + 2*len, *y2 = s + 3*len;
+    double rx, ry, rwc, ryc, rxc, r, a1, a2, b1, b2, a, b;
+    int i;
+
+    for (i=0; i<len; i++)
+    {
+        a1 = x1[i]; a2 = y1[i]; b1 = x2[i]; b2 = y2[i];
+        rxc = _f1 * b1 + _f4 * b2 + _f7;
+        ryc = _f2 * b1 + _f5 * b2 + _f8;
+        rwc = _f3 * b1 + _f6 * b2 + _f9;
+        r =(a1 * rxc + a2 * ryc + rwc);
+        rx = _f1 * a1 + _f2 * a2 + _f3;
+        ry = _f4 * a1 + _f5 * a2 + _f6;
+        a =  rxc*rxc + ryc*ryc;
+        b = rx*rx + ry*ry;
+        p[i] = r*r* (a+b)/(a*b); //Mishkin.  Symmetric epipolar distance
+    }
+}
+
+/* Pack the six-double-per-correspondence array into the SoA block above.
+   Once per estimator call, against an error evaluation per iteration. */
+void soa_pack (const double *u, double *s, int len)
+{
+    double *x1 = s, *y1 = s + len, *x2 = s + 2*len, *y2 = s + 3*len;
+    int i;
+
+    for (i=0; i<len; i++, u += 6)
+    {
+        x1[i] = u[0];
+        y1[i] = u[1];
+        x2[i] = u[3];
+        y2[i] = u[4];
+    }
+}
+
 void FDsidx (const double *mu, const double *F, double *p, int len,  int *idx, int siz)
 {
     double rx, ry, rwc, ryc, rxc, r;
@@ -352,7 +419,7 @@ void u2f(const double *u, const int *inl, int len,
 {
     double A1[3], A2[3];
     double *Z, V[9*9], U[8*8], D[9], *p;
-    int i, j;
+    int i, j, step;
 
     if (buffer == NULL)
         Z = (double *) malloc(sizeof(double) * 9 * len);
@@ -366,27 +433,27 @@ void u2f(const double *u, const int *inl, int len,
 
         cov_mat(V, Z, len, 9);
         lap_eig(V,D,9);
-        trnm(V,9); /* lapack stores column-wise */
+
+        /* LAPACK returns the eigenvectors as Fortran columns, which in this
+           row-major buffer are rows -- so the one we want is already
+           contiguous. The old code transposed the entire 9x9 just to read it
+           back with stride 9; reading row j directly is the same nine values.
+           (u2h has always done it this way.) */
+        j = 0;
+        for (i = 1; i<9; i++)
+            if (D[i] < D[j]) j = i;
+        p = V + 9*j;
+        step = 1;
     } else
     {
         lin_fm(u, Z, inl, len);
         svduv(D,Z,V,9,U,8);
+        p = V + 8;      /* ccmath's V is row-major: column 8, stride 9 */
+        step = 9;
     }
 
-    if (len > 8)
-    {
-        j = 0;
-        for (i = 1; i<9; i++)
-            if (D[i] < D[j]) j = i;
-        p = V + j;
-    } else
-        p = V + 8;
-
-    for (i = 0; i<9; i++)
-    {
+    for (i = 0; i<9; i++, p += step)
         F[i] = *p;
-        p += 9;
-    }
 
     singulF(F);
 
@@ -402,7 +469,7 @@ void u2fw(const double *u, const int *inl, const double * w,
 {
     double A1[3], A2[3];
     double *Z, V[9*9], U[8*8], D[9], *p;
-    int i, j;
+    int i, j, step;
 
     if (buffer == NULL)
         Z = (double *) malloc(sizeof(double) * 9 * len);
@@ -421,7 +488,13 @@ void u2fw(const double *u, const int *inl, const double * w,
 
         cov_mat(V, Z, len, 9);
         lap_eig(V,D,9);
-        trnm(V,9); /* lapack stores column-wise */
+
+        /* Eigenvector j is already contiguous here -- see u2f. */
+        j = 0;
+        for (i = 1; i<9; i++)
+            if (D[i] < D[j]) j = i;
+        p = V + 9*j;
+        step = 1;
     } else
     {
         lin_fm(u, Z, inl, len);
@@ -431,22 +504,12 @@ void u2fw(const double *u, const int *inl, const double * w,
             scalmul(Z+i, w[j], 9, 9);
         }
         svduv(D,Z,V,9,U,8);
+        p = V + 8;      /* ccmath's V is row-major: column 8, stride 9 */
+        step = 9;
     }
 
-    if (len > 8)
-    {
-        j = 0;
-        for (i = 1; i<9; i++)
-            if (D[i] < D[j]) j = i;
-        p = V + j;
-    } else
-        p = V + 8;
-
-    for (i = 0; i<9; i++)
-    {
+    for (i = 0; i<9; i++, p += step)
         F[i] = *p;
-        p += 9;
-    }
 
     singulF(F);
 
@@ -602,16 +665,19 @@ int nullspace_qr7x9(const double *A, double *N)
     double T[rows*cols];
     double tau[cols];
     double work[3*cols+1];
-    lapack_int p[cols];
+    int p[cols];
 #else
     double T[7*9];
     double tau[9];
     double work[3*9+1];
-    lapack_int p[9];
+    int p[9];
 #endif
 
     lapack_int work_size = 3*cols+1;
-    lapack_int info;
+    /* Zero-initialised because the vendor writes only the low half of it:
+       lapack_int is ptrdiff_t here, LAPACK's integer is 32 bits. Reading an
+       uninitialised high half made this function report failure at random. */
+    lapack_int info = 0;
     // assume underdetermined system with full possible rank...
     int null_size = cols - rows;
     lapack_int k,r,c;
@@ -627,13 +693,17 @@ int nullspace_qr7x9(const double *A, double *N)
 
     r = rows; c = cols;
     // call Fortran LAPACK function
-#ifdef _WIN32
-    dgeqp3_(&r, &c, T, &r, p, tau, work, &work_size, &info);
-#endif
-
-#ifdef __linux__
-    dgeqp3_(&r, &c, T, &r, p, tau, work, &work_size, &info);
-#endif
+    /* Called unconditionally. It used to be guarded by _WIN32 / __linux__,
+       like every other LAPACK call in this library — so on macOS, which
+       defines neither, the QR was preprocessed away and `info` was read
+       uninitialised. Dormant rather than harmful, because USE_QR is not
+       defined and the caller takes the LU path, but the same bug as the one
+       f349a6c fixed in lapwrap.c. */
+    /* jpvt is an ARRAY of the vendor's integers, so the ptrdiff_t convention
+       used elsewhere in this library cannot work for it: LAPACK writes 32-bit
+       elements at 32-bit stride, and reading them back as ptrdiff_t produced
+       out-of-bounds pivots (SIGBUS). Pass the vendor's width. */
+    dgeqp3_(&r, &c, T, &r, (lapack_int *)p, tau, work, &work_size, &info);
     if (info!=0)
         return -1;
 

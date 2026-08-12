@@ -17,29 +17,23 @@ jobs:
       actions: read
 
     steps:
-      - name: Download Linux wheels artifact
+      # Every wheels-* artifact the build workflow produces, by pattern rather
+      # than by name. The cp314 jobs are separate (cibuildwheel 2.21.2 does not
+      # know the identifier, and cp314 needs manylinux_2_28 on Linux), so
+      # listing artifacts individually silently dropped wheels-linux-2_28,
+      # wheels-macos-cp314 and wheels-windows-cp314 -- cp314 would have been
+      # built by CI and then not published.
+      - name: Download all wheel artifacts
         uses: actions/download-artifact@v4
         with:
-          name: wheels-linux
+          pattern: wheels-*
+          merge-multiple: true
           path: dist
           run-id: ${{ inputs.build_run_id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Download macOS wheels artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: wheels-macos
-          path: dist
-          run-id: ${{ inputs.build_run_id }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Download Windows wheels artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: wheels-windows
-          path: dist
-          run-id: ${{ inputs.build_run_id }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: List what will be published
+        run: ls -la dist
 
       - name: Publish to PyPI (trusted publishing)
         uses: pypa/gh-action-pypi-publish@release/v1

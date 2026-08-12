@@ -9,6 +9,7 @@
 #include "lapwrap.h"
 #include "rtools.h"
 #include "hash.h"
+#include "bsd_random.h"
 
 
 static HashTable HASH_TABLE_H;
@@ -30,7 +31,7 @@ static HashTable HASH_TABLE_H;
 static void reseed_rng(unsigned seed_value) {
     srand(seed_value);
 #ifndef WIN32
-    srandom(seed_value);
+    degensac_srandom(seed_value);
 #endif
 }
 
@@ -259,7 +260,6 @@ Score exp_ransacHcustomLAF (double *u, double *u_1, double *u_2,
     int i, j, *inliers, *inliersS, *lo_intbuff;
     char do_update = 0;
     Score maxS = {0,0,0,0}, maxSs = {0,0,0,0}, S = {0,0,0,0}, Scheck= {0,0,0,0};
-    unsigned rand_seed;
     int do_iterate;
     int iter_cnt = 0, no_rej = 0, iterID = 0;
     char new_max = 0;
@@ -309,7 +309,6 @@ Score exp_ransacHcustomLAF (double *u, double *u_1, double *u_2,
 
 
     no_sam = 0;
-    rand_seed = rand();
 
     samidx = pool + len - 4;
 
@@ -322,9 +321,7 @@ Score exp_ransacHcustomLAF (double *u, double *u_1, double *u_2,
     while(no_sam < max_sam)
     {
         no_sam++;
-        reseed_rng(rand_seed);
         multirsampleT(Z, 9, 2, pool, 4, len, M);
-        rand_seed = rand();
 
         /* orientation */
 #ifndef __OC_OFF__

@@ -44,12 +44,14 @@ unsigned getticks(void);
 #endif /*__linux__*/
 
 Score exp_iterFcustom(double *u, int len, int *inliers, int * inl2, double th, double ths, int iters,
-          double *F, double **errs, double *buffer, int * samidx, int iterID, unsigned inlLimit, double *resids, exFDsPtr EXFDS1,FDsPtr FDS1);
+          double *F, double **errs, double *buffer, int * samidx, int iterID, unsigned inlLimit, double *resids, exFDsPtr EXFDS1,FDsPtr FDS1,
+          const double *u_soa, FDsPtr FDS1soa);
 
 
 Score exp_inFranicustom (double *u, int len, int *inliers, int ninl,
              double th, double **errs, double *buffer,
-             double *F, int * samidx, int * iterID, unsigned inlLimit, double *resids,exFDsPtr EXFDS1,FDsPtr FDS1);
+             double *F, int * samidx, int * iterID, unsigned inlLimit, double *resids,exFDsPtr EXFDS1,FDsPtr FDS1,
+             const double *u_soa, FDsPtr FDS1soa);
 
 
 #ifdef __cplusplus
@@ -57,8 +59,8 @@ extern "C"
 #endif
 int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2, int len, double th, double laf_coef, double conf, int max_sam,
             double *F, unsigned char * inl,
-            int * data_out, int do_lo, unsigned inlLimit, double **resids, double* H_best, int* Ih, exFDsPtr EXFDS1, FDsPtr FDS1, FDsidxPtr FDS1idx,
-            double SymCheck_th, int enable_degen_check, int seed);
+            int * data_out, int do_lo, unsigned inlLimit, double **resids, exFDsPtr EXFDS1, FDsPtr FDS1, FDsidxPtr FDS1idx,
+            double SymCheck_th, int enable_degen_check, int seed, FDsPtr FDS1soa);
 
 #ifdef __cplusplus
 extern "C"
@@ -70,6 +72,19 @@ void FDs (const double *u, const double *F, double *p, int len);
 extern "C"
 #endif
 void FDsSym (const double *u, const double *F, double *p, int len);
+
+
+/* SoA forms of the two above, reading a packed x1|y1|x2|y2 block instead of
+   gathering from a six-double stride. Bit-identical results; see Ftools.c. */
+#ifdef __cplusplus
+extern "C"
+#endif
+void FDs_soa (const double *s, const double *F, double *p, int len);
+
+#ifdef __cplusplus
+extern "C"
+#endif
+void FDsSym_soa (const double *s, const double *F, double *p, int len);
 
 #ifdef __cplusplus
 extern "C"

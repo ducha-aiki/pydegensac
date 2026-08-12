@@ -2,6 +2,10 @@ name: Build
 
 on: [push]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build_wheels_linux:
     name: Build wheels on linux
@@ -22,7 +26,35 @@ jobs:
       - name: Build wheels
         run: .venv/bin/python -m cibuildwheel --output-dir wheelhouse
         env:
-          CIBW_BEFORE_ALL_LINUX: yum install -y lapack-devel blas-devel gcc-gfortran
+          # Default manylinux2014 (CentOS 7), deliberately: it keeps the
+          # glibc 2.17 floor, so CentOS 7 and Ubuntu 18.04 users can still
+          # `pip install pydegensac`.
+          #
+          # This was manylinux_2_28 for part of 2026-08-12, on the evidence that
+          # the image was worth ~1.25x on H / ~1.10x on F. Both halves of that
+          # have since been measured away and the image choice is now
+          # performance-neutral:
+          #
+          #   - The compiler term was CentOS 7's gcc 10.2.1 spilling `pinvJ`'s
+          #     normalisation loop to memory and serialising four divpd. That
+          #     loop no longer exists — the eight divisions were factored into
+          #     one — and the two images now time identically (H 3.55 vs 3.54
+          #     ms/pair, F 15.24 vs 15.36).
+          #   - The LAPACK term was manylinux2014 vendoring reference LAPACK
+          #     3.4.2 from 2012. The `openblas-devel` line below fixed that, not
+          #     the image: repaired wheels from the two images differ by 0.5% on
+          #     H and 0.1% on F (OpenBLAS 0.3.3 vs 0.3.15 — three years of
+          #     kernel work buys nothing on 9x9 matrices).
+          #
+          # Tables in docs/reports/2026-08-12-benchmark-handoff.md, sections 2
+          # and 2b. If this is ever moved back to manylinux_2_28, note that the
+          # image requires the dgeqp3_ prototype in lapwrap.h — gcc 14 makes
+          # implicit-function-declaration an error, so v_0.2.2 and older master
+          # cannot compile there at all.
+          # openblas-devel first: CMake's FindLAPACK checks OpenBLAS before the
+          # generic reference build, and falls back to it if absent, so this is
+          # a preference rather than a requirement.
+          CIBW_BEFORE_ALL_LINUX: yum install -y openblas-devel lapack-devel blas-devel gcc-gfortran
           # cp314 is built separately in build_wheels_linux_2_28: numpy publishes no
           # manylinux2014/manylinux_2_17 wheel for cp314 (only manylinux_2_28+), so it
           # can't be test-installed in this manylinux2014-based job.
@@ -89,7 +121,8 @@ jobs:
         run: .venv/bin/python -m cibuildwheel --output-dir wheelhouse
         env:
           CIBW_MANYLINUX_X86_64_IMAGE: manylinux_2_28
-          CIBW_BEFORE_ALL_LINUX: yum install -y lapack-devel blas-devel gcc-gfortran
+          # openblas-devel first; see the note in build_wheels_linux.
+          CIBW_BEFORE_ALL_LINUX: yum install -y openblas-devel lapack-devel blas-devel gcc-gfortran
           # cp314-only: numpy has no manylinux2014/manylinux_2_17 wheel for cp314,
           # so it needs the newer manylinux_2_28 image (numpy wheels exist there).
           CIBW_BUILD: cp314-manylinux_x86_64
@@ -116,6 +149,8 @@ jobs:
     name: Build wheels on macOS
     needs: build_wheels_linux
     runs-on: macOS-latest
+    permissions:
+      contents: write
 
     steps:
       - uses: actions/checkout@v4
@@ -125,6 +160,10 @@ jobs:
         run: python3 -m venv .venv
 
       - name: Install cibuildwheel
+        # cp314 is built by build_wheels_mac_cp314 below: this pin predates
+        # CPython 3.14 (and silently drops unknown build identifiers), while
+        # cibuildwheel 3.x dropped cp38 as a build target -- same split as the
+        # linux jobs.
         run: .venv/bin/python -m pip install cibuildwheel==2.21.2
 
       - name: Build wheels
@@ -139,7 +178,6 @@ jobs:
             cp311-macosx_x86_64 cp311-macosx_arm64
             cp312-macosx_x86_64 cp312-macosx_arm64
             cp313-macosx_x86_64 cp313-macosx_arm64
-            cp314-macosx_x86_64 cp314-macosx_arm64
           CIBW_REPAIR_WHEEL_COMMAND_MACOS: ""
           CIBW_TEST_COMMAND: >
             python -m pytest {project}/tests -q &&
@@ -153,6 +191,56 @@ jobs:
         with:
           name: wheels-macos
           path: wheelhouse/*.whl
+
+      - name: Publish wheels to GitHub release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: wheelhouse/*.whl
+
+  build_wheels_mac_cp314:
+    name: Build wheels on macOS (cp314)
+    needs: build_wheels_linux
+    runs-on: macOS-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+
+      - name: Create virtualenv
+        run: python3 -m venv .venv
+
+      - name: Install cibuildwheel
+        # Same version as build_wheels_linux_2_28; ships cp314 as a default
+        # target since 3.1.0.
+        run: .venv/bin/python -m pip install cibuildwheel==3.4.1
+
+      - name: Build wheels
+        run: .venv/bin/python -m cibuildwheel --output-dir wheelhouse
+        env:
+          CIBW_BEFORE_ALL_MACOS: brew install openblas lapack
+          CIBW_ARCHS_MACOS: "x86_64 arm64"
+          CIBW_BUILD: cp314-macosx_x86_64 cp314-macosx_arm64
+          CIBW_REPAIR_WHEEL_COMMAND_MACOS: ""
+          CIBW_TEST_COMMAND: >
+            python -m pytest {project}/tests -q &&
+            python -c "import os, runpy; os.chdir(r'{project}/examples');
+            runpy.run_path('simple-example.py', run_name='__main__')"
+          CIBW_TEST_REQUIRES: opencv-python-headless==4.* pytest
+          CIBW_ENVIRONMENT: PYDEGENSAC_GOLDEN_EXACT=0
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheels-macos-cp314
+          path: wheelhouse/*.whl
+
+      - name: Publish wheels to GitHub release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: wheelhouse/*.whl
 
   build_wheels_windows:
     name: Build wheels on windows
@@ -169,6 +257,8 @@ jobs:
         run: python -m venv .venv
 
       - name: Install cibuildwheel
+        # cp314 is built by build_wheels_windows_cp314 below -- same split as
+        # the macOS and linux jobs.
         run: .venv\Scripts\python -m pip install cibuildwheel==2.21.2
 
       - name: Build wheels
@@ -183,7 +273,6 @@ jobs:
             cp311-win_amd64
             cp312-win_amd64
             cp313-win_amd64
-            cp314-win_amd64
           CIBW_ENVIRONMENT_WINDOWS: >
             VCPKG_ROOT=C:/vcpkg
             CMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake
@@ -197,6 +286,52 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: wheels-windows
+          path: wheelhouse/*.whl
+
+      - name: Publish wheels to GitHub release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: wheelhouse/*.whl
+
+  build_wheels_windows_cp314:
+    name: Build wheels on windows (cp314)
+    needs: build_wheels_linux
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+
+      - name: Create virtualenv
+        run: python -m venv .venv
+
+      - name: Install cibuildwheel
+        # Same version as build_wheels_linux_2_28; ships cp314 as a default
+        # target since 3.1.0.
+        run: .venv\Scripts\python -m pip install cibuildwheel==3.4.1
+
+      - name: Build wheels
+        run: .venv\Scripts\python -m cibuildwheel --output-dir wheelhouse
+        env:
+          CIBW_ARCHS_WINDOWS: AMD64
+          CIBW_BEFORE_ALL_WINDOWS: vcpkg install openblas lapack --triplet x64-windows
+          CIBW_BUILD: cp314-win_amd64
+          CIBW_ENVIRONMENT_WINDOWS: >
+            VCPKG_ROOT=C:/vcpkg
+            CMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake
+            PYDEGENSAC_GOLDEN_EXACT=0
+          CIBW_TEST_COMMAND: >
+            python -m pytest {project}/tests -q &&
+            python -c "import os, runpy; os.chdir(r'{project}/examples');
+            runpy.run_path('simple-example.py', run_name='__main__')"
+          CIBW_TEST_REQUIRES: opencv-python-headless==4.* pytest
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheels-windows-cp314
           path: wheelhouse/*.whl
 
       - name: Publish wheels to GitHub release

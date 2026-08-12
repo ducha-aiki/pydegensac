@@ -1,6 +1,7 @@
 #! /usr/bin/env python3
 import os
 import re
+import shlex
 import sys
 import platform
 import subprocess
@@ -43,6 +44,13 @@ class CMakeBuild(build_ext):
             f"-DPYTHON_EXECUTABLE={sys.executable}",
             f"-DCMAKE_BUILD_TYPE={cfg}",
         ]
+
+        # Escape hatch for build-time CMake settings, e.g. pinning the BLAS
+        # vendor: PYDEGENSAC_CMAKE_ARGS="-DBLA_VENDOR=OpenBLAS". Space
+        # separated; appended last so it can override anything above.
+        extra = os.environ.get("PYDEGENSAC_CMAKE_ARGS", "").strip()
+        if extra:
+            cmake_args += shlex.split(extra)
 
         # --- macOS arch handling (cibuildwheel-friendly) ---
         # cibuildwheel sets _PYTHON_HOST_PLATFORM per build config, e.g.:

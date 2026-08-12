@@ -132,6 +132,47 @@ void u2h(const double *u, const int *inl, int len, double *H, double *buffer) {
     }
 }
 
+/* The symmetric transfer error that HDs/HDsi/HDsidx all compute:
+
+     pinvJ(a,b,c,d,e,pJ);  sum over j<4 of (pJ[j]*r1 + pJ[j+4]*r2)^2
+
+   pinvJ's last act is to divide all eight entries by N. The consumer squares
+   linear combinations of them and adds those up, so that 1/N factors straight
+   out of the whole expression as a single 1/N^2: eight divisions per
+   correspondence become one. Same value in exact arithmetic, different
+   rounding -- deliberate, see docs/superpowers/specs/
+   2026-08-12-covmat-inlidxs-perf-design.md.
+
+   The unnormalised entries are pinvJ's, kept in the same order so the two can
+   be read side by side. */
+static inline double pinvJ_sqsum (double a, double b, double c, double d,
+                                  double e, double r1, double r2)
+{
+    double a2=a*a, b2=b*b, c2=c*c, d2=d*d, e2=e*e;
+    double c2pd2 = c2+d2, ab = a*b, de = d*e;
+    double Q = c * (c2pd2 + e2);
+    double N, s0, s1, s2, s3;
+
+    double q0 = -b * de + a * (c2 + e2);
+    double q1 = b * c2pd2 - a * de;
+    double q2 = Q;
+    double q3 = -c * (a*d + b*e);
+
+    double q4 = d * (b2 + c2) - ab * e;
+    double q5 = -ab * d + e * (a2 + c2);
+    double q6 = q3;
+    double q7 = c * (a2 + b2 + c2);
+
+    N = a * q0 + b * q1 + c * q2;
+
+    s0 = q0 * r1 + q4 * r2;
+    s1 = q1 * r1 + q5 * r2;
+    s2 = q2 * r1 + q6 * r2;
+    s3 = q3 * r1 + q7 * r2;
+
+    return (s0*s0 + s1*s1 + s2*s2 + s3*s3) / (N*N);
+}
+
 void pinvJ (double a, double b, double c, double d, double e, double *pJ)
 {
     double a2=a*a, b2=b*b, c2=c*c, d2=d*d, e2=e*e;
@@ -163,7 +204,6 @@ void HDs(const double *lin, const double * u,
 {
     int i, j, shift = 2*len;
     const double *l;
-    double pJ[8];
     double r1, r2, a, b, c, d, e;
 
     for (i=0; i<len; i++)
@@ -184,15 +224,7 @@ void HDs(const double *lin, const double * u,
         d = H[1] - H[2] * u[1];
         e = H[4] - H[5] * u[1];
 
-        pinvJ(a,b,c,d,e,pJ);
-
-
-        *p = 0;
-        for (j = 0; j < 4; j++)
-        {
-            a = pJ[j] * r1 + pJ[j+4] * r2;
-            *p += a * a;
-        }
+        *p = pinvJ_sqsum(a,b,c,d,e,r1,r2);
         p++;
         u += 6;
     }
@@ -374,7 +406,6 @@ void HDsi(const double *lin, const double * u6,
 {
     int i, j, shift = 2*len;
     const double *l;
-    double pJ[8];
     double r1, r2, a, b, c, d, e;
     const double *u;
 
@@ -397,15 +428,7 @@ void HDsi(const double *lin, const double * u6,
         d = H[1] - H[2] * u[1];
         e = H[4] - H[5] * u[1];
 
-        pinvJ(a,b,c,d,e,pJ);
-
-
-        *p = 0;
-        for (j = 0; j < 4; j++)
-        {
-            a = pJ[j] * r1 + pJ[j+4] * r2;
-            *p += a * a;
-        }
+        *p = pinvJ_sqsum(a,b,c,d,e,r1,r2);
         p++;
     }
 }
@@ -609,7 +632,6 @@ void HDsidx(const double *lin, const double * mu, const double *H,
 {
     int mi, i, j, shift = 2*len;
     const double *l;
-    double pJ[8];
     const double *u;
     double r1, r2, a, b, c, d, e;
 
@@ -634,15 +656,7 @@ void HDsidx(const double *lin, const double * mu, const double *H,
         d = H[1] - H[2] * u[1];
         e = H[4] - H[5] * u[1];
 
-        pinvJ(a,b,c,d,e,pJ);
-
-
-        p[i] = 0;
-        for (j = 0; j < 4; j++)
-        {
-            a = pJ[j] * r1 + pJ[j+4] * r2;
-            p[i] += a * a;
-        }
+        p[i] = pinvJ_sqsum(a,b,c,d,e,r1,r2);
     }
 }
 

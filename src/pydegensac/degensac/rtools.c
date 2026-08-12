@@ -6,6 +6,9 @@
 
 #ifdef WIN32
 #define random rand
+#else
+#include "bsd_random.h"
+#define random degensac_random
 #endif
 
 /* inline int sample (int *pool, int max_sz, int i) */
@@ -158,13 +161,43 @@ void multirsampleT (double *data, int dat_siz, int dps,
 
 /*Indexes of inliers with error lower than given threshold. Returns RANSAC score.*/
 Score inlidxs (const double * err, int len, double th, int * inl) {
-  unsigned i;
+  int i;
   Score s = {0,0,0,0};
-  for (i = 0; i < len; ++i) {
-      s.J += truncQuad(err[i], th);
-      if (err[i] <= th) {
+  /* The MSAC gain needs 1/(th*9/4) per correspondence; computing it once and
+     multiplying is a numerics change (see truncQuadInv). th == 0 has no usable
+     reciprocal and scores 0 for every point, so it keeps the scalar path --
+     the flag is loop-invariant, so the branch hoists out. */
+  const int score_j = (th != 0);
+  const double inv = score_j ? 1/(th*9/4) : 0;
+  /* Four partial sums rather than one: the gain accumulator was a serial FP
+     dependency chain over every correspondence, running at add latency when
+     the work is trivially parallel. Reassociation changes rounding.
+     Branchless compress store: the write always happens, the index only
+     advances for inliers. Every caller allocates `inl` at `len` entries, so
+     the speculative write at s.I is in bounds. */
+  double j0 = 0, j1 = 0, j2 = 0, j3 = 0;
+  int n4 = len & ~3;
+  if (score_j) {
+      for (i = 0; i < n4; i += 4) {
+          j0 += truncQuadInv(err[i],   inv);
+          j1 += truncQuadInv(err[i+1], inv);
+          j2 += truncQuadInv(err[i+2], inv);
+          j3 += truncQuadInv(err[i+3], inv);
+          inl[s.I] = i;     s.I += (err[i]   <= th);
+          inl[s.I] = i+1;   s.I += (err[i+1] <= th);
+          inl[s.I] = i+2;   s.I += (err[i+2] <= th);
+          inl[s.I] = i+3;   s.I += (err[i+3] <= th);
+        }
+      for (i = n4; i < len; ++i) {
+          j0 += truncQuadInv(err[i], inv);
           inl[s.I] = i;
-          ++(s.I);
+          s.I += (err[i] <= th);
+        }
+      s.J = (j0 + j1) + (j2 + j3);
+    } else {
+      for (i = 0; i < len; ++i) {
+          inl[s.I] = i;
+          s.I += (err[i] <= th);
         }
     }
   return s;
@@ -224,16 +257,6 @@ int nsamples(int ninl, int ptNum, int samsiz, double conf)
     }
 }
 
-
-double truncQuad(double epsilon, double thr) {
-  if (thr == 0) {
-      return 0;
-    }
-  if ( epsilon >= thr*9/4 ) {
-      return 0;
-    }
-  return 1 - (epsilon/(thr*9/4));
-}
 
 int scoreLess(const Score s1, const Score s2) {
 #if __SCORE__ == SC_M

@@ -8,7 +8,7 @@ Python wrapper (via pybind11) around the original C implementation of LO-RANSAC 
 
 ## Build & test commands
 
-Building requires CMake, LAPACK/BLAS, and a C++11 compiler. On macOS, GCC may be needed instead of Clang (`CC=gcc-XX python3 setup.py build`).
+Building requires CMake, LAPACK/BLAS, and a C++11 compiler. Use the platform default compiler — Clang on macOS. (The README's `CC=gcc-8` hint is a 2020 third-party note; current Clang builds fine, the 2026-08 profiling work was done under Clang, and the golden bit-exactness baselines were captured with it, so switching compilers risks perturbing FP codegen.)
 
 ```bash
 pip install .                  # build + install (CMake is driven by setup.py)
@@ -26,7 +26,7 @@ Wheels are built by `.github/workflows/build_wheels.yml` with `cibuildwheel` for
 
 Three layers, from bottom up:
 
-1. **Legacy C core** — `src/pydegensac/degensac/` (RANSAC/DEGENSAC algorithms, e.g. `exp_ranH.c`, `exp_ranF.c`, `ranH.c` (degeneracy-support subset), `DegUtils.c`, `Ftools.c`, `Htools.c`, `rtools.c`, `utools.c`, `hash.c`, `lapwrap.c`) and `src/pydegensac/matutls/` (linear algebra utilities). This is decades-old procedural C linked against LAPACK; preserve its naming and style when editing. Compiled into static libs `pydegensac_support` and `matutls` by the top-level `CMakeLists.txt`. Golden fixed-seed regression tests in `tests/test_golden_regression.py` guarantee bit-equivalence; regenerate baselines only deliberately via `scripts/make_golden_data.py`.
+1. **Legacy C core** — `src/pydegensac/degensac/` (RANSAC/DEGENSAC algorithms, e.g. `exp_ranH.c`, `exp_ranF.c`, `ranH.c` (degeneracy-support subset), `DegUtils.c`, `Ftools.c`, `Htools.c`, `rtools.c`, `utools.c`, `hash.c`, `lapwrap.c`, `bsd_random.c` (lock-free BSD TYPE_3 RNG, bit-compatible with libc `random()` — see `docs/reports/2026-08-10-speedup-session.md`)) and `src/pydegensac/matutls/` (linear algebra utilities). This is decades-old procedural C linked against LAPACK; preserve its naming and style when editing. Compiled into static libs `pydegensac_support` and `matutls` by the top-level `CMakeLists.txt`. Golden fixed-seed regression tests in `tests/test_golden_regression.py` guarantee bit-equivalence; regenerate baselines only deliberately via `scripts/make_golden_data.py`.
 
 2. **pybind11 binding** — `src/pydegensac/bindings.cpp` exposes the low-level functions `findHomography_` and `findFundamentalMatrix_` (note trailing underscore) that take all parameters positionally with error types as ints. `lib/pybind11/` is vendored third-party code — don't touch it unless a dependency update is intentional.
 

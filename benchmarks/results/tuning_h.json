@@ -1,0 +1,121 @@
+{
+ "meta": {
+  "record": "meta",
+  "label": "branch",
+  "git_sha": "a8caab8",
+  "host": "DM-PC",
+  "python": "3.13.15",
+  "versions": {
+   "cv2": "4.13.0",
+   "poselib": "2.0.5",
+   "pydegensac": "0.3.0",
+   "numpy": "2.5.2",
+   "pydegensac_path": "/home/ducha/dev/pydegensac/benchmarks/.ab/pkg-branch/pydegensac/__init__.py"
+  },
+  "problem": "h",
+  "grid": [
+   [
+    0.25,
+    null
+   ],
+   [
+    0.5,
+    null
+   ],
+   [
+    0.75,
+    null
+   ],
+   [
+    1.0,
+    null
+   ],
+   [
+    1.5,
+    null
+   ],
+   [
+    2.0,
+    null
+   ],
+   [
+    4.0,
+    null
+   ],
+   [
+    8.0,
+    null
+   ],
+   [
+    16.0,
+    null
+   ],
+   [
+    32.0,
+    null
+   ],
+   [
+    64.0,
+    null
+   ]
+  ],
+  "max_iters": 25000,
+  "note": "poselib-prosac re-tuned after the HPatchesSeq score orientation fix; other methods ignore scores"
+ },
+ "best": {
+  "EVD": {
+   "cv2-ransac": {
+    "px_th": 1.0,
+    "ratio_th": null,
+    "maa": 0.557142857142857
+   },
+   "cv2-magsac": {
+    "px_th": 4.0,
+    "ratio_th": null,
+    "maa": 0.5714285714285714
+   },
+   "poselib": {
+    "px_th": 8.0,
+    "ratio_th": null,
+    "maa": 0.657142857142857
+   },
+   "poselib-prosac": {
+    "px_th": 4.0,
+    "ratio_th": null,
+    "maa": 0.6714285714285714
+   },
+   "pydegensac": {
+    "px_th": 1.0,
+    "ratio_th": null,
+    "maa": 0.6857142857142856
+   }
+  },
+  "HPatchesSeq": {
+   "cv2-ransac": {
+    "px_th": 16.0,
+    "ratio_th": null,
+    "maa": 0.9186206896551724
+   },
+   "cv2-magsac": {
+    "px_th": 64.0,
+    "ratio_th": null,
+    "maa": 0.9331034482758621
+   },
+   "poselib": {
+    "px_th": 16.0,
+    "ratio_th": null,
+    "maa": 0.9406896551724138
+   },
+   "poselib-prosac": {
+    "px_th": 16.0,
+    "ratio_th": null,
+    "maa": 0.9441379310344828
+   },
+   "pydegensac": {
+    "px_th": 4.0,
+    "ratio_th": null,
+    "maa": 0.9124137931034483
+   }
+  }
+ }
+}

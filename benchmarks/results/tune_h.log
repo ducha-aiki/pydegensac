@@ -1,0 +1,69 @@
+/home/ducha/dev/pydegensac/benchmarks/.ab/env/lib/python3.13/site-packages/h5py/__init__.py:36: UserWarning: h5py is running against HDF5 2.2.0 when it was built against 2.1.0, this may cause problems
+  _warn(("h5py is running against HDF5 {0} when it was built against {1}, "
+tuning h on EVD: 7 pairs, HPatchesSeq: 145 pairs at max_iters=25000
+  cv2-ransac       px=0.25  ratio=None EVD=0.3000 HPatchesSeq=0.7517
+  cv2-ransac       px=0.5   ratio=None EVD=0.4429 HPatchesSeq=0.8083
+  cv2-ransac       px=0.75  ratio=None EVD=0.5286 HPatchesSeq=0.8048
+  cv2-ransac       px=1.0   ratio=None EVD=0.5571 HPatchesSeq=0.8241
+  cv2-ransac       px=1.5   ratio=None EVD=0.4714 HPatchesSeq=0.8476
+  cv2-ransac       px=2.0   ratio=None EVD=0.4429 HPatchesSeq=0.8607
+  cv2-ransac       px=4.0   ratio=None EVD=0.4429 HPatchesSeq=0.8917
+  cv2-ransac       px=8.0   ratio=None EVD=0.4714 HPatchesSeq=0.9110
+  cv2-ransac       px=16.0  ratio=None EVD=0.5286 HPatchesSeq=0.9186
+  cv2-ransac       px=32.0  ratio=None EVD=0.4143 HPatchesSeq=0.8917
+  cv2-ransac       px=64.0  ratio=None EVD=0.3286 HPatchesSeq=0.7917
+  -> cv2-ransac / EVD: {'px_th': 1.0, 'ratio_th': None, 'maa': 0.557142857142857}
+  -> cv2-ransac / HPatchesSeq: {'px_th': 16.0, 'ratio_th': None, 'maa': 0.9186206896551724}
+  cv2-magsac       px=0.25  ratio=None EVD=0.1143 HPatchesSeq=0.8910
+  cv2-magsac       px=0.5   ratio=None EVD=0.3714 HPatchesSeq=0.9007
+  cv2-magsac       px=0.75  ratio=None EVD=0.5571 HPatchesSeq=0.9097
+  cv2-magsac       px=1.0   ratio=None EVD=0.5571 HPatchesSeq=0.9138
+  cv2-magsac       px=1.5   ratio=None EVD=0.5571 HPatchesSeq=0.9069
+  cv2-magsac       px=2.0   ratio=None EVD=0.5286 HPatchesSeq=0.9172
+  cv2-magsac       px=4.0   ratio=None EVD=0.5714 HPatchesSeq=0.9221
+  cv2-magsac       px=8.0   ratio=None EVD=0.4857 HPatchesSeq=0.9283
+  cv2-magsac       px=16.0  ratio=None EVD=0.5429 HPatchesSeq=0.9297
+  cv2-magsac       px=32.0  ratio=None EVD=0.5286 HPatchesSeq=0.9324
+  cv2-magsac       px=64.0  ratio=None EVD=0.5143 HPatchesSeq=0.9331
+  -> cv2-magsac / EVD: {'px_th': 4.0, 'ratio_th': None, 'maa': 0.5714285714285714}
+  -> cv2-magsac / HPatchesSeq: {'px_th': 64.0, 'ratio_th': None, 'maa': 0.9331034482758621}
+  poselib          px=0.25  ratio=None EVD=0.2000 HPatchesSeq=0.7317
+  poselib          px=0.5   ratio=None EVD=0.4143 HPatchesSeq=0.7793
+  poselib          px=0.75  ratio=None EVD=0.4429 HPatchesSeq=0.8014
+  poselib          px=1.0   ratio=None EVD=0.4429 HPatchesSeq=0.8131
+  poselib          px=1.5   ratio=None EVD=0.5714 HPatchesSeq=0.8448
+  poselib          px=2.0   ratio=None EVD=0.5571 HPatchesSeq=0.8593
+  poselib          px=4.0   ratio=None EVD=0.6429 HPatchesSeq=0.9014
+  poselib          px=8.0   ratio=None EVD=0.6571 HPatchesSeq=0.9290
+  poselib          px=16.0  ratio=None EVD=0.6000 HPatchesSeq=0.9407
+  poselib          px=32.0  ratio=None EVD=0.5286 HPatchesSeq=0.9366
+  poselib          px=64.0  ratio=None EVD=0.4857 HPatchesSeq=0.9110
+  -> poselib / EVD: {'px_th': 8.0, 'ratio_th': None, 'maa': 0.657142857142857}
+  -> poselib / HPatchesSeq: {'px_th': 16.0, 'ratio_th': None, 'maa': 0.9406896551724138}
+  poselib-prosac   px=0.25  ratio=None EVD=0.2429 HPatchesSeq=0.6676
+  poselib-prosac   px=0.5   ratio=None EVD=0.3000 HPatchesSeq=0.7186
+  poselib-prosac   px=0.75  ratio=None EVD=0.4286 HPatchesSeq=0.7379
+  poselib-prosac   px=1.0   ratio=None EVD=0.4286 HPatchesSeq=0.7503
+  poselib-prosac   px=1.5   ratio=None EVD=0.5000 HPatchesSeq=0.7917
+  poselib-prosac   px=2.0   ratio=None EVD=0.5143 HPatchesSeq=0.8090
+  poselib-prosac   px=4.0   ratio=None EVD=0.6714 HPatchesSeq=0.8745
+  poselib-prosac   px=8.0   ratio=None EVD=0.6714 HPatchesSeq=0.9062
+  poselib-prosac   px=16.0  ratio=None EVD=0.6000 HPatchesSeq=0.9234
+  poselib-prosac   px=32.0  ratio=None EVD=0.5286 HPatchesSeq=0.9352
+  poselib-prosac   px=64.0  ratio=None EVD=0.4857 HPatchesSeq=0.9097
+  -> poselib-prosac / EVD: {'px_th': 4.0, 'ratio_th': None, 'maa': 0.6714285714285714}
+  -> poselib-prosac / HPatchesSeq: {'px_th': 32.0, 'ratio_th': None, 'maa': 0.9351724137931037}
+  pydegensac       px=0.25  ratio=None EVD=0.4571 HPatchesSeq=0.7745
+  pydegensac       px=0.5   ratio=None EVD=0.4286 HPatchesSeq=0.8324
+  pydegensac       px=0.75  ratio=None EVD=0.5286 HPatchesSeq=0.8648
+  pydegensac       px=1.0   ratio=None EVD=0.6857 HPatchesSeq=0.8766
+  pydegensac       px=1.5   ratio=None EVD=0.6571 HPatchesSeq=0.8986
+  pydegensac       px=2.0   ratio=None EVD=0.6143 HPatchesSeq=0.9090
+  pydegensac       px=4.0   ratio=None EVD=0.5286 HPatchesSeq=0.9124
+  pydegensac       px=8.0   ratio=None EVD=0.5000 HPatchesSeq=0.8910
+  pydegensac       px=16.0  ratio=None EVD=0.4143 HPatchesSeq=0.8331
+  pydegensac       px=32.0  ratio=None EVD=0.2429 HPatchesSeq=0.7145
+  pydegensac       px=64.0  ratio=None EVD=0.0857 HPatchesSeq=0.5476
+  -> pydegensac / EVD: {'px_th': 1.0, 'ratio_th': None, 'maa': 0.6857142857142856}
+  -> pydegensac / HPatchesSeq: {'px_th': 4.0, 'ratio_th': None, 'maa': 0.9124137931034483}
+wrote /home/ducha/dev/pydegensac/benchmarks/results/tuning_h.json — copy `best` into tuned_config.json to use it

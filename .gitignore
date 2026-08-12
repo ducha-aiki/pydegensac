@@ -47,3 +47,17 @@ __pycache__
 
 # Downloaded/generated golden-data source assets (see scripts/make_golden_data.py)
 .cache/
+
+# Benchmark downloads, builds and raw per-pair results
+benchmarks/data
+benchmarks/.ab
+benchmarks/results/*.jsonl
+# run transcripts (noise); the tuning logs are kept as evidence
+benchmarks/results/ab.log
+benchmarks/results/repeat.log
+
+# Benchmark microbenchmark binary
+benchmarks/rng_cost
+benchmarks/results/releases.log
+benchmarks/results/h_rerun.log
+benchmarks/results/f_rerun.log
