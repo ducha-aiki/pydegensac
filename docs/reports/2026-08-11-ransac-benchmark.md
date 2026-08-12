@@ -18,10 +18,14 @@ than on the golden pairs: 1.19x (F) and 1.16x (H) in aggregate, rising to
 builds is significant at any budget on either problem (paired bootstrap over
 pairs, 95% CI, all intervals contain zero).
 
-In context: on F, pydegensac's accuracy is **statistically tied with poselib's**
-— but it needs 2.9x the time to get there. On H it is measurably *behind* the
-leading three while costing 5x what cv2's MAGSAC does. The speed-up narrows
-pydegensac's cost gap; it does not put it on the efficient frontier.
+In context, pydegensac is measurably behind the leader on **both** problems:
+-0.023 mAA against poselib-prosac on F at 1.5x its cost, and -0.012 against it
+on H at 5x what cv2's MAGSAC costs. The speed-up narrows the cost gap; it does
+not put pydegensac on the efficient frontier.
+
+**Separately, and much more importantly for macOS users: on macOS the LAPACK
+calls were never compiled in at all** — see the section below. Everything in
+this report is Linux, where they are.
 
 ## How to read the numbers
 
@@ -40,41 +44,44 @@ paired ones and should not be used to compare methods.
 ## F — fundamental matrix
 
 600 pairs of `st_peters_square` (IMC-2020 PhotoTourism val via the CVPR-2020
-RANSAC tutorial), RootSIFT-8k mutual-NN pools, ~1500-1900 correspondences per
-pair after ratio filtering. mAA over 1-10 deg of `max(R_err, t_err)`. Each
+RANSAC tutorial), RootSIFT-8k mutual-NN pools of ~2000 putative matches, of
+which each method's tuned ratio filter keeps a few hundred (median 272 at
+ratio 0.85). mAA over 1-10 deg of `max(R_err, t_err)`. Each
 method at its own tuned (px, SNN ratio); iteration budget swept 125 -> 50k.
 
 ![F time-mAA](../../benchmarks/results/time_maa_f.png)
 
-| method | best mAA | at budget | mean ms/pair | d mAA vs poselib (paired) |
+| method | best mAA | at budget | mean ms/pair | d mAA vs poselib-prosac (paired) |
 |---|---|---|---|---|
-| poselib | 0.4392 | 50000 | 39.1 | leader |
-| poselib-prosac | 0.4363 | 50000 | 106.4 | -0.0027 (-0.0275, +0.0208) |
-| pydegensac (base) | 0.4307 | 50000 | 137.1 | -0.0083 (-0.0335, +0.0185) |
-| pydegensac (branch) | 0.4297 | 50000 | 111.9 | -0.0097 (-0.0333, +0.0160) |
-| cv2-magsac | 0.3762 | 50000 | 28.4 | -0.0633 (-0.0892, -0.0370) `*` |
-| cv2-ransac | 0.3403 | 50000 | 282.6 | -0.0987 (-0.1268, -0.0713) `*` |
+| poselib-prosac | **0.4570** | 50000 | 40.6 | leader |
+| poselib | 0.4392 | 50000 | 39.7 | -0.0178 (-0.0413, +0.0060) |
+| pydegensac (branch) | 0.4340 | 25000 | 61.9 | -0.0230 (-0.0452, -0.0003) `*` |
+| pydegensac (base) | 0.4307 | 50000 | 137.1 | -0.0261 (-0.0498, -0.0025) `*` |
+| cv2-magsac | 0.3762 | 50000 | 28.9 | -0.0811 (-0.1088, -0.0548) `*` |
+| cv2-ransac | 0.3403 | 50000 | 288.3 | -0.1165 (-0.1425, -0.0898) `*` |
 
-- **Three-way tie at the top on accuracy**: poselib, poselib-prosac and
-  pydegensac are not separable. The two cv2 estimators are, decisively.
-- **The separation is in cost.** poselib buys that same accuracy in 39 ms
-  against pydegensac's 112 ms. That is the finding that matters, and it is far
-  outside timing scatter.
-- cv2-ransac is both the least accurate and by far the most expensive here
-  (283 ms) — it has no early-termination advantage at these inlier ratios and
-  simply runs its budget out.
+- **poselib-prosac leads, and pydegensac is measurably behind it** (-0.023,
+  paired CI excludes zero) at 1.5x the cost. poselib without PROSAC is not
+  separable from the leader.
+- The two cv2 estimators are decisively behind, and cv2-ransac is also by far
+  the most expensive here (288 ms) — it has no early-termination advantage at
+  these inlier ratios and simply runs its budget out.
 
 base vs branch at equal budget:
 
 | budget | mAA base | mAA branch | d mAA (95% CI, paired) | ms base | ms branch | speedup |
 |---|---|---|---|---|---|---|
-| 125 | 0.3707 | 0.3790 | +0.0081 (-0.0137, +0.0287) | 5.57 | 5.66 | 0.99x |
-| 500 | 0.3967 | 0.4055 | +0.0086 (-0.0115, +0.0293) | 7.85 | 7.72 | 1.02x |
-| 2500 | 0.4038 | 0.4225 | +0.0183 (-0.0017, +0.0385) | 15.03 | 13.55 | 1.11x |
-| 10000 | 0.4168 | 0.4258 | +0.0089 (-0.0100, +0.0290) | 36.54 | 30.66 | 1.19x |
-| 25000 | 0.4195 | 0.4287 | +0.0088 (-0.0100, +0.0285) | 75.97 | 62.03 | 1.22x |
-| 50000 | 0.4307 | 0.4297 | -0.0014 (-0.0203, +0.0170) | 137.09 | 111.93 | 1.22x |
-| **total** | | | | **317.1** | **267.0** | **1.19x** |
+| 125 | 0.3707 | 0.3728 | +0.0020 (-0.0180, +0.0223) | 5.57 | 5.61 | 0.99x |
+| 500 | 0.3967 | 0.4042 | +0.0074 (-0.0133, +0.0285) | 7.85 | 7.62 | 1.03x |
+| 2500 | 0.4038 | 0.4258 | +0.0220 (+0.0017, +0.0418) `*` | 15.03 | 13.59 | 1.11x |
+| 10000 | 0.4168 | 0.4337 | +0.0169 (-0.0027, +0.0365) | 36.54 | 30.61 | 1.19x |
+| 25000 | 0.4195 | 0.4340 | +0.0143 (-0.0048, +0.0333) | 75.97 | 61.89 | 1.23x |
+| 50000 | 0.4307 | 0.4277 | -0.0032 (-0.0245, +0.0172) | 137.09 | 111.99 | 1.22x |
+| **total** | | | | **317.1** | **266.7** | **1.19x** |
+
+One of nine budgets shows a significant accuracy difference (2500, favouring
+the branch); with nine comparisons that is what chance produces, and the sign
+is not consistent across the ladder.
 
 **The speedup grows monotonically with the iteration budget** (0.99x -> 1.22x).
 That is the signature of removing a *per-iteration fixed cost*, which is what
@@ -122,20 +129,20 @@ evaluation includes it, not because it separates anything.
 ## Why the golden-pair numbers don't transfer
 
 The session report's 4.2x / 2.2x summed per-pair medians over five golden pairs
-on macOS. Two things make those an upper bound:
+on macOS. **The platform is the whole story.** The optimisation replaced libc
+`srandom()`/`random()`; on macOS each `srandom()` re-derives the 31-word TYPE_3
+state and discards 310 warm-up draws *behind a lock* (~3.5 us/iteration,
+profiled at 77% of H runtime), while glibc runs the same algorithm without the
+lock. The cost being removed here is roughly an order of magnitude smaller.
 
-1. **Platform.** The optimisation replaced libc `srandom()`/`random()`. On
-   macOS each `srandom()` re-derives the 31-word TYPE_3 state and discards 310
-   warm-up draws *behind a lock* (~3.5 us/iteration, profiled at 77% of H
-   runtime). glibc runs the same algorithm without the lock, so the cost being
-   removed is much smaller here.
-2. **Problem size.** The golden pairs are small. These pools carry ~1500-1900
-   correspondences, so per-iteration model fitting and error evaluation
-   dominate and a fixed per-iteration saving is a smaller share of the whole.
+It is *not* problem size, which was the other candidate: after each method's
+tuned ratio filter the estimators see a few hundred correspondences (median 272
+at ratio 0.85, 185 at 0.80), not the ~2000 in the raw pools — comparable to the
+golden pairs, so that explanation does not survive contact with the data.
 
-Both show up directly in the data: the speedup is ~1.0x at 125 iterations,
-where per-call overheads dominate, and reaches 1.22x only at 50k, where the
-per-iteration term is essentially the whole runtime.
+The speedup being ~1.0x at 125 iterations and 1.22x at 50k is the other half of
+the evidence: a fixed per-iteration saving is invisible when per-call overheads
+dominate and worth the most when the iteration term is the whole runtime.
 
 `benchmarks/rng_cost.c` measures the removed cost directly, and confirms the
 mechanism quantitatively. On this machine (x86-64, glibc):
@@ -224,6 +231,63 @@ returns 150. This is the old-pybind11 problem that `0.2` was yanked for, but
 **0.1.2 is not yanked**, and it is the version pinned by anything installed
 before 2026. It fails silently, which is the worst way to fail.
 
+## macOS never called LAPACK at all
+
+`lapwrap.c` declared and called `dgesvd_` and `dsyev_` only under `#ifdef
+_WIN32` or `#ifdef __linux__`. macOS defines neither, so on macOS the
+preprocessor removed **every LAPACK call in the file**: `lap_SVD` and `lap_eig`
+returned without computing anything, leaving `info = 1` and their outputs
+untouched.
+
+That is not cosmetic. Both are on the least-squares path:
+
+- `u2f` / `u2fw` (F least squares) call `lap_eig`, then `singulF`, whose first
+  act is `if (lap_SVD(...) != 0) { memcpy(F, identity); return; }` — so every
+  least-squares F refit on macOS returned the **identity matrix**.
+- `u2h` (H least squares, the `len > 4` branch — i.e. every local-optimisation
+  refit) calls `lap_eig` and then copies the first 9 values of an untouched
+  covariance matrix as the homography.
+
+In other words, local optimisation — the LO in LO-RANSAC, and the whole point
+of DEGENSAC's refinement — has been dead on macOS. RANSAC still returns a model
+because the garbage refits score badly and get rejected, so the result falls
+back to the best minimal-sample hypothesis.
+
+Reproduced by building `899af7f` with `-U__linux__`, which is exactly what
+macOS compiles: the resulting `.so` has zero references to `dgesvd_`/`dsyev_`.
+Cost, measured on this benchmark:
+
+| | LAPACK linked (Linux) | LAPACK compiled out (macOS) |
+|---|---|---|
+| F `st_peters_square`, best mAA | 0.4365 | **0.3272** |
+| F, total ms over the ladder | 267.6 | **15.7** |
+| H `HPatchesSeq`, best mAA | 0.9117 | **0.7021** |
+| H, total ms over the ladder | 18.4 | **7.2** |
+
+macOS loses 0.11 mAA on F and 0.21 on H, and is 17x / 2.6x "faster" precisely
+because it is skipping the work. Three consequences:
+
+1. **macOS wheels have been shipping a crippled estimator**, for as long as
+   these guards have been there.
+2. **The 4.2x / 2.2x golden-pair speed-ups in the session report were measured
+   on that build**, where the LAPACK path costs nothing — so they describe a
+   configuration no Linux or Windows user has ever run.
+3. **The golden baselines were captured on macOS** and therefore encode the
+   broken behaviour. Fixing this changes macOS outputs and needs a deliberate
+   baseline regeneration.
+
+The fix declares both prototypes unconditionally and drops the `#ifdef`s around
+the calls. Verified output-preserving *on Linux* — where the calls were already
+compiled in — by comparing seeded outputs across 50 real pairs before and
+after: byte-identical. On macOS it is by construction a behaviour change.
+
+The same commit removes the per-call workspace query and `malloc`/`free` from
+both wrappers (memoised `lwork` per shape, stack buffer). That was expected to
+be a speed-up and **is not** — 18.4 ms before and after on H, 267.6 vs 267.8 on
+F. The LAPACK path is simply not hot enough on Linux for it to show. It is kept
+because it is tidier and removes an allocation from an inner loop, not because
+it buys anything measurable.
+
 ## The tutorial archives disagree about which way `match_conf` points
 
 PROSAC needs correspondences ordered best-first, so the benchmark has to know
@@ -252,6 +316,39 @@ Effect of the fix on HPatchesSeq: poselib-prosac's tuned threshold moved 32 ->
 16 px, its val mAA 0.9352 -> 0.9441, and on test it went from fourth place
 (0.9166) to the top of the table (0.9297). No other method reads scores, and
 the F and EVD orientations were already correct, so nothing else moved.
+
+## PROSAC on F is working, and per-method ratio tuning hid it
+
+The first version of the F table had poselib-prosac at 106 ms against poselib's
+39 ms — PROSAC apparently costing 2.7x for nothing. It is not: the ordering is
+correct, and the gap was an artefact of tuning each method's SNN ratio
+independently.
+
+Two checks. First, the returned inlier mask really does correspond to the
+returned model — if the un-permutation after PROSAC's sort were wrong, it would
+not: across pairs the mask agrees with "Sampson distance <= threshold" for
+98.5-100% of correspondences, the residue being poselib's own post-hoc
+refinement. Second, run both at an *identical* configuration (px 0.5,
+ratio 0.85), which removes the pool-size difference:
+
+| budget | poselib mAA | ms | poselib-prosac mAA | ms |
+|---|---|---|---|---|
+| 125 | 0.3342 | 1.57 | **0.4075** | 2.20 |
+| 1000 | 0.4350 | 5.10 | **0.4908** | 6.10 |
+| 10000 | 0.4992 | 13.92 | **0.5183** | 14.98 |
+| 50000 | 0.5042 | 34.72 | **0.5175** | 34.75 |
+
+(120-pair subset, so not comparable to the headline table's absolute values.)
+PROSAC is worth +0.073 mAA at 125 iterations for no extra time at large
+budgets — exactly what it is supposed to do.
+
+**The tuning rule was the problem.** The grid argmax gave poselib-prosac ratio
+0.90 (mAA 0.4433) over 0.85 (0.4413): a 0.002 difference, far inside
+run-to-run scatter, but 0.90 keeps a 1.6x bigger pool (median 474 vs 272
+correspondences) and cost 2.7x the runtime. Picking a threshold by unqualified
+argmax over a noisy grid buys noise with wall-clock. The config now takes the
+cheaper option among statistically tied ones, which affected only this entry —
+every other method's argmax was either clear or already the cheaper side.
 
 ## Thresholds: the imc21 values do not transfer to this scene
 

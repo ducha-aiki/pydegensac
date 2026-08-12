@@ -60,3 +60,4 @@ benchmarks/results/repeat.log
 benchmarks/rng_cost
 benchmarks/results/releases.log
 benchmarks/results/h_rerun.log
+benchmarks/results/f_rerun.log

@@ -26,7 +26,21 @@ jobs:
       - name: Build wheels
         run: .venv/bin/python -m cibuildwheel --output-dir wheelhouse
         env:
-          CIBW_BEFORE_ALL_LINUX: yum install -y lapack-devel blas-devel gcc-gfortran
+          # manylinux_2_28 (AlmaLinux 8) rather than the default manylinux2014
+          # (CentOS 7). CentOS 7 ships reference LAPACK 3.4.2 from 2012, and
+          # auditwheel vendors it into every wheel: measured on the benchmark,
+          # that costs ~8% of homography runtime against a modern LAPACK
+          # (docs/reports/2026-08-11-ransac-benchmark.md). manylinux_2_28
+          # ships LAPACK 3.8+ and gcc 12. The cp314 job below already builds
+          # this project on that image.
+          # Cost: requires glibc >= 2.28, so no CentOS 7 / Ubuntu 18.04. That
+          # is no longer much of a restriction — numpy itself dropped
+          # manylinux_2_17 wheels at 2.3 (see the CIBW_BEFORE_TEST note below).
+          CIBW_MANYLINUX_X86_64_IMAGE: manylinux_2_28
+          # openblas-devel first: CMake's FindLAPACK checks OpenBLAS before the
+          # generic reference build, and falls back to it if absent, so this is
+          # a preference rather than a requirement.
+          CIBW_BEFORE_ALL_LINUX: yum install -y openblas-devel lapack-devel blas-devel gcc-gfortran
           # cp314 is built separately in build_wheels_linux_2_28: numpy publishes no
           # manylinux2014/manylinux_2_17 wheel for cp314 (only manylinux_2_28+), so it
           # can't be test-installed in this manylinux2014-based job.
@@ -93,7 +107,8 @@ jobs:
         run: .venv/bin/python -m cibuildwheel --output-dir wheelhouse
         env:
           CIBW_MANYLINUX_X86_64_IMAGE: manylinux_2_28
-          CIBW_BEFORE_ALL_LINUX: yum install -y lapack-devel blas-devel gcc-gfortran
+          # openblas-devel first; see the note in build_wheels_linux.
+          CIBW_BEFORE_ALL_LINUX: yum install -y openblas-devel lapack-devel blas-devel gcc-gfortran
           # cp314-only: numpy has no manylinux2014/manylinux_2_17 wheel for cp314,
           # so it needs the newer manylinux_2_28 image (numpy wheels exist there).
           CIBW_BUILD: cp314-manylinux_x86_64

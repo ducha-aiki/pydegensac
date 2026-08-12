@@ -13,6 +13,11 @@
   "h: tuned by `run.py tune h` on the val split; the sweep runs on test. The H",
   "   correspondences ship pre-filtered at SNN ~0.85 and carry no ratio knob,",
   "   hence ratio_th is null.",
+  "Tie-break: the grid argmax for poselib-prosac was ratio 0.90 (mAA 0.4433)",
+  "over 0.85 (0.4413) \u2014 a 0.002 difference, far inside run-to-run scatter, but",
+  "0.90 keeps a 1.6x larger correspondence pool and cost 2.7x the runtime. Where",
+  "configs are statistically tied, the cheaper one is taken; otherwise threshold",
+  "tuning silently buys noise with wall-clock.",
   "Regenerate with run.py tune; the full grid lands in results/tuning_{f,h}.json."
  ],
  "f": {
@@ -34,8 +39,8 @@
    },
    "poselib-prosac": {
     "px_th": 0.5,
-    "ratio_th": 0.9,
-    "source": "run.py tune f (300-pair tuning subset)"
+    "ratio_th": 0.85,
+    "source": "run.py tune f; ratio 0.85 not 0.90 (tie-break, see below)"
    },
    "pydegensac": {
     "px_th": 0.5,

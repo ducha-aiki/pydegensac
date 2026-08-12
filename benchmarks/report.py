@@ -16,24 +16,30 @@ import numpy as np
 
 import metrics
 
-#: Colour per curve. pydegensac's two builds are the point of the figure, so
-#: they get the two ends of a warm ramp; the field is cool/neutral.
+#: Colour per curve. pydegensac is the subject, so it takes the warm end
+#: (base = light, branch = deep red) and the field takes cool/green hues that
+#: stay distinct from it — cv2-magsac in particular must not read as a shade
+#: of pydegensac-base.
 COLORS = {
-    "pydegensac (base)": "#f0a35e",
-    "pydegensac (branch)": "#d1462f",
-    "cv2-ransac": "#1baf7a",
-    "cv2-magsac": "#eda100",
+    "pydegensac (base)": "#f2a25c",
+    "pydegensac (branch)": "#c9302c",
+    "cv2-ransac": "#1f9e78",
+    "cv2-magsac": "#8c6d1f",
     "poselib": "#2a78d6",
     "poselib-prosac": "#7a4fd1",
     # release comparison (run_releases.sh): published wheels cool, local
     # builds of the same code warm, so a wheel-vs-source gap is visible.
     "pydegensac (pypi-0.1.2)": "#9fb6c9",
-    "pydegensac (pypi-0.2.1)": "#5b8db8",
-    "pydegensac (pypi-0.2.2)": "#2a78d6",
-    "pydegensac (local-0.2.2)": "#eda100",
-    "pydegensac (local-master)": "#f0a35e",
-    "pydegensac (local-branch)": "#d1462f",
+    "pydegensac (pypi-0.2.1)": "#4f86b5",
+    "pydegensac (pypi-0.2.2)": "#14507f",
+    "pydegensac (local-0.2.2)": "#f2c14e",
+    "pydegensac (local-master)": "#f2a25c",
+    "pydegensac (local-branch)": "#c9302c",
 }
+#: Dashed for the published wheels, solid for local builds, so the two groups
+#: separate even where colours are close.
+DASHED = {"pydegensac (pypi-0.1.2)", "pydegensac (pypi-0.2.1)",
+          "pydegensac (pypi-0.2.2)"}
 SURFACE, PAGE = "#fcfcfb", "#f9f9f7"
 INK, INK2, MUTED, GRID, BASELINE = "#0b0b0b", "#52514e", "#898781", "#e1e0d9", "#c3c2b7"
 
@@ -235,16 +241,27 @@ def plot(all_curves, problem, out_path):
     for ax, subset in zip(axes[0], subsets):
         ax.set_facecolor(SURFACE)
         ax.set_xscale("log")
+        ys, peaks = [], []
         for curve, pts in sorted(all_curves[subset].items()):
             xy = np.array([(p[0] * 1000, p[2]) for p in pts])
+            ys += list(xy[:, 1])
+            peaks.append(xy[:, 1].max())
             color = COLORS.get(curve, MUTED)
             # Bootstrap band: without it the curves look far better separated
-            # than the pair counts support.
+            # than the pair counts support. Kept faint so it never competes
+            # with the lines.
             ax.fill_between(xy[:, 0], [p[6] for p in pts], [p[7] for p in pts],
-                            color=color, alpha=0.12, linewidth=0, zorder=2)
-            ax.plot(xy[:, 0], xy[:, 1], "-o", color=color,
+                            color=color, alpha=0.07, linewidth=0, zorder=1)
+            ax.plot(xy[:, 0], xy[:, 1],
+                    "--o" if curve in DASHED else "-o", color=color,
                     linewidth=2, markersize=6, label=curve, zorder=3,
                     markeredgecolor=SURFACE, markeredgewidth=1.2)
+        # Zoom to where the curves actually separate: drop the bottom fifth of
+        # the points, but never so far that a curve's own peak falls off.
+        lo = min(np.percentile(ys, 20), min(peaks) - 0.01)
+        hi = max(ys)
+        pad = 0.05 * max(hi - lo, 1e-6)
+        ax.set_ylim(lo - pad, hi + pad)
         ax.set_title(subset, color=INK, fontsize=10.5)
         ax.set_xlabel("mean time per pair (ms, log scale)", color=MUTED,
                       fontsize=9)
