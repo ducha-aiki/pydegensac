@@ -72,5 +72,17 @@ set(degensac_srcs
 )
 
 add_library(pydegensac_support ${degensac_srcs})
+# pydegensac_support calls into matutls (mattr, mattr's neighbours in ccmath.h),
+# so it has to come first on the link line: a static archive only yields the
+# members needed by what the linker has already seen. Stating the dependency
+# here rather than relying on the order in target_link_libraries below lets
+# CMake order and repeat the archives itself.
+#
+# Without LTO the flat order happened to work. With it, GCC's linker plugin
+# resolves archive members differently and the reference to `mattr` from
+# DegUtils.c/exp_ranH.c arrived after matutls had already been passed, so every
+# LTO build on Linux/GCC linked an extension that failed to import with
+# "undefined symbol: mattr" — both manylinux images and local gcc 13.3.
+target_link_libraries(pydegensac_support PUBLIC matutls)
 pybind11_add_module(pydegensac "src/pydegensac/bindings.cpp")
-target_link_libraries(pydegensac PRIVATE ${LAPACK_LIBRARIES} matutls pydegensac_support)
+target_link_libraries(pydegensac PRIVATE ${LAPACK_LIBRARIES} pydegensac_support)
