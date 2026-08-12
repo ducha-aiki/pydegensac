@@ -58,9 +58,14 @@ is still open.
   357 -> 354 inliers and +0.001 px, i.e. noise. `05466646-05534141` no longer
   passes capture sanity with LO restored and is replaced by
   `06373813-06639257`.
-- **glibc floor**: moving Linux wheels to manylinux_2_28 drops CentOS 7 /
-  Ubuntu 18.04. Reversible by deleting one line
-  (`CIBW_MANYLINUX_X86_64_IMAGE`).
+- ~~**glibc floor**: moving Linux wheels to manylinux_2_28 drops CentOS 7 /
+  Ubuntu 18.04~~ — **decided 2026-08-12: keep the floor.** The main Linux job
+  is back on the default manylinux2014, so CentOS 7 / Ubuntu 18.04 users can
+  still install. Sections 2 and 2b measured the image choice as
+  performance-neutral on both counts — the compiler term died with `pinvJ`'s
+  array, and the LAPACK term died with the `openblas-devel` line rather than
+  the image — so the floor now costs nothing. The cp314 job stays on
+  manylinux_2_28 because numpy publishes no manylinux2014 wheel for cp314.
 - **cp38**: the main Linux job still uses cibuildwheel 2.21.2 because 3.x
   dropped cp38. If cp38 support is dropped, the two Linux jobs can merge and
   the `numpy<2.3` workarounds go away.

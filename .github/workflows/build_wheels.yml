@@ -26,24 +26,31 @@ jobs:
       - name: Build wheels
         run: .venv/bin/python -m cibuildwheel --output-dir wheelhouse
         env:
-          # manylinux_2_28 (AlmaLinux 8) rather than the default manylinux2014
-          # (CentOS 7). Worth ~1.25x on homography and ~1.10x on fundamental
-          # matrix for anyone installing from PyPI — essentially the whole
-          # published-wheel-vs-local-build gap, measured by rebuilding the same
-          # source in both images
-          # (docs/reports/2026-08-11-ransac-benchmark.md).
-          # Almost all of that is the compiler, not the LAPACK: CentOS 7's
-          # gcc 10.2.1 devtoolset spills `pinvJ`'s normalisation loop to memory
-          # and serialises four divpd behind it, which alone is 30% of H
-          # runtime. The vendored reference LAPACK 3.4.2 from 2012 is only ~1%
-          # of H (~5% of F). manylinux_2_28 ships gcc 14 and LAPACK 3.8+.
-          # This image REQUIRES the dgeqp3_ prototype in lapwrap.h: gcc 14
-          # makes implicit-function-declaration an error, so v_0.2.2 and older
-          # master do not compile here at all.
-          # Cost: requires glibc >= 2.28, so no CentOS 7 / Ubuntu 18.04. That
-          # is no longer much of a restriction — numpy itself dropped
-          # manylinux_2_17 wheels at 2.3 (see the CIBW_BEFORE_TEST note below).
-          CIBW_MANYLINUX_X86_64_IMAGE: manylinux_2_28
+          # Default manylinux2014 (CentOS 7), deliberately: it keeps the
+          # glibc 2.17 floor, so CentOS 7 and Ubuntu 18.04 users can still
+          # `pip install pydegensac`.
+          #
+          # This was manylinux_2_28 for part of 2026-08-12, on the evidence that
+          # the image was worth ~1.25x on H / ~1.10x on F. Both halves of that
+          # have since been measured away and the image choice is now
+          # performance-neutral:
+          #
+          #   - The compiler term was CentOS 7's gcc 10.2.1 spilling `pinvJ`'s
+          #     normalisation loop to memory and serialising four divpd. That
+          #     loop no longer exists — the eight divisions were factored into
+          #     one — and the two images now time identically (H 3.55 vs 3.54
+          #     ms/pair, F 15.24 vs 15.36).
+          #   - The LAPACK term was manylinux2014 vendoring reference LAPACK
+          #     3.4.2 from 2012. The `openblas-devel` line below fixed that, not
+          #     the image: repaired wheels from the two images differ by 0.5% on
+          #     H and 0.1% on F (OpenBLAS 0.3.3 vs 0.3.15 — three years of
+          #     kernel work buys nothing on 9x9 matrices).
+          #
+          # Tables in docs/reports/2026-08-12-benchmark-handoff.md, sections 2
+          # and 2b. If this is ever moved back to manylinux_2_28, note that the
+          # image requires the dgeqp3_ prototype in lapwrap.h — gcc 14 makes
+          # implicit-function-declaration an error, so v_0.2.2 and older master
+          # cannot compile there at all.
           # openblas-devel first: CMake's FindLAPACK checks OpenBLAS before the
           # generic reference build, and falls back to it if absent, so this is
           # a preference rather than a requirement.
