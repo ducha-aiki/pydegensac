@@ -148,7 +148,31 @@ Commits `8648752` through `15445ef`.
 Everything below is measured on M1 only. Four things want Linux eyes, in
 priority order.
 
-### 1. LTO under the wheel toolchains (`d9cb2a4`) -- blocking for the wheels
+### 1. LTO under the wheel toolchains (`d9cb2a4`) -- ANSWERED: it was broken (`01d899b`)
+
+**Every LTO build on Linux failed to import**, with `undefined symbol: mattr` --
+local gcc 13.3 and both manylinux images; every non-LTO build was fine. Not the
+suspected `pinvJ` miscompile, and not image-specific: a link failure. Since LTO
+is on by default wherever `check_ipo_supported()` passes, and it passes in both
+images, the next wheel matrix would have published broken wheels for every
+Linux Python.
+
+Latent bug that LTO exposed, not a compiler problem. `mattr` is defined in
+`matutls` and called from `pydegensac_support`, but `target_link_libraries`
+listed `matutls` first, and a static archive only yields the members needed by
+what the linker has already seen. Without LTO the flat order happened to work;
+GCC's linker plugin resolves archive members differently and does not. Fixed by
+declaring the dependency (`pydegensac_support PUBLIC matutls`) so CMake orders
+and repeats the archives itself.
+
+With LTO on after the fix: imports in all three toolchains, 33 tests pass, H
+inlier checksum identical to the non-LTO build (142796), ~3% on H locally. So
+LTO stays on and is bit-exact here too. `PYDEGENSAC_NO_LTO=1` is what bisected
+it -- worth keeping.
+
+Original note follows.
+
+
 
 CMakeLists now enables `CMAKE_INTERPROCEDURAL_OPTIMIZATION` when
 `check_ipo_supported()` says yes, with `-fno-strict-aliasing` alongside it.
@@ -172,6 +196,31 @@ Re-run `benchmarks/toolchain/run_arms.sh` against `15445ef`. If the two images
 converge, the manylinux_2_28 move becomes optional rather than load-bearing,
 and the CentOS 7 / Ubuntu 18.04 glibc floor can be kept. That is a real
 decision that this change may have taken off the table.
+
+**ANSWERED: they converge.** Same protocol as before, bare `.so` against one
+host OpenBLAS, LTO on, at `01d899b`:
+
+| arm | H ms/pair | | F ms/pair | |
+|---|---|---|---|---|
+| local, gcc 13.3 | 3.24 | 1.00x | 15.34 | 1.00x |
+| manylinux2014, gcc 10.2.1 | 3.55 | 1.095x | 15.24 | 0.99x |
+| manylinux_2_28, gcc 14.2.1 | 3.54 | 1.092x | 15.36 | 1.00x |
+
+The two images are now indistinguishable from each other (3.550 vs 3.542 on H)
+where the old code had them at 1.41x vs 1.055x. Removing the `pJ[]` array
+removed what gcc 10.2.1 was spilling, so the `pinvJ` finding is history rather
+than a live constraint.
+
+**This measures the compiler, not the wheel.** It deliberately excludes what
+`auditwheel` vendors, which is the other half of the image choice -- see the
+vendored-BLAS section below before trading `manylinux_2_28` away for the glibc
+floor.
+
+Unexplained leftover, small and image-independent: both containers sit ~9%
+above local gcc 13.3 on H while matching each other exactly, despite being
+gcc 10.2 and gcc 14.2. Two very different compilers agreeing with each other
+and differing from a third points at something environmental rather than
+codegen. Not chased.
 
 ### 3. Re-measure the series on Linux
 
