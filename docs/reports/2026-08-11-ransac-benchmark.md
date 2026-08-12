@@ -12,11 +12,17 @@ base = `master@08464ca`, branch = `speed-up3@a8caab8`.
 
 ## Headline
 
-**The speed-up is real, costs nothing in accuracy, and is much smaller here
-than on the golden pairs: 1.19x (F) and 1.16x (H) in aggregate, rising to
-1.22x / 1.39x at the largest budgets.** No accuracy difference between the two
-builds is significant at any budget on either problem (paired bootstrap over
-pairs, 95% CI, all intervals contain zero).
+**The speed-up is real and costs nothing in accuracy. On Linux the branch as a
+whole is 2.2x (F) and 1.7x (H HPatchesSeq) in aggregate, rising to 2.6x / 1.9x
+at the largest budgets** — measured twice, `08464ca` against `6e72f7f`
+(2.18x/2.20x on F, 1.73x/1.72x on H). No accuracy difference is significant at
+any budget on either problem once both runs are in hand: the two `*` marks that
+appeared in the first run both vanished on repeat, one flipping sign.
+
+The RNG change that this branch set out to make accounts for 1.19x / 1.20x of
+that; the rest is the second optimisation pass that the macOS LAPACK fix made
+visible (see below). The Linux tables in the two sections that follow are the
+post-optimisation ones.
 
 In context, pydegensac is measurably behind the leader on **both** problems:
 -0.023 mAA against poselib-prosac on F at 1.5x its cost, and -0.012 against it
@@ -58,40 +64,56 @@ method at its own tuned (px, SNN ratio); iteration budget swept 125 -> 50k.
 
 | method | best mAA | at budget | mean ms/pair | d mAA vs poselib-prosac (paired) |
 |---|---|---|---|---|
-| poselib-prosac | **0.4570** | 50000 | 40.6 | leader |
-| poselib | 0.4392 | 50000 | 39.7 | -0.0178 (-0.0413, +0.0060) |
-| pydegensac (branch) | 0.4340 | 25000 | 61.9 | -0.0230 (-0.0452, -0.0003) `*` |
-| pydegensac (base) | 0.4307 | 50000 | 137.1 | -0.0261 (-0.0498, -0.0025) `*` |
-| cv2-magsac | 0.3762 | 50000 | 28.9 | -0.0811 (-0.1088, -0.0548) `*` |
-| cv2-ransac | 0.3403 | 50000 | 288.3 | -0.1165 (-0.1425, -0.0898) `*` |
+| poselib-prosac | **0.4570** | 50000 | 40.7 | leader |
+| pydegensac (branch) | 0.4403 | 50000 | 51.7 | -0.0169 (-0.0402, +0.0068) |
+| poselib | 0.4392 | 50000 | 39.9 | -0.0178 (-0.0413, +0.0060) |
+| pydegensac (base) | 0.4272 | 50000 | 135.8 | -0.0300 (-0.0535, -0.0062) `*` |
+| cv2-magsac | 0.3762 | 50000 | 29.0 | -0.0811 (-0.1088, -0.0548) `*` |
+| cv2-ransac | 0.3403 | 50000 | 287.7 | -0.1165 (-0.1425, -0.0898) `*` |
 
-- **poselib-prosac leads, and pydegensac is measurably behind it** (-0.023,
-  paired CI excludes zero) at 1.5x the cost. poselib without PROSAC is not
-  separable from the leader.
+- **After the optimisation pass, pydegensac is no longer separable from the
+  leader on F**: -0.0169 with a CI that now contains zero, where `master` is
+  -0.0300 and excludes it. `master`'s deficit was significant; the branch's is
+  not.
+- Cost is the part that moved: 135.8 -> 51.7 ms/pair at the top budget, against
+  poselib-prosac's 40.7. The branch is within 1.27x of the leader's cost where
+  `master` was 3.3x.
 - The two cv2 estimators are decisively behind, and cv2-ransac is also by far
   the most expensive here (288 ms) — it has no early-termination advantage at
   these inlier ratios and simply runs its budget out.
 
-base vs branch at equal budget:
+base vs branch at equal budget, and the same ladder run a second time to
+separate signal from scatter:
 
-| budget | mAA base | mAA branch | d mAA (95% CI, paired) | ms base | ms branch | speedup |
-|---|---|---|---|---|---|---|
-| 125 | 0.3707 | 0.3728 | +0.0020 (-0.0180, +0.0223) | 5.57 | 5.61 | 0.99x |
-| 500 | 0.3967 | 0.4042 | +0.0074 (-0.0133, +0.0285) | 7.85 | 7.62 | 1.03x |
-| 2500 | 0.4038 | 0.4258 | +0.0220 (+0.0017, +0.0418) `*` | 15.03 | 13.59 | 1.11x |
-| 10000 | 0.4168 | 0.4337 | +0.0169 (-0.0027, +0.0365) | 36.54 | 30.61 | 1.19x |
-| 25000 | 0.4195 | 0.4340 | +0.0143 (-0.0048, +0.0333) | 75.97 | 61.89 | 1.23x |
-| 50000 | 0.4307 | 0.4277 | -0.0032 (-0.0245, +0.0172) | 137.09 | 111.99 | 1.22x |
-| **total** | | | | **317.1** | **266.7** | **1.19x** |
+| budget | mAA base | mAA branch | d mAA (95% CI, paired) | ms base | ms branch | speedup | run 2 |
+|---|---|---|---|---|---|---|---|
+| 125 | 0.3770 | 0.3697 | -0.0076 (-0.0277, +0.0115) | 5.83 | 4.83 | 1.21x | 1.17x |
+| 250 | 0.3877 | 0.3720 | -0.0161 (-0.0368, +0.0042) | 6.76 | 5.45 | 1.24x | 1.21x |
+| 500 | 0.3988 | 0.3838 | -0.0153 (-0.0365, +0.0050) | 8.03 | 6.21 | 1.29x | 1.30x |
+| 1000 | 0.4063 | 0.3858 | -0.0209 (-0.0410, -0.0018) `*` | 10.00 | 7.16 | 1.40x | 1.40x |
+| 2500 | 0.4165 | 0.4042 | -0.0124 (-0.0327, +0.0080) | 15.00 | 9.28 | 1.62x | 1.62x |
+| 5000 | 0.4158 | 0.4193 | +0.0032 (-0.0172, +0.0243) | 22.40 | 12.15 | 1.84x | 1.85x |
+| 10000 | 0.4240 | 0.4277 | +0.0033 (-0.0172, +0.0247) | 36.25 | 17.10 | 2.12x | 2.13x |
+| 25000 | 0.4255 | 0.4342 | +0.0084 (-0.0108, +0.0270) | 75.38 | 30.76 | 2.45x | 2.48x |
+| 50000 | 0.4272 | 0.4403 | +0.0131 (-0.0067, +0.0337) | 135.79 | 51.67 | 2.63x | 2.69x |
+| **total** | | | | **315.5** | **144.6** | **2.18x** | **2.20x** |
 
-One of nine budgets shows a significant accuracy difference (2500, favouring
-the branch); with nine comparisons that is what chance produces, and the sign
-is not consistent across the ladder.
+**Timing reproduces to within 1%** at every budget, so the ladder is solid.
 
-**The speedup grows monotonically with the iteration budget** (0.99x -> 1.22x).
-That is the signature of removing a *per-iteration fixed cost*, which is what
-the RNG work did, and it means the saving is largest exactly where pydegensac
-is most expensive.
+**The one significant accuracy delta is scatter, and the repeat proves it.**
+Run 1 looks alarming at first read: five consecutive negative deltas at the low
+budgets, one of them significant at 1000 (-0.0209). Five same-sign values in a
+row is only a ~6% coincidence, so it is worth checking rather than waving away.
+Run 2, same builds, same pairs, disagrees completely — 1000 comes back at
+-0.0016 (-0.0217, +0.0187), nothing is significant anywhere, and the sign
+pattern is different. The M1 run of the same code shows no low-budget deficit
+either (-0.0032, +0.0019, +0.0003, -0.0004 at 125-1000). Three independent
+looks, one pattern, and it does not survive.
+
+**The speedup still grows monotonically with the budget** (1.21x -> 2.63x), the
+signature of a per-iteration fixed cost being removed — now a much larger one
+than the RNG alone, and still largest exactly where pydegensac is most
+expensive.
 
 ## H — homography
 
@@ -105,31 +127,40 @@ HPatchesSeq:
 
 | method | best mAA | at budget | mean ms/pair | d mAA vs poselib-prosac (paired) |
 |---|---|---|---|---|
-| poselib-prosac | 0.9297 | 1600 | 7.74 | leader |
-| cv2-magsac | 0.9269 | 25000 | 0.91 | -0.0027 (-0.0124, +0.0076) |
-| poselib | 0.9262 | 25000 | 5.42 | -0.0034 (-0.0214, +0.0097) |
-| pydegensac (branch) | 0.9172 | 25000 | 4.53 | -0.0124 (-0.0186, -0.0062) `*` |
-| cv2-ransac | 0.9103 | 25000 | 22.65 | -0.0192 (-0.0297, -0.0090) `*` |
-| pydegensac (base) | 0.9103 | 25000 | 6.29 | -0.0194 (-0.0290, -0.0110) `*` |
+| poselib-prosac | 0.9297 | 1600 | 7.81 | leader |
+| cv2-magsac | 0.9269 | 25000 | 0.92 | -0.0027 (-0.0124, +0.0076) |
+| poselib | 0.9262 | 25000 | 5.48 | -0.0034 (-0.0214, +0.0097) |
+| cv2-ransac | 0.9103 | 25000 | 22.94 | -0.0192 (-0.0297, -0.0090) `*` |
+| pydegensac (branch) | 0.9083 | 6400 | 2.34 | -0.0212 (-0.0317, -0.0117) `*` |
+| pydegensac (base) | 0.9069 | 6400 | 4.19 | -0.0226 (-0.0338, -0.0124) `*` |
 
 - **The top three are statistically tied; cv2-magsac wins on cost by a mile**
-  — 0.91 ms/pair against poselib-prosac's 7.7 and poselib's 5.4, for a
+  — 0.92 ms/pair against poselib-prosac's 7.8 and poselib's 5.5, for a
   difference in mAA that the paired test cannot distinguish from zero.
-- **pydegensac is measurably behind all three** (-0.012 vs the leader, CI
-  excludes zero) at 5x cv2-magsac's cost. The branch does lift it clear of
-  master (-0.012 vs -0.019 against the leader).
-- base vs branch: 1.05x at small budgets rising to **1.39x at 25000**,
-  1.20x aggregate — the same budget-dependent shape as F. No per-budget
-  accuracy difference is significant.
+- **pydegensac is still measurably behind all three on accuracy** (-0.021 vs the
+  leader, CI excludes zero), and the optimisation pass does not change that —
+  it was never going to, since it changes cost and not what gets sampled.
+- What it does change is cost: **2.34 ms/pair, second-cheapest in the roster**,
+  behind only cv2-magsac's 0.92 and now well under poselib's 5.5. On H the
+  trade is explicit — pydegensac is the cheap-but-less-accurate option.
+- base vs branch: 1.53x at small budgets rising to **1.96x at 25000**, 1.73x
+  aggregate (1.72x on a repeat) — the same budget-dependent shape as F.
 - pydegensac is the only method whose HPatches optimum is a tight threshold
   (4 px); every other method wanted 16-64 px, and pydegensac degrades sharply
   when loosened (val mAA 0.9241 at 4 px -> 0.8331 at 16 px). It has less
   headroom from threshold tuning than the rest of the field.
 
+Run 1 flagged one significant delta on the H ladder, at budget 400
+(-0.0404, favouring base). It is scatter, on the same evidence as F's: the
+repeat gives +0.0264 at that budget with every CI containing zero and every
+delta positive, and M1 gives +0.0079. The documented HPatchesSeq scatter for a
+repeat of an *identical* configuration is 0.037, which -0.0404 barely clears.
+
 **EVD is not usable for ranking.** With 8 pairs, one pair is 0.125 mAA and the
-marginal CIs span 0.20-0.69. Its aggregate speedup reads 1.51x but per-budget
-values swing between 0.59x and 1.80x. It is reported because the reference
-evaluation includes it, not because it separates anything.
+marginal CIs span 0.20-0.69. Its aggregate speedup reads 2.03x here and 2.21x
+on the repeat, with per-budget values swinging between 0.86x and 2.47x. It is
+reported because the reference evaluation includes it, not because it separates
+anything.
 
 ## Why the golden-pair numbers don't transfer
 
@@ -499,6 +530,40 @@ error evaluation, and LTO. Details in
 
 Estimator calls per second on M1, start to finish: **F 19.2 -> 36 (1.88x),
 H 250 -> 621 (2.49x)**.
+
+### Why M1 reads 2.91x on H where Linux reads 1.73x
+
+The two platforms disagree about the H speed-up by a factor of 1.7, and it is
+worth being precise about why, because the naive reading — "the optimisations
+work better on ARM" — is wrong. Totals in mean ms/pair summed over the ladder:
+
+| | `master` | branch | ratio |
+|---|---|---|---|
+| F, Linux | 315.5 | 144.6 | 2.18x |
+| F, M1 | 330.8 | 144.8 | 2.29x |
+| H `HPatchesSeq`, Linux | 21.7 | 12.6 | 1.73x |
+| H `HPatchesSeq`, M1 | 31.3 | 10.8 | 2.91x |
+
+**On F the branch lands at the same absolute cost on both platforms** — 144.6
+against 144.8, which is closer than either platform's run-to-run scatter. The
+entire difference in ratio is the denominator: M1's `master` was 1.05x slower.
+
+**On H the denominator does most of the work too.** M1's `master` is 1.44x
+slower than Linux's (31.3 vs 21.7), while M1's branch is 1.17x faster than
+Linux's (10.8 vs 12.6). 1.44 x 1.17 = 1.68, which is the 2.91/1.73 gap. So
+roughly two thirds of it is macOS `master` being slow rather than the branch
+being fast.
+
+That is the `srandom()` lock again, and H is where it hurts most: `rng_cost`
+measures 1079 ns/iteration saved on M1 against 366 on glibc, and H runs many
+cheap iterations, so a per-iteration fixed cost is a much larger share of H's
+runtime than of F's. macOS had more to gain because it started further behind.
+
+The remaining third is real and ISA-shaped, as expected: the two biggest wins
+in the pass were `cov_mat`'s strided passes and `inlidxs`'s per-correspondence
+division, both of which depend on the compiler's vectoriser and the target's
+divider. **The honest summary is that the pass is worth ~1.7x on H and ~2.2x on
+F on x86-64/glibc, and more on macOS mostly because macOS was worse off.**
 
 ### Where pydegensac sits on M1
 
