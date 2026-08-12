@@ -71,7 +71,19 @@ int inlidxso (const double * err, const double * sgn, int len, double th,
 /*Number of samples to ensure given confidence*/
 int nsamples(int ninl, int ptNum, int samsiz, double conf);
 
-double truncQuad(double epsilon, double thr);
+/* Truncated-quadratic gain. Defined here rather than in rtools.c so that it
+   inlines: inlidxs calls it once per correspondence, and that loop is the
+   single hottest thing in F (46% of self time), so a cross-TU call in it was
+   measurable. */
+static inline double truncQuad(double epsilon, double thr) {
+  if (thr == 0) {
+      return 0;
+    }
+  if ( epsilon >= thr*9/4 ) {
+      return 0;
+    }
+  return 1 - (epsilon/(thr*9/4));
+}
 
 /* Score comparator */
 int scoreLess(const Score s1, const Score s2);

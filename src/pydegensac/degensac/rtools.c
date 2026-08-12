@@ -161,14 +161,15 @@ void multirsampleT (double *data, int dat_siz, int dps,
 
 /*Indexes of inliers with error lower than given threshold. Returns RANSAC score.*/
 Score inlidxs (const double * err, int len, double th, int * inl) {
-  unsigned i;
+  int i;
   Score s = {0,0,0,0};
+  /* Branchless compress store: the write always happens, the index only
+     advances for inliers. Every caller allocates `inl` at `len` entries, so
+     the speculative write at s.I is in bounds. */
   for (i = 0; i < len; ++i) {
       s.J += truncQuad(err[i], th);
-      if (err[i] <= th) {
-          inl[s.I] = i;
-          ++(s.I);
-        }
+      inl[s.I] = i;
+      s.I += (err[i] <= th);
     }
   return s;
 }
@@ -227,16 +228,6 @@ int nsamples(int ninl, int ptNum, int samsiz, double conf)
     }
 }
 
-
-double truncQuad(double epsilon, double thr) {
-  if (thr == 0) {
-      return 0;
-    }
-  if ( epsilon >= thr*9/4 ) {
-      return 0;
-    }
-  return 1 - (epsilon/(thr*9/4));
-}
 
 int scoreLess(const Score s1, const Score s2) {
 #if __SCORE__ == SC_M
