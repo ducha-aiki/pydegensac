@@ -222,6 +222,42 @@ gcc 10.2 and gcc 14.2. Two very different compilers agreeing with each other
 and differing from a third points at something environmental rather than
 codegen. Not chased.
 
+### 2b. The other half: what `auditwheel` vendors -- also converged
+
+Built real repaired wheels in both images with
+`benchmarks/toolchain/build_wheel_in_image.sh` (CI's `CIBW_BEFORE_ALL_LINUX`
+verbatim, then `auditwheel repair`), installed them and timed them as shipped,
+so each uses its own vendored BLAS rather than the host's:
+
+| arm | H ms/pair | | F ms/pair | |
+|---|---|---|---|---|
+| manylinux2014 wheel, vendors OpenBLAS 0.3.3 | 3.642 | 1.000 | 16.54 | 1.000 |
+| manylinux_2_28 wheel, vendors OpenBLAS 0.3.15 | 3.623 | 0.995 | 16.55 | 1.001 |
+| local bare `.so` + host OpenBLAS | 3.260 | 0.895 | 15.20 | 0.919 |
+
+**Indistinguishable** -- 0.5% on H and 0.1% on F, both inside the run-to-run
+spread. Three years of OpenBLAS buys nothing here, which is what you would
+expect when every LAPACK call is on a 9x9 matrix, far below the size where
+kernel work pays.
+
+Worth noting *why* this is now a comparison of two OpenBLAS versions rather
+than OpenBLAS against the 2012 reference build: `f349a6c` added
+`openblas-devel` to `CIBW_BEFORE_ALL_LINUX`, so manylinux2014 no longer vendors
+reference LAPACK 3.4.2. That single line, not the image move, is what killed
+the LAPACK term.
+
+**So the image choice is now performance-neutral on both counts** -- compiler
+(2 above) and vendored libraries (here). Whether to keep `manylinux_2_28` is a
+pure compatibility and tooling question now: going back to manylinux2014 would
+restore the CentOS 7 / Ubuntu 18.04 floor at no measurable speed cost, but it
+still drags the cibuildwheel-2.x/cp38 split and the numpy `manylinux_2_17`
+situation along with it, which is what the workflow comments already weigh.
+Nothing here forces the decision either way; it just removes speed as an
+argument.
+
+The ~9-10% wheel-vs-local residual shows up identically in both wheels, so it
+is not the vendored BLAS either. Same unexplained environmental term as above.
+
 ### 3. Re-measure the series on Linux
 
 The M1 numbers will not transfer -- the two biggest wins were `cov_mat`

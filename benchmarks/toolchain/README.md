@@ -45,6 +45,19 @@ ARMS="pkg-local-head pkg-ml2014-head" toolchain/run_arms.sh h 7 > h.jsonl
 python toolchain/summarize.py h.jsonl
 ```
 
+`build_wheel_in_image.sh` is the companion for the other half of the question:
+it runs CI's `CIBW_BEFORE_ALL_LINUX` and `auditwheel repair`, so you get the
+wheel *as shipped*, vendored BLAS and all. Use `build_in_image.sh` to compare
+compilers (one LAPACK, held constant) and this one to compare images as users
+receive them.
+
+```bash
+docker run --rm -v "$PWD/..":/src:ro -v "$PWD/.ab/iso/whl-ml228":/out \
+    quay.io/pypa/manylinux_2_28_x86_64 \
+    bash /src/benchmarks/toolchain/build_wheel_in_image.sh HEAD
+pip install --no-deps --target .ab/pkg-whl-ml228 .ab/iso/whl-ml228/*.whl
+```
+
 `EXTRA_CFLAGS` is passed through to the container build — that is how the
 visibility hypothesis was tested, and how pre-`lapwrap` refs are built at all
 (`v_0.2.2` needs `-Wno-error=implicit-function-declaration`, since gcc 14
