@@ -627,13 +627,13 @@ int nullspace_qr7x9(const double *A, double *N)
 
     r = rows; c = cols;
     // call Fortran LAPACK function
-#ifdef _WIN32
+    /* Called unconditionally. It used to be guarded by _WIN32 / __linux__,
+       like every other LAPACK call in this library — so on macOS, which
+       defines neither, the QR was preprocessed away and `info` was read
+       uninitialised. Dormant rather than harmful, because USE_QR is not
+       defined and the caller takes the LU path, but the same bug as the one
+       f349a6c fixed in lapwrap.c. */
     dgeqp3_(&r, &c, T, &r, p, tau, work, &work_size, &info);
-#endif
-
-#ifdef __linux__
-    dgeqp3_(&r, &c, T, &r, p, tau, work, &work_size, &info);
-#endif
     if (info!=0)
         return -1;
 
