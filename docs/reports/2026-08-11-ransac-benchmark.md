@@ -212,17 +212,48 @@ the 7.0 ms H gap:
 | local build + the wheel's bundled LAPACK 3.4.2 | 22.64 |
 | the PyPI wheel itself | 27.91 |
 
-so ~25% of the gap is the vendored LAPACK, and the rest is still unexplained.
-Ruled out by measurement, not assumption: **compiler version** (master built
-locally with gcc 10.4 runs at 21.7 ms, indistinguishable from gcc 13.3's
-21.5 — so manylinux's gcc 10.2 is not the cause), **assertions** (`NDEBUG` is
-set in both, no `__assert_fail`), **hardening flags** (identical `__stack_chk`
-usage, no fortify symbols), and **codegen** (both binaries are essentially
-all-scalar with near-identical instruction mixes: 59,915 vs 60,779).
+so ~25% of the gap is the vendored LAPACK.
 
-Worth pursuing separately from this PR: a newer manylinux image, or linking
-OpenBLAS instead of reference LAPACK, looks like free double-digit percent for
-every Linux `pip install` user. The residual needs its own investigation.
+### Where the rest goes: a perf profile
+
+Profiled with `perf` on a driver that calls `findHomography` in a loop and does
+nothing else (the benchmark's own metric is 85% of process time and buries the
+estimator; threads pinned, since unpinned OpenBLAS spends 20-43% in
+`__sched_yield` and swamps everything).
+
+| | wheel 0.2.2 | local 0.2.2 |
+|---|---|---|
+| wall | 0.71 s | 0.54 s |
+| `pydegensac.so` | 64.3% -> **0.456 s** | 57.8% -> **0.312 s** |
+| `libc` | 15.1% -> 0.107 s | 18.6% -> 0.100 s |
+| LAPACK | 3.5% -> 0.025 s | 3.7% -> 0.020 s |
+
+**The extra time is inside pydegensac's own compiled code** — 1.46x on the same
+source — while libc and LAPACK are the same in absolute terms. So this is
+codegen, not a library.
+
+What that is *not*, each ruled out by direct experiment rather than argument:
+
+- **LAPACK implementation**: 20.87 ms (OpenBLAS) vs 21.31 (modern reference).
+- **Optimisation level**: local `-O2` 0.44 s vs `-O3` 0.43 s.
+- **Compiler major version**: conda gcc 10.4 21.7 ms vs gcc 13.3 21.5 ms.
+- **Symbol visibility**: the wheel exports 425 dynamic symbols against the
+  local build's 121, which looked promising — but rebuilding with
+  `-fvisibility=hidden` (6 exported) only bought 5%, 0.51 s vs 0.54.
+- **Assertions** (`NDEBUG` set in both), **hardening** (identical
+  `__stack_chk`, no fortify symbols), **instruction mix** (59,915 vs 60,779,
+  both essentially all-scalar).
+
+The one difference not yet isolated: the wheel records `GCC 10.2.1`, which is
+RedHat's *devtoolset* build, whereas the gcc-10 control above was conda's
+10.4.0 — a different build of GCC with different defaults and a CentOS 7
+baseline. Testing that needs the manylinux image itself, i.e. Docker, which is
+not available on this machine. (Incidentally the 0.1.2 wheel records two
+compilers, GCC 8.5.0 and 12.1.1.)
+
+So the CI change below is worth the ~25% of the gap that is LAPACK; the
+remaining ~75% is a real, reproducible property of the manylinux toolchain that
+wants a Docker-equipped machine to finish off.
 
 **Unrelated hazard found on the way**: `pydegensac==0.1.2` silently returns
 *every* correspondence as an inlier under numpy 2.x — 300/300 on a synthetic
