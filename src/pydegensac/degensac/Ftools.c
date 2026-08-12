@@ -352,7 +352,7 @@ void u2f(const double *u, const int *inl, int len,
 {
     double A1[3], A2[3];
     double *Z, V[9*9], U[8*8], D[9], *p;
-    int i, j;
+    int i, j, step;
 
     if (buffer == NULL)
         Z = (double *) malloc(sizeof(double) * 9 * len);
@@ -366,27 +366,27 @@ void u2f(const double *u, const int *inl, int len,
 
         cov_mat(V, Z, len, 9);
         lap_eig(V,D,9);
-        trnm(V,9); /* lapack stores column-wise */
+
+        /* LAPACK returns the eigenvectors as Fortran columns, which in this
+           row-major buffer are rows -- so the one we want is already
+           contiguous. The old code transposed the entire 9x9 just to read it
+           back with stride 9; reading row j directly is the same nine values.
+           (u2h has always done it this way.) */
+        j = 0;
+        for (i = 1; i<9; i++)
+            if (D[i] < D[j]) j = i;
+        p = V + 9*j;
+        step = 1;
     } else
     {
         lin_fm(u, Z, inl, len);
         svduv(D,Z,V,9,U,8);
+        p = V + 8;      /* ccmath's V is row-major: column 8, stride 9 */
+        step = 9;
     }
 
-    if (len > 8)
-    {
-        j = 0;
-        for (i = 1; i<9; i++)
-            if (D[i] < D[j]) j = i;
-        p = V + j;
-    } else
-        p = V + 8;
-
-    for (i = 0; i<9; i++)
-    {
+    for (i = 0; i<9; i++, p += step)
         F[i] = *p;
-        p += 9;
-    }
 
     singulF(F);
 
@@ -402,7 +402,7 @@ void u2fw(const double *u, const int *inl, const double * w,
 {
     double A1[3], A2[3];
     double *Z, V[9*9], U[8*8], D[9], *p;
-    int i, j;
+    int i, j, step;
 
     if (buffer == NULL)
         Z = (double *) malloc(sizeof(double) * 9 * len);
@@ -421,7 +421,13 @@ void u2fw(const double *u, const int *inl, const double * w,
 
         cov_mat(V, Z, len, 9);
         lap_eig(V,D,9);
-        trnm(V,9); /* lapack stores column-wise */
+
+        /* Eigenvector j is already contiguous here -- see u2f. */
+        j = 0;
+        for (i = 1; i<9; i++)
+            if (D[i] < D[j]) j = i;
+        p = V + 9*j;
+        step = 1;
     } else
     {
         lin_fm(u, Z, inl, len);
@@ -431,22 +437,12 @@ void u2fw(const double *u, const int *inl, const double * w,
             scalmul(Z+i, w[j], 9, 9);
         }
         svduv(D,Z,V,9,U,8);
+        p = V + 8;      /* ccmath's V is row-major: column 8, stride 9 */
+        step = 9;
     }
 
-    if (len > 8)
-    {
-        j = 0;
-        for (i = 1; i<9; i++)
-            if (D[i] < D[j]) j = i;
-        p = V + j;
-    } else
-        p = V + 8;
-
-    for (i = 0; i<9; i++)
-    {
+    for (i = 0; i<9; i++, p += step)
         F[i] = *p;
-        p += 9;
-    }
 
     singulF(F);
 
