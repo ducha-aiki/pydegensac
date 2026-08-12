@@ -163,11 +163,19 @@ void multirsampleT (double *data, int dat_siz, int dps,
 Score inlidxs (const double * err, int len, double th, int * inl) {
   int i;
   Score s = {0,0,0,0};
+  /* The MSAC gain needs 1/(th*9/4) per correspondence; computing it once and
+     multiplying is a numerics change (see truncQuadInv). th == 0 has no usable
+     reciprocal and scores 0 for every point, so it keeps the scalar path --
+     the flag is loop-invariant, so the branch hoists out. */
+  const int score_j = (th != 0);
+  const double inv = score_j ? 1/(th*9/4) : 0;
   /* Branchless compress store: the write always happens, the index only
      advances for inliers. Every caller allocates `inl` at `len` entries, so
      the speculative write at s.I is in bounds. */
   for (i = 0; i < len; ++i) {
-      s.J += truncQuad(err[i], th);
+      if (score_j) {
+          s.J += truncQuadInv(err[i], inv);
+        }
       inl[s.I] = i;
       s.I += (err[i] <= th);
     }

@@ -1,6 +1,8 @@
 #ifndef __RTOOLS_H__
 #define __RTOOLS_H__
 
+#include <math.h>
+
 #define DEGENSAC_EPS 2.2204e-16
 #define MAX_SAMPLES 1000000
 #define CONFIDENCE 0.95
@@ -83,6 +85,17 @@ static inline double truncQuad(double epsilon, double thr) {
       return 0;
     }
   return 1 - (epsilon/(thr*9/4));
+}
+
+/* truncQuad with the reciprocal supplied by the caller: inv = 1/(thr*9/4).
+   Equivalent in exact arithmetic -- truncQuad returns 0 exactly where
+   1 - epsilon*inv <= 0 -- but x*(1/y) does not round like x/y, so this is a
+   deliberate numerics change. The point is to hoist a division out of a loop
+   that runs once per correspondence. Callers must handle thr == 0 themselves;
+   1/0 is not a usable reciprocal.
+   See docs/superpowers/specs/2026-08-12-covmat-inlidxs-perf-design.md. */
+static inline double truncQuadInv(double epsilon, double inv) {
+  return fmax(0.0, 1 - epsilon*inv);
 }
 
 /* Score comparator */
