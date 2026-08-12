@@ -23,6 +23,12 @@ extern void dgeqp3_( lapack_int* m, lapack_int* n, double* a, lapack_int* lda,
                      lapack_int* jpvt, double* tau, double* work, lapack_int* lwork,
                      lapack_int* info );
 
+/* DSYRK prototype (BLAS). Used by cov_mat for the symmetric rank-k update
+   Z^T Z, which is what that function computes by hand for small inputs. */
+extern void dsyrk_( char* uplo, char* trans, lapack_int* n, lapack_int* k,
+                    double* alpha, double* a, lapack_int* lda, double* beta,
+                    double* c, lapack_int* ldc );
+
 /* Library of tools wrapping LAPACK utilities and making their usage a bit more comfortable.
    All the matrices are stored row-wise! */
 

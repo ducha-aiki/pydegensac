@@ -3,6 +3,23 @@
 //#include <stdio.h>
 
 #include "utools.h"
+#include "lapwrap.h"
+
+/* Length from which cov_mat hands Z^T Z to BLAS dsyrk instead of doing it
+   itself. In isolation dsyrk already wins at len=10 (M1/Accelerate, siz=9, ns
+   per call: len 8 -- 213 by hand vs 216 dsyrk; 10 -- 257 vs 164; 64 -- 1543 vs
+   244; 256 -- 6519 vs 516), but in the estimators a threshold that low costs
+   F 3% while gaining H 25%, because F's small-len calls pay the call overhead
+   more often than they save. Measured end to end, estimator calls per 10 s:
+
+     threshold      F      H
+     no dsyrk     297   3880
+     >= 10        288   4860
+     >= 32        306   5394
+     >= 64        306   5346
+
+   32 is the only setting that wins on both. */
+#define COV_BLAS_MIN 32
 
 void normu (const double *u, const int * inl, int len, 
            double *A1, double *A2)
@@ -186,6 +203,25 @@ void cov_mat(double *Cv, const double * Z, int len, int siz)
 
    for (i=0; i<siz*siz; i++)
       Cv[i] = 0;
+
+   if (len >= COV_BLAS_MIN)
+   {
+      /* Fortran reads the row-major len x siz array Z as a column-major
+         siz x len matrix A, so A*A^T ("N", no transpose) is the Z^T Z we
+         want. The result is symmetric, so the row-major/column-major
+         distinction does not matter for Cv -- but dsyrk writes only one
+         triangle, hence the mirror below. Integer widths follow the rest of
+         this library: lapack_int is ptrdiff_t and the vendor BLAS reads the
+         low half, which is correct for these small positive values on any
+         little-endian target. */
+      lapack_int n = siz, kk = len, lda = siz, ldc = siz;
+      double alpha = 1.0, beta = 0.0;
+      dsyrk_("L", "N", &n, &kk, &alpha, (double *) Z, &lda, &beta, Cv, &ldc);
+      for (i=0; i<siz; i++)
+         for (j=0; j<i; j++)
+            Cv[siz*i + j] = Cv[i + siz*j];
+      return;
+   }
 
    for (k=0; k<lenM; k+=siz)
       for (i=0; i<siz; i++)
