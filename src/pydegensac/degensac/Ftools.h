@@ -52,6 +52,12 @@ extern "C"
 #endif
 void FDsidx (const double *mu, const double *F, double *p, int len,  int *idx, int siz);
 
+/* SoA forms of FDs/FDsSym, reading a packed x1|y1|x2|y2 block built by
+   soa_pack. Bit-identical to their strided counterparts; see Ftools.c. */
+void FDs_soa (const double *s, const double *F, double *p, int len);
+void FDsSym_soa (const double *s, const double *F, double *p, int len);
+void soa_pack (const double *u, double *s, int len);
+
 
 #ifdef __cplusplus
 extern "C"

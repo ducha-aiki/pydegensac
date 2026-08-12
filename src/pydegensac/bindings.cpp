@@ -317,6 +317,9 @@ py::tuple findFundamentalMatrix_(py::array_t<double, py::array::c_style | py::ar
     FDsPtr FDS1 = nullptr;
     exFDsPtr EXFDS1 = nullptr;
     FDsidxPtr FDSidx1 = nullptr;
+    // SoA form of FDS1, used for the whole-array error evaluations in the
+    // RANSAC loop; identical results, contiguous loads (see Ftools.c).
+    FDsPtr FDS1soa = nullptr;
 
     double error_threshold = 0.0;
     double SymCheck_th = 0.0;
@@ -326,6 +329,7 @@ py::tuple findFundamentalMatrix_(py::array_t<double, py::array::c_style | py::ar
         FDS1 = &FDs;
         EXFDS1 = &exFDs;
         FDSidx1 = &FDsidx;
+        FDS1soa = &FDs_soa;
 
         error_threshold = px_th*px_th;
         SymCheck_th = px_th*px_th * SYM_CHECK_COEF;
@@ -336,6 +340,7 @@ py::tuple findFundamentalMatrix_(py::array_t<double, py::array::c_style | py::ar
         FDS1 = &FDsSym;
         EXFDS1 = &exFDsSym;
         FDSidx1 = &FDsSymidx;
+        FDS1soa = &FDsSym_soa;
         error_threshold = px_th*px_th;
         SymCheck_th = px_th*px_th * SYM_CHECK_COEF;
         break;
@@ -367,7 +372,8 @@ py::tuple findFundamentalMatrix_(py::array_t<double, py::array::c_style | py::ar
                          EXFDS1,FDS1,FDSidx1,
                          SymCheck_th,
                          (int)enable_degeneracy_check,
-                         seed);
+                         seed,
+                         FDS1soa);
 
     return pack_output(F, in.inl, in.num_tents);
 }
