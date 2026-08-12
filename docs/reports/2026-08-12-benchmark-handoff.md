@@ -300,7 +300,34 @@ equal-correctness arm (`master` + the fixed `lapwrap.c`) is no longer needed
 now that the fix is in the branch's history -- compare `08464ca` against
 `15445ef` directly.
 
-### 4. Verify output-preservation on Linux
+### 4. Verify output-preservation on Linux -- DONE, gate passes
+
+`scripts/stat_ab.py` over the `pip --target` trees `run_ab.sh` built
+(`08464ca` vs `6e72f7f`), 10 golden pairs x 4 metrics x 1000 seeds:
+
+```
+min p = 0.03776  (golden_f_reichstag_05461164.../gt_err)  over 40 comparisons
+```
+
+The gate is `FAIL_P = 0.01`, so this passes with room. Three of the 40 land
+below 0.05 -- `gt_err` and `gt_prec` on one reichstag pair (both 0.03776) and
+`inliers` on `golden_h_adam` (0.04279). Two of those three are the same
+underlying quantity, since `gt_err` and `gt_prec` are both functions of the
+inlier mask, so it is really two independent flags where 40 comparisons at
+0.05 predict two.
+
+Worth saying plainly: min p here (0.038) is lower than the 0.108 the docstring
+records for `4430bc7`. That is expected rather than worrying -- `4430bc7` was
+one reseed removal, this is the entire branch against `master`, including a
+different RNG stream and every numerics change in the optimisation pass. The
+question these KS tests answer is whether the output *distributions* differ,
+not whether the outputs are identical; they are not identical and were never
+meant to be (the F inlier checksum moved 11576 -> 11578 across the series).
+
+Note `scipy` is not in `benchmarks/.ab/env` by default -- `pip install scipy`
+into whichever interpreter you point at this.
+
+### 4b. The original note
 
 `scripts/stat_ab.py` is now a committed tool rather than an ad hoc script: two
 `pip --target` builds in, KS tests out, over inlier count, GT error, GT
