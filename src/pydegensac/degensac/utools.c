@@ -46,7 +46,32 @@ void normu (const double *u, const int * inl, int len,
         A1[i] /= len; A2[i] /= len;
       }
 
-  for (j = 0; j < len; j++)
+  /* Two partial sums per image rather than one: each mean-distance
+     accumulator was a serial chain with a square root in it, so the loop ran
+     at sqrt-plus-add latency on work that is independent per correspondence.
+     Reassociation changes rounding. */
+  {
+    double s1a = 0, s1b = 0, s2a = 0, s2b = 0;
+    int n2 = len & ~1;
+    for (j = 0; j < n2; j += 2)
+      {
+        const double *q = p + 6*inl[j];
+        const double *w = p + 6*inl[j+1];
+        double qa = q[0] - A1[1], qb = q[1] - A1[2];
+        double wa = w[0] - A1[1], wb = w[1] - A1[2];
+        s1a += sqrt(qa*qa + qb*qb);
+        s1b += sqrt(wa*wa + wb*wb);
+        qa = q[3] - A2[1]; qb = q[4] - A2[2];
+        wa = w[3] - A2[1]; wb = w[4] - A2[2];
+        s2a += sqrt(qa*qa + qb*qb);
+        s2b += sqrt(wa*wa + wb*wb);
+      }
+    A1[0] = s1a + s1b;
+    A2[0] = s2a + s2b;
+    j = n2;
+  }
+
+  for (; j < len; j++)
     {
       u = p+ 6*inl[j];
       a = u[0] - A1[1];
