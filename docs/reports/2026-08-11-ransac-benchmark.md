@@ -24,10 +24,13 @@ that; the rest is the second optimisation pass that the macOS LAPACK fix made
 visible (see below). The Linux tables in the two sections that follow are the
 post-optimisation ones.
 
-In context, pydegensac is measurably behind the leader on **both** problems:
--0.023 mAA against poselib-prosac on F at 1.5x its cost, and -0.012 against it
-on H at 5x what cv2's MAGSAC costs. The speed-up narrows the cost gap; it does
-not put pydegensac on the efficient frontier.
+In context — and this changed with the optimisation pass, so the tables below
+supersede what this paragraph used to say — pydegensac is **no longer separable
+from the leader on F** (-0.0169 against poselib-prosac, CI contains zero, at
+1.3x its cost) while remaining measurably behind on H (-0.021, CI excludes
+zero, though at 2.3 ms it is the second-cheapest method in the roster). The
+speed-up closes the accuracy question on F and turns H into a cost/accuracy
+trade rather than a straight loss.
 
 **Separately, and much more importantly for macOS users: on macOS the LAPACK
 calls were never compiled in at all** — see the section below. Everything in

@@ -5,6 +5,28 @@ from sparse correspondences. It implements [LO-RANSAC](https://link.springer.com
 
 It was originally located in [https://github.com/ducha-aiki/pyransac](https://github.com/ducha-aiki/pyransac), but was renamed to avoid conflict with already existing [pyransac](https://pypi.org/project/pyransac/) in pypi from other author.
 
+> ### macOS users: upgrade
+>
+> Every macOS build published before **0.3.0** silently skipped all of its
+> LAPACK calls. The C sources guarded them behind `#ifdef _WIN32` / `#ifdef
+> __linux__`, and macOS defines neither, so the preprocessor removed them: the
+> least-squares refits that local optimisation depends on returned an identity
+> matrix (F) or an untouched covariance matrix (H). LO-RANSAC's local
+> optimisation — the thing that makes this estimator worth using — never ran.
+>
+> Results were degraded, not broken, so nothing failed loudly: measured on
+> public data it cost **0.11 mAA on fundamental and 0.21 on homography**.
+> Anything you benchmarked on macOS against other estimators was measuring a
+> crippled build. Linux and Windows were unaffected.
+>
+> To check an existing install:
+>
+> ```bash
+> nm -u $(python -c "import pydegensac,glob,os;print(glob.glob(os.path.dirname(pydegensac.__file__)+'/*.so')[0])") | grep -E 'dgesvd|dsyev'
+> ```
+>
+> Empty output means you have an affected build.
+
 # Performance
 
 Vanilla pydegensac implementation is marginally better than OpenCV one and with degeneracy-check enabled (DEGENSAC) it is the state of the art,
@@ -29,16 +51,40 @@ fundamental matrix on IMC-2020 PhotoTourism val (600 pairs of
 CVPR-2020 RANSAC tutorial data, reprojection mAA 1-20 px). Every method runs at
 its own tuned thresholds; each point on a curve is one iteration budget.
 
-![F time-mAA](benchmarks/results/time_maa_f.png)
+<table>
+<tr><th width="50%">Linux x86-64</th><th width="50%">Apple M1</th></tr>
+<tr>
+<td><img alt="F time-mAA, Linux" src="benchmarks/results/time_maa_f.png"></td>
+<td><img alt="F time-mAA, Apple M1" src="benchmarks/results/time_maa_f_m1.png"></td>
+</tr>
+<tr>
+<td><img alt="H time-mAA, Linux" src="benchmarks/results/time_maa_h.png"></td>
+<td><img alt="H time-mAA, Apple M1" src="benchmarks/results/time_maa_h_m1.png"></td>
+</tr>
+</table>
 
-![H time-mAA](benchmarks/results/time_maa_h.png)
+**Fundamental matrix.** poselib with PROSAC leads, but pydegensac is no longer
+separable from it — -0.017 mAA on Linux, -0.021 on M1, both with confidence
+intervals containing zero — and it beats both OpenCV estimators by a wide
+margin. It costs about 1.3x the leader on Linux (52 vs 41 ms/pair) and is level
+with it on M1 (50 vs 52).
 
-poselib with PROSAC leads both problems. pydegensac is measurably behind it on
-each — -0.023 mAA on F at 1.5x the cost, -0.012 on H at 5x what
-`cv2.USAC_MAGSAC` costs — while beating both OpenCV estimators on F by a clear
-margin. This is consistent with the 2023 homography benchmark above. (EVD's 8
-test pairs cannot separate methods, hence the confidence bands swamping that
-panel.)
+**Homography.** pydegensac is the second-cheapest estimator in the roster
+(2.3 ms/pair on Linux, 2.6 on M1), undercutting both poselib variants, but it
+remains measurably behind the top three on accuracy: -0.021 mAA on Linux,
+-0.010 on M1, both intervals excluding zero. `cv2.USAC_MAGSAC` wins homography
+outright, matching the leader's accuracy at 0.9 ms. That is consistent with the
+2023 homography benchmark above.
+
+So the two problems now have different answers: on F pydegensac is competitive
+with the best available, on H it is a cost/accuracy trade rather than a
+straight win. (EVD's 8 test pairs cannot separate anything, hence the
+confidence bands swamping that panel.)
+
+Both platforms show the same picture, but the version-to-version speed-up
+differs: the 0.3.0 optimisation work is worth **2.2x (F) / 1.7x (H) on Linux**
+and **2.3x / 2.9x on M1**. The gap is mostly the denominator — macOS had more
+to gain because a lock in its `srandom()` left the old build further behind.
 
 Full results, protocol, and the caveats that matter (run-to-run scatter,
 threshold-transfer failure between scenes):
@@ -52,6 +98,14 @@ To build and install `pydegensac`, you can use pip from Windows, macOS and Linux
 ```bash
 pip install pydegensac
 ```
+
+> **Do not pin `pydegensac==0.1.2` if you are on numpy 2.x.** That combination
+> returns **every correspondence as an inlier**, silently — on a synthetic set
+> with 150 planted outliers among 300 matches it reports 300 inliers, where the
+> same wheel under numpy 1.26 correctly reports 150. It is the old pybind11
+> incompatibility that `0.2` was yanked for, but `0.1.2` was never yanked, so
+> it is what an old pin or an unconstrained resolve on a fresh numpy can still
+> land on. Use the latest release, or hold numpy below 2.0.
 
 Or clone or download this repository and then, from within the repository, run:
 
