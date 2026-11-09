@@ -2,6 +2,33 @@
 
 #include <stdint.h>
 
+#if defined(_WIN32) || defined(WIN32)
+/* The Windows CRT uses one stream for both sampling and degeneracy checks.
+   Keep its 32-bit wraparound and 15-bit output, but own the state per thread. */
+static DEGENSAC_THREAD_LOCAL uint32_t win_rand_state = 1;
+
+void degensac_srand(unsigned seed)
+{
+    win_rand_state = seed;
+}
+
+int degensac_rand(void)
+{
+    win_rand_state = win_rand_state * 214013u + 2531011u;
+    return (int) ((win_rand_state >> 16) & 0x7fffu);
+}
+
+void degensac_srandom(unsigned seed)
+{
+    degensac_srand(seed);
+}
+
+long degensac_random(void)
+{
+    return (long) degensac_rand();
+}
+#else
+
 /* TYPE_3 additive-feedback generator: x[i] = (x[i-3] + x[i-31]) mod 2^32,
    output is the top 31 bits. Matches FreeBSD/macOS libc random(). */
 
@@ -56,11 +83,11 @@ static const uint32_t pow16807[RAND_DEG] = {
 
 /* Park-Miller step via Schrage's trick; FreeBSD substitutes 123459876 for a
    zero input so the LCG cannot stick at zero. */
-static int32_t good_rand(int32_t x)
+static int32_t good_rand(int32_t x, int bsd_seed)
 {
     int32_t hi, lo;
 
-    if (x == 0)
+    if (bsd_seed && x == 0)
         x = 123459876;
     hi = x / 127773;
     lo = x % 127773;
@@ -70,10 +97,13 @@ static int32_t good_rand(int32_t x)
     return x;
 }
 
-static void init_table_state(uint32_t tbl[RAND_DEG], int *fptr, int *rptr, unsigned seed)
+static void init_table_state(uint32_t tbl[RAND_DEG], int *fptr, int *rptr, unsigned seed, int bsd_seed)
 {
     uint32_t init[RAND_DEG], x[RAND_DEG];
     int i, j, k;
+
+    if (!bsd_seed && seed == 0)
+        seed = 1;
 
     if ((int32_t) seed > 0 && seed < 2147483647u) {
         /* seeding LCG is Park-Miller, so init[i] = 16807^i * seed mod
@@ -88,11 +118,11 @@ static void init_table_state(uint32_t tbl[RAND_DEG], int *fptr, int *rptr, unsig
             init[i] = (uint32_t) v;
         }
     } else {
-        /* seed 0 or with the top bit set: libc runs the LCG on the raw
-           int32 (with the good_rand zero substitution) -- follow it */
+        /* Boundary seeds use the signed recurrence. Only BSD replaces a
+           zero intermediate value; glibc leaves it at zero. */
         init[0] = (uint32_t) seed;
         for (i = 1; i < RAND_DEG; i++)
-            init[i] = (uint32_t) good_rand((int32_t) init[i - 1]);
+            init[i] = (uint32_t) good_rand((int32_t) init[i - 1], bsd_seed);
     }
     /* the warm-up recurrence visits the seeded slots rotated by RAND_SEP */
     for (k = 0; k < RAND_DEG; k++)
@@ -122,7 +152,7 @@ long degensac_random(void)
 
 void degensac_srandom(unsigned seed)
 {
-    init_table_state(rand_tbl, &fptr_idx, &rptr_idx, seed);
+    init_table_state(rand_tbl, &fptr_idx, &rptr_idx, seed, 1);
 }
 
 #if defined(__APPLE__)
@@ -161,7 +191,7 @@ static DEGENSAC_THREAD_LOCAL int deg_rptr_idx = 0;
 
 void degensac_srand(unsigned seed)
 {
-    init_table_state(deg_rand_tbl, &deg_fptr_idx, &deg_rptr_idx, seed);
+    init_table_state(deg_rand_tbl, &deg_fptr_idx, &deg_rptr_idx, seed, 0);
 }
 
 int degensac_rand(void)
@@ -177,3 +207,5 @@ int degensac_rand(void)
     return (int) (val & 0x7fffffff);
 }
 #endif
+
+#endif /* Windows / BSD generators */

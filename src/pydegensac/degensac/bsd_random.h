@@ -1,17 +1,11 @@
 #ifndef BSD_RANDOM_H
 #define BSD_RANDOM_H
 
-/* Thread-safe reimplementation of the 4.3BSD TYPE_3 random()/srandom() pair,
-   bit-compatible with the macOS/FreeBSD libc sequence for every seed and
-   with glibc for every nonzero seed. The RANSAC loops reseed the generator
-   on every iteration (deterministic seed chain), which makes libc srandom()
-   a major bottleneck; this local version removes the calling/locking overhead
-   via precomputed warm-up transformation matrices and thread-local state.
-
-   Also provides degensac_rand()/degensac_srand() for degeneracy checks:
-   uses thread-local state matching macOS Park-Miller rand() on Darwin and
-   glibc TYPE_3 rand() on Linux, guaranteeing thread-safety without inter-thread
-   state corruption. */
+/* Thread-local RNGs preserving the estimator's platform-specific streams.
+   On Unix, random()/srandom() use the historical BSD TYPE_3 sequence with
+   precomputed warm-up matrices. The separate rand()/srand() stream matches
+   Darwin's Park-Miller generator or glibc's TYPE_3 seed semantics.
+   On Windows, both pairs share the same CRT-compatible 15-bit LCG stream. */
 
 void degensac_srandom(unsigned seed);
 long degensac_random(void);
