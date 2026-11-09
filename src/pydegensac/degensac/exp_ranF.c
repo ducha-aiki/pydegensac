@@ -6,8 +6,9 @@
 #include "exp_ranF.h"
 #include "DegUtils.h"
 #include "hash.h"
+#include "bsd_random.h"
 
-static HashTable HASH_TABLE_F;
+static DEGENSAC_THREAD_LOCAL HashTable HASH_TABLE_F;
 
 #include "Ftools.h"
 #include "rtools.h"
@@ -261,6 +262,19 @@ Score exp_inFranicustom (double *u, int len, int *inliers, int ninl,
     return maxS;
 }
 
+static inline void sampleF7(const double *u, int *pool, int len, double *A) {
+    int i, k, l;
+    for (i = 0; i < 7; i++) {
+        int q = sample(pool, len, i);
+        const double *s = u + 6 * q;
+        double *row = A + 9 * i;
+        int pos = 0;
+        for (k = 0; k < 3; k++)
+            for (l = 0; l < 3; l++)
+                row[pos++] = s[k+3] * s[l];
+    }
+}
+
 int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2, int len, double th, double laf_coef,
                          double conf, int max_sam,
                          double *F, unsigned char * inl,
@@ -322,8 +336,7 @@ int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2, int len, double th
     }
     samidx = pool + len - 7;
 
-    Z = (double *) malloc(len * 9 * sizeof(double));
-    lin_fm(u, Z, pool, len);
+    Z = NULL;
 
     /* Coordinates repacked once per call into x1|y1|x2|y2, so the whole-array
        error evaluations read contiguously instead of gathering four doubles
@@ -361,7 +374,7 @@ int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2, int len, double th
     while(no_sam < max_sam) {
         no_sam ++;
 
-        rsampleT(Z, 9, pool, 7, len, A);
+        sampleF7(u, pool, len, A);
         loadSample(u, samidx, 7, 6, u7);
 
 
@@ -524,7 +537,8 @@ int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2, int len, double th
             }
         }
 
-        data_out[LmaxI+2] ++;
+        if (data_out != NULL)
+            data_out[LmaxI+2] ++;
 
         if (do_lo>0 && (no_sam == ITER_SAM) && non_degen_samples_count) {
             do_iterate = 1;
@@ -788,7 +802,6 @@ int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2, int len, double th
     free(d_check);
     free(err_laf);
     free(pool);
-    free(Z);
     free(u_soa);
     free(err);
     free(errorsBest);
@@ -796,8 +809,10 @@ int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2, int len, double th
     free(buffer);
     free(bufferP);
     free(HDs);
-    *data_out = no_sam;
-    data_out[1] = iter_cnt;
+    if (data_out != NULL) {
+        *data_out = no_sam;
+        data_out[1] = iter_cnt;
+    }
 
     ////printf("__PROFILE: AFTER ransac: %d\n", getticks()/1000);
     return maxS.I;

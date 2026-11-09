@@ -12,4 +12,14 @@
 void degensac_srandom(unsigned seed);
 long degensac_random(void);
 
+#if defined(_MSC_VER)
+#  define DEGENSAC_THREAD_LOCAL __declspec(thread)
+#elif defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
+#  define DEGENSAC_THREAD_LOCAL _Thread_local
+#elif defined(__GNUC__) || defined(__clang__)
+#  define DEGENSAC_THREAD_LOCAL __thread
+#else
+#  define DEGENSAC_THREAD_LOCAL
+#endif
+
 #endif /* BSD_RANDOM_H */

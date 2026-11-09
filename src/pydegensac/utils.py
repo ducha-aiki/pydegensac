@@ -53,7 +53,7 @@ def convert_and_check(kps1):
             raise err_message
         if (num < 4):
             raise err_message 
-        out = kps1.astype(np.float64)
+        out = np.asarray(kps1, dtype=np.float64)
     elif type(kps1) is list:
         if OPENCV_HERE:
             if type(kps1[0]) is not cv2.KeyPoint:

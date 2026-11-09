@@ -202,27 +202,22 @@ void pinvJ (double a, double b, double c, double d, double e, double *pJ)
 void HDs(const double *lin, const double * u, 
          const double *H, double *p, int len)
 {
-    int i, j, shift = 2*len;
-    const double *l;
+    int i;
     double r1, r2, a, b, c, d, e;
+    (void)lin;
+    (void)len;
 
     for (i=0; i<len; i++)
     {
-        r1 = 0;
-        r2 = 0;
-        l = lin + 2*i;
-        for (j = 0; j < 9; j++)
-        {
-            r1 += H[j] * *l;
-            r2 += H[j] * l[1];
-            l += shift;
-        }
+        double x1 = u[0], y1 = u[1], x2 = u[3], y2 = u[4];
+        r1 = H[0]*x2 + H[2]*(-x1*x2) + H[3]*y2 + H[5]*(-x1*y2) + H[6] + H[8]*(-x1);
+        r2 = H[1]*x2 + H[2]*(-y1*x2) + H[4]*y2 + H[5]*(-y1*y2) + H[7] + H[8]*(-y1);
 
-        a = H[0] - H[2] * u[0];
-        b = H[3] - H[5] * u[0];
-        c = -H[8] - H[2] * u[3] - H[5] * u[4];
-        d = H[1] - H[2] * u[1];
-        e = H[4] - H[5] * u[1];
+        a = H[0] - H[2] * x1;
+        b = H[3] - H[5] * x1;
+        c = -H[8] - H[2] * x2 - H[5] * y2;
+        d = H[1] - H[2] * y1;
+        e = H[4] - H[5] * y1;
 
         *p = pinvJ_sqsum(a,b,c,d,e,r1,r2);
         p++;
@@ -404,29 +399,24 @@ void HDsSymMaxSq(const double *lin, const double * u,
 void HDsi(const double *lin, const double * u6,
           const double *H, double *p, int len, int *pts, int ni)
 {
-    int i, j, shift = 2*len;
-    const double *l;
+    int i;
     double r1, r2, a, b, c, d, e;
     const double *u;
+    (void)lin;
+    (void)len;
 
     for (i=0; i<ni; i++)
     {
         u = u6 + 6*pts[i];
-        r1 = 0;
-        r2 = 0;
-        l = lin + 2*pts[i];
-        for (j = 0; j < 9; j++)
-        {
-            r1 += H[j] * *l;
-            r2 += H[j] * l[1];
-            l += shift;
-        }
+        double x1 = u[0], y1 = u[1], x2 = u[3], y2 = u[4];
+        r1 = H[0]*x2 + H[2]*(-x1*x2) + H[3]*y2 + H[5]*(-x1*y2) + H[6] + H[8]*(-x1);
+        r2 = H[1]*x2 + H[2]*(-y1*x2) + H[4]*y2 + H[5]*(-y1*y2) + H[7] + H[8]*(-y1);
 
-        a = H[0] - H[2] * u[0];
-        b = H[3] - H[5] * u[0];
-        c = -H[8] - H[2] * u[3] - H[5] * u[4];
-        d = H[1] - H[2] * u[1];
-        e = H[4] - H[5] * u[1];
+        a = H[0] - H[2] * x1;
+        b = H[3] - H[5] * x1;
+        c = -H[8] - H[2] * x2 - H[5] * y2;
+        d = H[1] - H[2] * y1;
+        e = H[4] - H[5] * y1;
 
         *p = pinvJ_sqsum(a,b,c,d,e,r1,r2);
         p++;
@@ -630,31 +620,25 @@ void HDsiSymMax(const double *lin, const double * u6,
 void HDsidx(const double *lin, const double * mu, const double *H,
             double *p, int len, int *idx, int siz)
 {
-    int mi, i, j, shift = 2*len;
-    const double *l;
+    int mi, i;
     const double *u;
     double r1, r2, a, b, c, d, e;
+    (void)lin;
+    (void)len;
 
     for (mi=0; mi<siz; mi++)
     {
         i = idx[mi];
-        r1 = 0;
-        r2 = 0;
-        l = lin + 2*i;
         u = mu + 6*i;
+        double x1 = u[0], y1 = u[1], x2 = u[3], y2 = u[4];
+        r1 = H[0]*x2 + H[2]*(-x1*x2) + H[3]*y2 + H[5]*(-x1*y2) + H[6] + H[8]*(-x1);
+        r2 = H[1]*x2 + H[2]*(-y1*x2) + H[4]*y2 + H[5]*(-y1*y2) + H[7] + H[8]*(-y1);
 
-        for (j = 0; j < 9; j++)
-        {
-            r1 += H[j] * *l;
-            r2 += H[j] * l[1];
-            l += shift;
-        }
-
-        a = H[0] - H[2] * u[0];
-        b = H[3] - H[5] * u[0];
-        c = -H[8] - H[2] * u[3] - H[5] * u[4];
-        d = H[1] - H[2] * u[1];
-        e = H[4] - H[5] * u[1];
+        a = H[0] - H[2] * x1;
+        b = H[3] - H[5] * x1;
+        c = -H[8] - H[2] * x2 - H[5] * y2;
+        d = H[1] - H[2] * y1;
+        e = H[4] - H[5] * y1;
 
         p[i] = pinvJ_sqsum(a,b,c,d,e,r1,r2);
     }

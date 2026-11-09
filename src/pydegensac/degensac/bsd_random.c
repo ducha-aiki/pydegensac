@@ -9,17 +9,17 @@
 #define RAND_SEP 3
 #define WARMUP  (10 * RAND_DEG)
 
-static uint32_t rand_tbl[RAND_DEG];
-static int fptr_idx = RAND_SEP;
-static int rptr_idx = 0;
+static DEGENSAC_THREAD_LOCAL uint32_t rand_tbl[RAND_DEG];
+static DEGENSAC_THREAD_LOCAL int fptr_idx = RAND_SEP;
+static DEGENSAC_THREAD_LOCAL int rptr_idx = 0;
 
 /* libc srandom() warms the table with 310 discarded draws.  The update is
    linear mod 2^32, so the warmed table equals a fixed 31x31 coefficient
    matrix times the seeded words -- 961 independent multiply-adds the
    compiler can vectorize, instead of a 310-step serial dependency chain. */
-static uint32_t warm_mat[RAND_DEG][RAND_DEG];
-static uint32_t pow16807[RAND_DEG];  /* 16807^i mod 2^31-1 */
-static int tables_ready = 0;
+static DEGENSAC_THREAD_LOCAL uint32_t warm_mat[RAND_DEG][RAND_DEG];
+static DEGENSAC_THREAD_LOCAL uint32_t pow16807[RAND_DEG];  /* 16807^i mod 2^31-1 */
+static DEGENSAC_THREAD_LOCAL int tables_ready = 0;
 
 static void init_tables(void)
 {

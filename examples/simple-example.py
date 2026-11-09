@@ -40,7 +40,10 @@ if __name__ == '__main__':
     img1 = cv2.cvtColor(cv2.imread('img/v_dogman/1.ppm'), cv2.COLOR_BGR2RGB)
     img2 = cv2.cvtColor(cv2.imread('img/v_dogman/6.ppm'), cv2.COLOR_BGR2RGB)
     # SIFT is not available by pip install, so lets use AKAZE features
-    det = cv2.AKAZE_create(descriptor_type = 3, threshold=0.00001)
+    try:
+        det = cv2.AKAZE_create(descriptor_type = 3, threshold=0.00001)
+    except AttributeError:
+        det = cv2.SIFT_create()
     kps1, descs1 = det.detectAndCompute(img1,None)
     kps2, descs2 = det.detectAndCompute(img2,None)
     bf = cv2.BFMatcher()

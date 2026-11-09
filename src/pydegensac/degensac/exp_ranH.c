@@ -12,7 +12,7 @@
 #include "bsd_random.h"
 
 
-static HashTable HASH_TABLE_H;
+static DEGENSAC_THREAD_LOCAL HashTable HASH_TABLE_H;
 
 
 #include "exp_ranH.h"
@@ -234,6 +234,24 @@ Score exp_inHranicustom (double *u, int len, int *inliers, int ninl,
     return maxS;
 }
 
+static inline void sampleH4(const double *u, int *pool, int len, double *M) {
+    int i;
+    for (i = 0; i < 4; i++) {
+        int q = sample(pool, len, i);
+        const double *s = u + 6 * q;
+        double x1 = s[0], y1 = s[1], x2 = s[3], y2 = s[4];
+        double *row0 = M + 18 * i;
+        double *row1 = row0 + 9;
+        row0[0] = x2;  row0[1] = 0.0; row0[2] = -x1*x2;
+        row0[3] = y2;  row0[4] = 0.0; row0[5] = -x1*y2;
+        row0[6] = 1.0; row0[7] = 0.0; row0[8] = -x1;
+
+        row1[0] = 0.0; row1[1] = x2;  row1[2] = -y1*x2;
+        row1[3] = 0.0; row1[4] = y2;  row1[5] = -y1*y2;
+        row1[6] = 0.0; row1[7] = 1.0; row1[8] = -y1;
+    }
+}
+
 
 Score exp_ransacHcustomLAF (double *u, double *u_1, double *u_2,
                             int len,
@@ -291,8 +309,7 @@ Score exp_ransacHcustomLAF (double *u, double *u_1, double *u_2,
     for (i = 0; i < len; i ++)
         pool[i] = i;
 
-    Z = (double *) malloc(len * 18 * sizeof(double));
-    lin_hg(u, Z, pool, len);
+    Z = NULL;
 
     buffer = (double *) malloc (len * 18 * sizeof(double));
 
@@ -321,7 +338,7 @@ Score exp_ransacHcustomLAF (double *u, double *u_1, double *u_2,
     while(no_sam < max_sam)
     {
         no_sam++;
-        multirsampleT(Z, 9, 2, pool, 4, len, M);
+        sampleH4(u, pool, len, M);
 
         /* orientation */
 #ifndef __OC_OFF__
@@ -701,7 +718,6 @@ Score exp_ransacHcustomLAF (double *u, double *u_1, double *u_2,
 #endif // __HASHING__
 
     free(pool);
-    free(Z);
     free(buffer);
     free(err);
     free(inliers);
@@ -709,12 +725,14 @@ Score exp_ransacHcustomLAF (double *u, double *u_1, double *u_2,
     free(lo_intbuff);
     free(d_check);
 
-    *data_out = no_sam;
-    data_out[1] = iter_cnt;
-    if (iter_type == 0) {
-        data_out[1] = 0;
+    if (data_out != NULL) {
+        *data_out = no_sam;
+        data_out[1] = iter_cnt;
+        if (iter_type == 0) {
+            data_out[1] = 0;
+        }
+        data_out[2] = no_rej;
     }
-    data_out[2] = no_rej;
     //printf("%d %d %d sampl, rej, iter_cnt\n", no_sam, no_rej, iter_cnt);
     return maxS;
 }
