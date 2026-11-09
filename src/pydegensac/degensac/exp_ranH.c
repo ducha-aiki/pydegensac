@@ -29,10 +29,8 @@ static DEGENSAC_THREAD_LOCAL HashTable HASH_TABLE_H;
 //#define FULL_SYMM
 
 static void reseed_rng(unsigned seed_value) {
-    srand(seed_value);
-#ifndef WIN32
+    degensac_srand(seed_value);
     degensac_srandom(seed_value);
-#endif
 }
 
 int HcloseToSingular(const double *h){

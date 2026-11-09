@@ -28,13 +28,11 @@ struct ConvertedInput {
     double *u2_p1 = nullptr;
     double *u2_p2 = nullptr;
     unsigned char *inl = nullptr;
-    int *data_out = nullptr;
 
     ConvertedInput() = default;
     ConvertedInput(const ConvertedInput&) = delete;
     ConvertedInput& operator=(const ConvertedInput&) = delete;
     ~ConvertedInput() {
-        free(data_out);
         delete [] u2;
         delete [] u2_p1;
         delete [] u2_p2;
@@ -284,7 +282,7 @@ py::tuple findHomography_(py::array_t<double, py::array::c_style | py::array::fo
                              H,
                              in.inl,
                              4,
-                             in.data_out,
+                             nullptr,
                              oriented_constr,
                              0,
                              NULL,
@@ -366,7 +364,7 @@ py::tuple findFundamentalMatrix_(py::array_t<double, py::array::c_style | py::ar
                              max_iters,
                              F,
                              in.inl,
-                             in.data_out,
+                             nullptr,
                              1, 0,
                              NULL,
                              EXFDS1,FDS1,FDSidx1,

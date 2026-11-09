@@ -47,10 +47,8 @@ static DEGENSAC_THREAD_LOCAL HashTable HASH_TABLE_F;
 #endif
 
 static void reseed_rng(unsigned seed_value) {
-    srand(seed_value);
-#ifndef WIN32
+    degensac_srand(seed_value);
     degensac_srandom(seed_value);
-#endif
 }
 
 int no_mto(double *A)

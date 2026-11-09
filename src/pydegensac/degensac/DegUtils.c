@@ -1,5 +1,6 @@
 //#undef __STRICT_ANSI__
 #include "DegUtils.h"
+#include "bsd_random.h"
 #include "rtools.h"
 #include "Htools.h"
 #include "Ftools.h"
@@ -184,29 +185,9 @@ void sortDs(double * Ds, double * sDs, unsigned char * idx){
 
 
 void dHDs(double * H, double * u, unsigned len, double * Ds, int * bufferP, double * bufferZ) {
-  unsigned i;
-  int * p;
-  double * Z;
-
-  if (bufferP) {
-      p = bufferP;
-    } else {
-      p = (int *)malloc(len * sizeof(int));
-    }
-  if (bufferZ) {
-      Z = bufferZ;
-    } else {
-      Z = (double *) malloc(len * 18 * sizeof(double));
-    }
-  for (i = 0; i < len; i ++) p[i] = i;
-  lin_hg(u, Z, p, len);
-  HDs(Z, u, H, Ds, len);
-  if (!bufferP) {
-      free(p);
-    }
-  if (!bufferZ) {
-      free(Z);
-    }
+  (void) bufferP;
+  (void) bufferZ;
+  HDs(NULL, u, H, Ds, (int) len);
 }
 
 /*ax = [0 -a(3) a(2); a(3) 0 -a(1); -a(2) a(1) 0]; */
@@ -344,7 +325,7 @@ unsigned rFtH(double * u, unsigned char * hinl, double th, double * H, unsigned 
     } else {
       for(no_sam = 1; no_sam < 2*max_sam; ++no_sam) {
           for (pos = 0; pos < s_size; ++pos) {
-              idx = pos + 1 + rand()%(nhinlCount-pos-1);
+              idx = pos + 1 + degensac_rand()%(nhinlCount-pos-1);
               auxI = ptr[pos];
               ptr[pos] = ptr[idx];
               ptr[idx] = auxI;
@@ -607,13 +588,13 @@ void dual_sample(double * uA, unsigned lenA, unsigned sA, double * uB, unsigned 
 
   /*Shuffle pointers - at least the first 's̈́'*/
   for (pos = 0; pos < sA; ++pos) {
-      idx = rand() % lenA;
+      idx = degensac_rand() % lenA;
       i = ptrA[pos];
       ptrA[pos] = ptrA[idx];
       ptrA[idx] = i;
     }
   for (pos = 0; pos < sB; ++pos) {
-      idx = rand() % lenB;
+      idx = degensac_rand() % lenB;
       i = ptrB[pos];
       ptrB[pos] = ptrB[idx];
       ptrB[idx] = i;
@@ -692,29 +673,27 @@ unsigned u2Fit(double * u, unsigned len, double * F, unsigned char * inl, double
 
 unsigned innerH(double * H, double * u, unsigned len, double th, unsigned iters, unsigned char * inl, int * pool, double * buffer)
 {
-  double *err, *d, *Z;
+  double *err, *d;
   double *errs[5];
   int i, j, I, *inliers;
   Score S;
 
+  (void) pool;
   err = (double *) malloc(len * 4 * sizeof(double));
   for (i=0; i<4; i++) {
       errs[i] = err + i * len;
     }
   inliers = (int *) malloc(sizeof(int) * len);
-  for (i=0; i<len; i++) pool[i] = i;
-  Z = (double *) malloc(len * 18 * sizeof(double));
-  lin_hg(u, Z, pool, len);
 
   d = errs[0];
 
-  HDs(Z, u, H, d, len);
-  S = inlidxs(d, len, th, inliers);
-  S = inHrani (u, len, inliers, S.I, th, Z, errs, buffer, H, iters);
+  HDs(NULL, u, H, d, (int) len);
+  S = inlidxs(d, (int) len, th, inliers);
+  S = inHrani (u, (int) len, inliers, S.I, th, NULL, errs, buffer, H, iters);
 
   d = errs[0];
   I = 0;
-  for (j = 0; j < len; j++) {
+  for (j = 0; j < (int) len; j++) {
       if (d[j] <= th) {
           ++I;
           inl[j] = 1;
@@ -724,7 +703,6 @@ unsigned innerH(double * H, double * u, unsigned len, double th, unsigned iters,
     }
 
   free(err);
-  free(Z);
   free(inliers);
   
   return I;
