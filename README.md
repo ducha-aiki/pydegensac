@@ -57,32 +57,34 @@ and homography on EVD (8 test pairs) and HPatchesSeq (145 test pairs), using
 reprojection mAA 1–20 px. Thresholds are retained from the previous tuning,
 which used OpenCV 4.13; they have not been retuned for OpenCV 5.0.
 
-**Linux x86-64** — Intel Core i7-14700K, WSL2, single-threaded estimator calls.
-pydegensac uses **seed 12345**, reset for every pair and iteration budget;
-OpenCV and PoseLib retain their estimator defaults. These are single-seed
-measurements: confidence intervals resample image pairs, not seeds, repeated
-runs, or timing noise.
+<table>
+<tr><th width="50%">Linux x86-64</th><th width="50%">Apple M1</th></tr>
+<tr>
+<td><img alt="F time-mAA, Linux" src="benchmarks/results/time_maa_f_linux.png"></td>
+<td><img alt="F time-mAA, Apple M1" src="benchmarks/results/time_maa_f_m1.png"></td>
+</tr>
+<tr>
+<td><img alt="H time-mAA, Linux" src="benchmarks/results/time_maa_h_linux.png"></td>
+<td><img alt="H time-mAA, Apple M1" src="benchmarks/results/time_maa_h_m1.png"></td>
+</tr>
+</table>
 
-![Fundamental matrix time versus mAA, Linux, pydegensac 0.3.1](benchmarks/results/time_maa_f_linux.png)
-![Homography time versus mAA, Linux, pydegensac 0.3.1](benchmarks/results/time_maa_h_linux.png)
+These are single-threaded estimator calls (Linux: Intel Core i7-14700K WSL2; Apple M1: MacBook Air). pydegensac uses **seed 12345**, reset for every pair and iteration budget; OpenCV and PoseLib retain their estimator defaults. These are single-seed measurements: confidence intervals resample image pairs, not seeds, repeated runs, or timing noise.
 
-**Fundamental matrix.** At each method's best budget, pydegensac reaches
-0.423 mAA at 51.2 ms/pair, compared with PoseLib PROSAC's 0.457 at 40.3 ms.
-The paired gap is -0.034 mAA (95% CI -0.055 to -0.012), so this run separates
-them on accuracy. OpenCV MAGSAC reaches 0.376 mAA at 29.9 ms; OpenCV RANSAC
-reaches 0.340 at 183.7 ms.
+**Fundamental matrix.** At each method's best budget:
+- On **Linux**, pydegensac reaches 0.423 mAA at 51.2 ms/pair, compared with PoseLib PROSAC's 0.457 at 40.3 ms (paired gap -0.034 mAA, 95% CI -0.055 to -0.012). OpenCV MAGSAC reaches 0.376 at 29.9 ms; OpenCV RANSAC reaches 0.340 at 183.7 ms.
+- On **Apple M1**, pydegensac reaches 0.425 mAA at 56.0 ms/pair, compared with PoseLib PROSAC's 0.457 at 63.1 ms (paired gap -0.033 mAA, 95% CI -0.055 to -0.010). OpenCV MAGSAC reaches 0.375 at 68.3 ms; OpenCV RANSAC reaches 0.340 at 327.7 ms.
 
-**Homography.** On HPatchesSeq, pydegensac reaches 0.9048 mAA at 2.25 ms/pair
-(6,400 iterations). OpenCV MAGSAC reaches 0.9269 at 0.88 ms, while PoseLib
-PROSAC reaches 0.9297 at 7.79 ms. The paired pydegensac gap to PoseLib PROSAC
-is -0.025 mAA (95% CI -0.042 to -0.012). EVD has only 8 test pairs and much
-wider intervals; it does not separate pydegensac from the leader in this run.
+**Homography.** On HPatchesSeq, at each method's best budget:
+- On **Linux**, pydegensac reaches 0.9048 mAA at 2.25 ms/pair (6,400 iterations). OpenCV MAGSAC reaches 0.9269 at 0.88 ms, while PoseLib PROSAC reaches 0.9297 at 7.79 ms (paired pydegensac gap -0.025 mAA, 95% CI -0.042 to -0.012).
+- On **Apple M1**, pydegensac reaches 0.9048 mAA at 2.08 ms/pair (6,400 iterations). OpenCV MAGSAC reaches 0.9269 at 1.21 ms, while PoseLib PROSAC reaches 0.9297 at 9.41 ms (paired pydegensac gap -0.025 mAA, 95% CI -0.042 to -0.012).
 
-The Apple M1 rerun for 0.3.1 and OpenCV 5.0 is pending; the older M1 measurements
-are retained in the historical reports rather than mixed into this comparison.
+On both platforms, EVD has only 8 test pairs and much wider intervals; it does not separate pydegensac from the leader in either run.
 
-Full results: [fundamental matrix](benchmarks/results/report_f_linux.md) and
-[homography](benchmarks/results/report_h_linux.md).
+Full results:
+- Linux: [fundamental matrix](benchmarks/results/report_f_linux.md) and [homography](benchmarks/results/report_h_linux.md)
+- Apple M1: [fundamental matrix](benchmarks/results/report_f_m1.md) and [homography](benchmarks/results/report_h_m1.md)
+
 See [benchmark instructions](benchmarks/README.md) for dependencies and the
 protocol, and the [earlier study](docs/reports/2026-08-11-ransac-benchmark.md)
 for historical results and threshold-transfer caveats.
