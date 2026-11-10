@@ -27,7 +27,7 @@ def convert_cv2_kpts_to_xyA(kps):
     and pyramid index to extract from for the patch extraction 
     """
     num = len(kps)
-    out = np.zeros((num,6)).astype(np.float64)
+    out = np.zeros((num,6), dtype=np.float64)
     for i, kp in enumerate(kps):
         out[i,:2] = kp.pt
         s = kp.size
@@ -47,7 +47,7 @@ def convert_and_check(kps1):
             raise ValueError("Keypoints should be list of cv2.KeyPoint \
                              or numpy.array [Nx2] or [Nx6]. N>=4  \
                              Got shape of {} with shape instead".format(str(sh)))
-        out = np.asarray(kps1, dtype=np.float64)
+        out = np.ascontiguousarray(kps1, dtype=np.float64)
     elif type(kps1) is list:
         if OPENCV_HERE:
             if type(kps1[0]) is not cv2.KeyPoint:
