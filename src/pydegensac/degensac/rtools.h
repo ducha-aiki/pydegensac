@@ -98,9 +98,21 @@ static inline double truncQuad(double epsilon, double thr) {
    that runs once per correspondence. Callers must handle thr == 0 themselves;
    1/0 is not a usable reciprocal.
    See docs/superpowers/specs/2026-08-12-covmat-inlidxs-perf-design.md. */
+#if defined(__SSE2__) || defined(_M_X64) || (defined(_M_IX86_FP) && _M_IX86_FP >= 2)
+#include <emmintrin.h>
+static inline double truncQuadInv(double epsilon, double inv) {
+  /* maxsd(g, 0) is g > 0 ? g : 0, which equals fmax(0.0, g) here: a NaN g
+     yields 0.0, and 1 - x never rounds to -0.0. GCC neither inlines fmax
+     (a libm call per correspondence) nor if-converts the ternary (an
+     unpredictable branch, slower still); maxsd is one branchless op. */
+  return _mm_cvtsd_f64(_mm_max_sd(_mm_set_sd(1 - epsilon*inv),
+                                  _mm_setzero_pd()));
+}
+#else
 static inline double truncQuadInv(double epsilon, double inv) {
   return fmax(0.0, 1 - epsilon*inv);
 }
+#endif
 
 /* Score comparator */
 int scoreLess(const Score s1, const Score s2);
