@@ -51,8 +51,9 @@ with `SEED=42 ./run_current.sh linux`, using a separate platform label if
 you want to keep multiple runs. All three thread-count variables are forced to 1.
 Outputs are `results/{f,h}_current_<platform>.jsonl`,
 `results/report_{f,h}_<platform>.md`, and
-`results/time_maa_{f,h}_<platform>.png`. Commit the reports and plots after
-the M1 run and add them to the README comparison; raw JSONL stays local.
+`results/time_maa_{f,h}_<platform>.png`. These generated reports, plots, and
+raw JSONL are temporary investigation outputs; keep them out of commits and
+pull requests. Store shared comparison artifacts outside the repository.
 Do not run other CPU-intensive work concurrently with the timing sweeps.
 
 For historical A/B experiments, `./run_ab.sh <base-ref>` remains available.
