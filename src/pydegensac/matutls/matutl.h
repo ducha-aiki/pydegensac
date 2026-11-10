@@ -11,7 +11,7 @@
 /* Utility routines for real and complex matrix computations
  */
 #ifndef CPX
-#ifdef WIN32
+#if defined(WIN32) || defined(_WIN32)
 #undef complex
 #endif
 struct complex
