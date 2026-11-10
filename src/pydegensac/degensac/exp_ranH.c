@@ -275,6 +275,7 @@ Score exp_ransacHcustomLAF (double *u, double *u_1, double *u_2,
     double *errs[5];
     int i, j, *inliers, *inliersS, *lo_intbuff;
     char do_update = 0;
+    int model_found = 0;
     Score maxS = {0,0,0,0}, maxSs = {0,0,0,0}, S = {0,0,0,0}, Scheck= {0,0,0,0};
     int do_iterate;
     int iter_cnt = 0, no_rej = 0, iterID = 0;
@@ -301,27 +302,32 @@ Score exp_ransacHcustomLAF (double *u, double *u_1, double *u_2,
     htInit(&HASH_TABLE_H);
 #endif // __HASHING__
 
-    /* allocations */
+    /* One per-call allocation; put doubles first to retain malloc alignment. */
+    const int need_check = doSymCheck || DO_LAF_CHECK;
+    const size_t double_count = (size_t)len * (22 + need_check);
+    void *workspace = malloc(double_count * sizeof(double) +
+                             (size_t)len * 4 * sizeof(int));
+    if (workspace == NULL) {
+        memset(H, 0, 9 * sizeof(double));
+        memset(inl, 0, (size_t)len * sizeof(*inl));
+        if (data_out != NULL) memset(data_out, 0, 3 * sizeof(*data_out));
+        if (resids != NULL) *resids = NULL;
+        return maxS;
+    }
+    buffer = (double *)workspace;
+    err = buffer + (size_t)len * 18;
+    d_check = need_check ? err + (size_t)len * 4 : NULL;
+    pool = (int *)(buffer + double_count);
+    inliers = pool + len;
+    inliersS = inliers + len;
+    lo_intbuff = inliersS + len;
 
-    pool = (int *)malloc(len * sizeof(int));
     for (i = 0; i < len; i ++)
         pool[i] = i;
-
     Z = NULL;
-
-    buffer = (double *) malloc (len * 18 * sizeof(double));
-
-    err = (double *) malloc(len * 4 * sizeof(double));
-    d_check = (double *) malloc(len * sizeof(double));
-
     for (i=0; i<4; i++)
         errs[i] = err + i * len;
     errs[4] = errs[3];
-
-    inliers = (int *) malloc(sizeof(int) * len);
-    inliersS = (int *) malloc(sizeof(int) * len);
-    lo_intbuff = (int *) malloc(sizeof(int) * len);
-
 
     no_sam = 0;
 
@@ -410,6 +416,7 @@ Score exp_ransacHcustomLAF (double *u, double *u_1, double *u_2,
             maxS = S;
             new_max = 1;
             memcpy(H, h, 9 * sizeof(double));
+            model_found = 1;
 
         } // end of check
 
@@ -549,6 +556,12 @@ Score exp_ransacHcustomLAF (double *u, double *u_1, double *u_2,
                 max_sam = new_sam;
             new_max = 0;
         }
+    }
+    /* No accepted hypothesis: the residual buffers have no valid best model. */
+    if (!model_found) {
+        memset(H, 0, 9 * sizeof(double));
+        memset(inl, 0, (size_t)len * sizeof(*inl));
+        goto cleanup;
     }
     /*If there were no LOs, do at least one NOW!*/
     if (iter_cnt == 0 && iter_type != 0) {
@@ -709,19 +722,14 @@ Score exp_ransacHcustomLAF (double *u, double *u_1, double *u_2,
 
     }
 
+cleanup:
     /* deallocations */
 
 #ifdef __HASHING__
     htClear(&HASH_TABLE_H);
 #endif // __HASHING__
 
-    free(pool);
-    free(buffer);
-    free(err);
-    free(inliers);
-    free(inliersS);
-    free(lo_intbuff);
-    free(d_check);
+    free(workspace);
 
     if (data_out != NULL) {
         *data_out = no_sam;
