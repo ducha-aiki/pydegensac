@@ -69,6 +69,7 @@ set(degensac_srcs
         src/pydegensac/degensac/Htools.c
         src/pydegensac/degensac/ranH.c
         src/pydegensac/degensac/rtools.c
+        src/pydegensac/degensac/simd_avx.c
         src/pydegensac/degensac/utools.c
         src/pydegensac/degensac/lapwrap.c
 )

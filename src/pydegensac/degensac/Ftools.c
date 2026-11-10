@@ -9,6 +9,7 @@
 #include "lapwrap.h"
 
 #include "Ftools.h"
+#include "simd.h"
 #define SYMMETRIC_ERROR
 #define SYMMETRIC_ERROR_CHECK
 #define pit 1.0471975511965967
@@ -117,6 +118,10 @@ void FDs_soa (const double *s, const double *F, double *p, int len)
     double rx, ry, rwc, ryc, rxc, r, a1, a2, b1, b2;
     int i;
 
+#ifdef DEGENSAC_HAVE_AVX_KERNELS
+    if (degensac_use_avx()) { FDs_soa_avx(s, F, p, len); return; }
+#endif
+
     for (i=0; i<len; i++)
     {
         a1 = x1[i]; a2 = y1[i]; b1 = x2[i]; b2 = y2[i];
@@ -135,6 +140,10 @@ void FDsSym_soa (const double *s, const double *F, double *p, int len)
     const double *x1 = s, *y1 = s + len, *x2 = s + 2*len, *y2 = s + 3*len;
     double rx, ry, rwc, ryc, rxc, r, a1, a2, b1, b2, a, b;
     int i;
+
+#ifdef DEGENSAC_HAVE_AVX_KERNELS
+    if (degensac_use_avx()) { FDsSym_soa_avx(s, F, p, len); return; }
+#endif
 
     for (i=0; i<len; i++)
     {
