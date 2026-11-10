@@ -7,6 +7,8 @@ import sys
 from time import time
 from copy import deepcopy
 run_cv2 = True
+# Fixed seed: reproducible output, and a deterministic CI smoke test. Use -1 for a time-based seed.
+SEED = 42
 #Now helper function for running homography RANSAC
 def verify_cv2(kps1, kps2, tentatives, th = 4.0 , n_iter = 2000):
     src_pts = np.float32([ kps1[m.queryIdx].pt for m in tentatives ]).reshape(-1,2)
@@ -18,7 +20,7 @@ def verify_cv2(kps1, kps2, tentatives, th = 4.0 , n_iter = 2000):
 def verify_pydegensac(kps1, kps2, tentatives, th = 4.0,  n_iter = 2000):
     src_pts = np.float32([ kps1[m.queryIdx].pt for m in tentatives ]).reshape(-1,2)
     dst_pts = np.float32([ kps2[m.trainIdx].pt for m in tentatives ]).reshape(-1,2)
-    H, mask = pydegensac.findHomography(src_pts, dst_pts, th, 0.99, n_iter)
+    H, mask = pydegensac.findHomography(src_pts, dst_pts, th, 0.99, n_iter, seed=SEED)
     print ('pydegensac found {} inliers'.format(int(deepcopy(mask).astype(np.float32).sum())))
     return H, mask
 
@@ -32,7 +34,7 @@ def verify_cv2_fundam(kps1, kps2, tentatives, th = 1.0 , n_iter = 10000):
 def verify_pydegensac_fundam(kps1, kps2, tentatives, th = 1.0,  n_iter = 10000):
     src_pts = np.float32([ kps1[m.queryIdx].pt for m in tentatives ]).reshape(-1,2)
     dst_pts = np.float32([ kps2[m.trainIdx].pt for m in tentatives ]).reshape(-1,2)
-    F, mask = pydegensac.findFundamentalMatrix(src_pts, dst_pts, th, 0.999, n_iter, enable_degeneracy_check= True)
+    F, mask = pydegensac.findFundamentalMatrix(src_pts, dst_pts, th, 0.999, n_iter, enable_degeneracy_check= True, seed=SEED)
     print ('pydegensac found {} inliers'.format(int(deepcopy(mask).astype(np.float32).sum())))
     return F, mask
 
@@ -53,7 +55,10 @@ if __name__ == '__main__':
     tentatives = [m[0] for i, m in enumerate(matches) if matchesMask[i] ]
 
     th = 4.0
-    n_iter = 2000
+    # About 12% of the tentatives are inliers, so 2000 iterations left ~5% of
+    # unseeded runs stuck on a wrong model; this example doubles as the wheel
+    # smoke test, so give it a sufficient budget.
+    n_iter = 20000
     t=time()
     print (f"Num tentatives: {len(tentatives)}")
     print ("Running homography estimation")
