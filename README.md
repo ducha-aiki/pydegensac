@@ -129,22 +129,23 @@ python -utt simple-example.py
 You should see the following output:
 
 ```
+Num tentatives: 625
 Running homography estimation
-cv2 found 40 inliers
-OpenCV runtime 0.02355  sec
-pydegensac found 78 inliers
-pydegensac runtime 0.00320  sec
-H =  [[ 5.59934334e-03 -2.36037104e-03 -2.78369679e+01]
- [ 4.86321171e-02 -1.24542142e-01 -1.00600649e+01]
- [ 1.95536148e-04  9.43300063e-06 -1.76685691e-01]]
+cv2 found 39 inliers
+OpenCV runtime 0.01810  sec
+pydegensac found 74 inliers
+pydegensac runtime 0.00251  sec
+H =  [[ 3.11780982e-01  5.25464685e-02 -1.03843008e+03]
+ [ 1.74306833e+00 -4.19829687e+00 -3.96516667e+02]
+ [ 6.90073255e-03  2.20936659e-04 -6.11602534e+00]]
 Running fundamental matrix estimation
 cv2 found 32 inliers
-OpenCV runtime 0.67554  sec
-pydegensac found 44 inliers
-pydegensac 0.04702  sec
-F =  [[-7.35044984e-04 -2.72572333e-03  1.38155992e+00]
- [ 1.43946998e-03  2.33120834e-05 -7.88961637e-01]
- [-3.35556093e-01  1.00000000e+00 -1.78675406e+02]]
+OpenCV runtime 0.51542  sec
+pydegensac found 77 inliers
+pydegensac 0.05508  sec
+F =  [[ 6.48569395e-06  5.83116242e-05 -2.14328944e-02]
+ [-2.87155326e-05 -1.89643410e-07  1.49425716e-02]
+ [ 6.96294565e-03 -2.02712455e-02  2.67319526e+00]]
 ```
 
 # Building hints from Tomasz Malisiewicz
