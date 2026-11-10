@@ -146,3 +146,88 @@ def test_public_api_seed_makes_results_deterministic():
     )
     np.testing.assert_array_equal(inliers1, inliers2)
     np.testing.assert_allclose(f1, f2)
+
+
+def test_concurrent_threads_deterministic_with_degeneracy_check():
+    from concurrent.futures import ThreadPoolExecutor
+
+    pts1_f, pts2_f = _make_fundamental_points()
+
+    # Fundamental matrix with degeneracy check enabled
+    f_serial, m_serial = pydegensac.findFundamentalMatrix(
+        pts1_f, pts2_f, px_th=1e-4, enable_degeneracy_check=True, max_iters=1000, seed=42
+    )
+
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        threaded_f = list(
+            ex.map(
+                lambda _: pydegensac.findFundamentalMatrix(
+                    pts1_f, pts2_f, px_th=1e-4, enable_degeneracy_check=True, max_iters=1000, seed=42
+                ),
+                range(20),
+            )
+        )
+
+    for f_par, m_par in threaded_f:
+        np.testing.assert_array_equal(m_serial, m_par)
+        np.testing.assert_allclose(f_serial, f_par)
+
+    # Homography matrix under concurrent threads
+    pts1_h, pts2_h, _ = _make_homography_points()
+    h_serial, m_h_serial = pydegensac.findHomography(
+        pts1_h, pts2_h, px_th=1e-5, max_iters=1000, seed=42
+    )
+
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        threaded_h = list(
+            ex.map(
+                lambda _: pydegensac.findHomography(
+                    pts1_h, pts2_h, px_th=1e-5, max_iters=1000, seed=42
+                ),
+                range(20),
+            )
+        )
+
+    for h_par, m_par in threaded_h:
+        np.testing.assert_array_equal(m_h_serial, m_par)
+        np.testing.assert_allclose(h_serial, h_par)
+
+
+def test_homography_laf_consistency():
+    rng = np.random.RandomState(42)
+    pts1 = rng.uniform(50, 500, size=(40, 2))
+    theta = 0.05
+    r_mat = np.array([[np.cos(theta), -np.sin(theta)], [np.sin(theta), np.cos(theta)]])
+    t_vec = np.array([20.0, 30.0])
+
+    pts2 = (pts1 @ r_mat.T) + t_vec
+
+    laf1 = np.zeros((len(pts1), 6), dtype=np.float64)
+    laf1[:, :2] = pts1
+    laf1[:, 2] = 1.0
+    laf1[:, 5] = 1.0
+
+    laf2 = np.zeros((len(pts2), 6), dtype=np.float64)
+    laf2[:, :2] = pts2
+    laf2[:, 2] = r_mat[0, 0]
+    laf2[:, 3] = r_mat[0, 1]
+    laf2[:, 4] = r_mat[1, 0]
+    laf2[:, 5] = r_mat[1, 1]
+
+    # Invert affine orientation for the last 10 points
+    laf2[30:, 2:6] = -laf2[30:, 2:6]
+
+    # Without LAF check, all 40 points have consistent positions
+    _, mask_no_laf = pydegensac.findHomography(
+        laf1, laf2, px_th=1.0, laf_consistensy_coef=-1.0, seed=42
+    )
+    assert np.count_nonzero(mask_no_laf) == 40
+
+    # With LAF consistency check, the 10 affine-inconsistent points are rejected
+    h_laf, mask_laf = pydegensac.findHomography(
+        laf1, laf2, px_th=1.0, laf_consistensy_coef=1.0, seed=42
+    )
+    assert np.count_nonzero(mask_laf[:30]) == 30
+    assert np.count_nonzero(mask_laf[30:]) == 0
+    assert h_laf.shape == (3, 3)
+    assert np.isfinite(h_laf).all()

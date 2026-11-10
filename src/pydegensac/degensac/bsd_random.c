@@ -2,57 +2,92 @@
 
 #include <stdint.h>
 
+#if defined(_WIN32) || defined(WIN32)
+/* The Windows CRT uses one stream for both sampling and degeneracy checks.
+   Keep its 32-bit wraparound and 15-bit output, but own the state per thread. */
+static DEGENSAC_THREAD_LOCAL uint32_t win_rand_state = 1;
+
+void degensac_srand(unsigned seed)
+{
+    win_rand_state = seed;
+}
+
+int degensac_rand(void)
+{
+    win_rand_state = win_rand_state * 214013u + 2531011u;
+    return (int) ((win_rand_state >> 16) & 0x7fffu);
+}
+
+void degensac_srandom(unsigned seed)
+{
+    degensac_srand(seed);
+}
+
+long degensac_random(void)
+{
+    return (long) degensac_rand();
+}
+#else
+
 /* TYPE_3 additive-feedback generator: x[i] = (x[i-3] + x[i-31]) mod 2^32,
-   output is the top 31 bits.  Matches FreeBSD/macOS libc random(). */
+   output is the top 31 bits. Matches FreeBSD/macOS libc random(). */
 
 #define RAND_DEG 31
 #define RAND_SEP 3
-#define WARMUP  (10 * RAND_DEG)
 
-static uint32_t rand_tbl[RAND_DEG];
-static int fptr_idx = RAND_SEP;
-static int rptr_idx = 0;
+static DEGENSAC_THREAD_LOCAL uint32_t rand_tbl[RAND_DEG];
+static DEGENSAC_THREAD_LOCAL int fptr_idx = RAND_SEP;
+static DEGENSAC_THREAD_LOCAL int rptr_idx = 0;
 
-/* libc srandom() warms the table with 310 discarded draws.  The update is
+/* libc srandom() warms the table with 310 discarded draws. The update is
    linear mod 2^32, so the warmed table equals a fixed 31x31 coefficient
-   matrix times the seeded words -- 961 independent multiply-adds the
-   compiler can vectorize, instead of a 310-step serial dependency chain. */
-static uint32_t warm_mat[RAND_DEG][RAND_DEG];
-static uint32_t pow16807[RAND_DEG];  /* 16807^i mod 2^31-1 */
-static int tables_ready = 0;
+   matrix times the seeded words. Precomputed as compile-time constants to avoid
+   runtime initialization, dynamic arrays, and multi-thread data races. */
+static const uint32_t warm_mat[RAND_DEG][RAND_DEG] = {
+    {10972605u, 9480264u, 5702239u, 8983148u, 8231567u, 4728106u, 7320276u, 7130133u, 3954500u, 5937551u, 6158615u, 3337591u, 4793992u, 5302529u, 2842455u, 3853579u, 4549498u, 2441533u, 3084788u, 3888717u, 2113300u, 2460156u, 3310584u, 1841124u, 1955875u, 2806452u, 1612296u, 1551414u, 13341071u, 10897477u, 6931407u},
+    {6931407u, 10972605u, 9480264u, 5702239u, 8983148u, 8231567u, 4728106u, 7320276u, 7130133u, 3954500u, 5937551u, 6158615u, 3337591u, 4793992u, 5302529u, 2842455u, 3853579u, 4549498u, 2441533u, 3084788u, 3888717u, 2113300u, 2460156u, 3310584u, 1841124u, 1955875u, 2806452u, 1612296u, 8482821u, 13341071u, 10897477u},
+    {10897477u, 6931407u, 10972605u, 9480264u, 5702239u, 8983148u, 8231567u, 4728106u, 7320276u, 7130133u, 3954500u, 5937551u, 6158615u, 3337591u, 4793992u, 5302529u, 2842455u, 3853579u, 4549498u, 2441533u, 3084788u, 3888717u, 2113300u, 2460156u, 3310584u, 1841124u, 1955875u, 2806452u, 12509773u, 8482821u, 13341071u},
+    {2368466u, 1417213u, 1229168u, 1989457u, 1248697u, 974133u, 1662872u, 1101434u, 773606u, 1382725u, 971518u, 616909u, 1143559u, 856086u, 495136u, 940413u, 753031u, 400922u, 768791u, 660781u, 328233u, 624632u, 578133u, 272176u, 504281u, 504132u, 228828u, 404461u, 2806452u, 1612296u, 1551414u},
+    {1551414u, 2368466u, 1417213u, 1229168u, 1989457u, 1248697u, 974133u, 1662872u, 1101434u, 773606u, 1382725u, 971518u, 616909u, 1143559u, 856086u, 495136u, 940413u, 753031u, 400922u, 768791u, 660781u, 328233u, 624632u, 578133u, 272176u, 504281u, 504132u, 228828u, 1955875u, 2806452u, 1612296u},
+    {1612296u, 1551414u, 2368466u, 1417213u, 1229168u, 1989457u, 1248697u, 974133u, 1662872u, 1101434u, 773606u, 1382725u, 971518u, 616909u, 1143559u, 856086u, 495136u, 940413u, 753031u, 400922u, 768791u, 660781u, 328233u, 624632u, 578133u, 272176u, 504281u, 504132u, 1841124u, 1955875u, 2806452u},
+    {2806452u, 1612296u, 1551414u, 2368466u, 1417213u, 1229168u, 1989457u, 1248697u, 974133u, 1662872u, 1101434u, 773606u, 1382725u, 971518u, 616909u, 1143559u, 856086u, 495136u, 940413u, 753031u, 400922u, 768791u, 660781u, 328233u, 624632u, 578133u, 272176u, 504281u, 3310584u, 1841124u, 1955875u},
+    {1955875u, 2806452u, 1612296u, 1551414u, 2368466u, 1417213u, 1229168u, 1989457u, 1248697u, 974133u, 1662872u, 1101434u, 773606u, 1382725u, 971518u, 616909u, 1143559u, 856086u, 495136u, 940413u, 753031u, 400922u, 768791u, 660781u, 328233u, 624632u, 578133u, 272176u, 2460156u, 3310584u, 1841124u},
+    {1841124u, 1955875u, 2806452u, 1612296u, 1551414u, 2368466u, 1417213u, 1229168u, 1989457u, 1248697u, 974133u, 1662872u, 1101434u, 773606u, 1382725u, 971518u, 616909u, 1143559u, 856086u, 495136u, 940413u, 753031u, 400922u, 768791u, 660781u, 328233u, 624632u, 578133u, 2113300u, 2460156u, 3310584u},
+    {3310584u, 1841124u, 1955875u, 2806452u, 1612296u, 1551414u, 2368466u, 1417213u, 1229168u, 1989457u, 1248697u, 974133u, 1662872u, 1101434u, 773606u, 1382725u, 971518u, 616909u, 1143559u, 856086u, 495136u, 940413u, 753031u, 400922u, 768791u, 660781u, 328233u, 624632u, 3888717u, 2113300u, 2460156u},
+    {2460156u, 3310584u, 1841124u, 1955875u, 2806452u, 1612296u, 1551414u, 2368466u, 1417213u, 1229168u, 1989457u, 1248697u, 974133u, 1662872u, 1101434u, 773606u, 1382725u, 971518u, 616909u, 1143559u, 856086u, 495136u, 940413u, 753031u, 400922u, 768791u, 660781u, 328233u, 3084788u, 3888717u, 2113300u},
+    {2113300u, 2460156u, 3310584u, 1841124u, 1955875u, 2806452u, 1612296u, 1551414u, 2368466u, 1417213u, 1229168u, 1989457u, 1248697u, 974133u, 1662872u, 1101434u, 773606u, 1382725u, 971518u, 616909u, 1143559u, 856086u, 495136u, 940413u, 753031u, 400922u, 768791u, 660781u, 2441533u, 3084788u, 3888717u},
+    {3888717u, 2113300u, 2460156u, 3310584u, 1841124u, 1955875u, 2806452u, 1612296u, 1551414u, 2368466u, 1417213u, 1229168u, 1989457u, 1248697u, 974133u, 1662872u, 1101434u, 773606u, 1382725u, 971518u, 616909u, 1143559u, 856086u, 495136u, 940413u, 753031u, 400922u, 768791u, 4549498u, 2441533u, 3084788u},
+    {3084788u, 3888717u, 2113300u, 2460156u, 3310584u, 1841124u, 1955875u, 2806452u, 1612296u, 1551414u, 2368466u, 1417213u, 1229168u, 1989457u, 1248697u, 974133u, 1662872u, 1101434u, 773606u, 1382725u, 971518u, 616909u, 1143559u, 856086u, 495136u, 940413u, 753031u, 400922u, 3853579u, 4549498u, 2441533u},
+    {2441533u, 3084788u, 3888717u, 2113300u, 2460156u, 3310584u, 1841124u, 1955875u, 2806452u, 1612296u, 1551414u, 2368466u, 1417213u, 1229168u, 1989457u, 1248697u, 974133u, 1662872u, 1101434u, 773606u, 1382725u, 971518u, 616909u, 1143559u, 856086u, 495136u, 940413u, 753031u, 2842455u, 3853579u, 4549498u},
+    {4549498u, 2441533u, 3084788u, 3888717u, 2113300u, 2460156u, 3310584u, 1841124u, 1955875u, 2806452u, 1612296u, 1551414u, 2368466u, 1417213u, 1229168u, 1989457u, 1248697u, 974133u, 1662872u, 1101434u, 773606u, 1382725u, 971518u, 616909u, 1143559u, 856086u, 495136u, 940413u, 5302529u, 2842455u, 3853579u},
+    {3853579u, 4549498u, 2441533u, 3084788u, 3888717u, 2113300u, 2460156u, 3310584u, 1841124u, 1955875u, 2806452u, 1612296u, 1551414u, 2368466u, 1417213u, 1229168u, 1989457u, 1248697u, 974133u, 1662872u, 1101434u, 773606u, 1382725u, 971518u, 616909u, 1143559u, 856086u, 495136u, 4793992u, 5302529u, 2842455u},
+    {2842455u, 3853579u, 4549498u, 2441533u, 3084788u, 3888717u, 2113300u, 2460156u, 3310584u, 1841124u, 1955875u, 2806452u, 1612296u, 1551414u, 2368466u, 1417213u, 1229168u, 1989457u, 1248697u, 974133u, 1662872u, 1101434u, 773606u, 1382725u, 971518u, 616909u, 1143559u, 856086u, 3337591u, 4793992u, 5302529u},
+    {5302529u, 2842455u, 3853579u, 4549498u, 2441533u, 3084788u, 3888717u, 2113300u, 2460156u, 3310584u, 1841124u, 1955875u, 2806452u, 1612296u, 1551414u, 2368466u, 1417213u, 1229168u, 1989457u, 1248697u, 974133u, 1662872u, 1101434u, 773606u, 1382725u, 971518u, 616909u, 1143559u, 6158615u, 3337591u, 4793992u},
+    {4793992u, 5302529u, 2842455u, 3853579u, 4549498u, 2441533u, 3084788u, 3888717u, 2113300u, 2460156u, 3310584u, 1841124u, 1955875u, 2806452u, 1612296u, 1551414u, 2368466u, 1417213u, 1229168u, 1989457u, 1248697u, 974133u, 1662872u, 1101434u, 773606u, 1382725u, 971518u, 616909u, 5937551u, 6158615u, 3337591u},
+    {3337591u, 4793992u, 5302529u, 2842455u, 3853579u, 4549498u, 2441533u, 3084788u, 3888717u, 2113300u, 2460156u, 3310584u, 1841124u, 1955875u, 2806452u, 1612296u, 1551414u, 2368466u, 1417213u, 1229168u, 1989457u, 1248697u, 974133u, 1662872u, 1101434u, 773606u, 1382725u, 971518u, 3954500u, 5937551u, 6158615u},
+    {6158615u, 3337591u, 4793992u, 5302529u, 2842455u, 3853579u, 4549498u, 2441533u, 3084788u, 3888717u, 2113300u, 2460156u, 3310584u, 1841124u, 1955875u, 2806452u, 1612296u, 1551414u, 2368466u, 1417213u, 1229168u, 1989457u, 1248697u, 974133u, 1662872u, 1101434u, 773606u, 1382725u, 7130133u, 3954500u, 5937551u},
+    {5937551u, 6158615u, 3337591u, 4793992u, 5302529u, 2842455u, 3853579u, 4549498u, 2441533u, 3084788u, 3888717u, 2113300u, 2460156u, 3310584u, 1841124u, 1955875u, 2806452u, 1612296u, 1551414u, 2368466u, 1417213u, 1229168u, 1989457u, 1248697u, 974133u, 1662872u, 1101434u, 773606u, 7320276u, 7130133u, 3954500u},
+    {3954500u, 5937551u, 6158615u, 3337591u, 4793992u, 5302529u, 2842455u, 3853579u, 4549498u, 2441533u, 3084788u, 3888717u, 2113300u, 2460156u, 3310584u, 1841124u, 1955875u, 2806452u, 1612296u, 1551414u, 2368466u, 1417213u, 1229168u, 1989457u, 1248697u, 974133u, 1662872u, 1101434u, 4728106u, 7320276u, 7130133u},
+    {7130133u, 3954500u, 5937551u, 6158615u, 3337591u, 4793992u, 5302529u, 2842455u, 3853579u, 4549498u, 2441533u, 3084788u, 3888717u, 2113300u, 2460156u, 3310584u, 1841124u, 1955875u, 2806452u, 1612296u, 1551414u, 2368466u, 1417213u, 1229168u, 1989457u, 1248697u, 974133u, 1662872u, 8231567u, 4728106u, 7320276u},
+    {7320276u, 7130133u, 3954500u, 5937551u, 6158615u, 3337591u, 4793992u, 5302529u, 2842455u, 3853579u, 4549498u, 2441533u, 3084788u, 3888717u, 2113300u, 2460156u, 3310584u, 1841124u, 1955875u, 2806452u, 1612296u, 1551414u, 2368466u, 1417213u, 1229168u, 1989457u, 1248697u, 974133u, 8983148u, 8231567u, 4728106u},
+    {4728106u, 7320276u, 7130133u, 3954500u, 5937551u, 6158615u, 3337591u, 4793992u, 5302529u, 2842455u, 3853579u, 4549498u, 2441533u, 3084788u, 3888717u, 2113300u, 2460156u, 3310584u, 1841124u, 1955875u, 2806452u, 1612296u, 1551414u, 2368466u, 1417213u, 1229168u, 1989457u, 1248697u, 5702239u, 8983148u, 8231567u},
+    {8231567u, 4728106u, 7320276u, 7130133u, 3954500u, 5937551u, 6158615u, 3337591u, 4793992u, 5302529u, 2842455u, 3853579u, 4549498u, 2441533u, 3084788u, 3888717u, 2113300u, 2460156u, 3310584u, 1841124u, 1955875u, 2806452u, 1612296u, 1551414u, 2368466u, 1417213u, 1229168u, 1989457u, 9480264u, 5702239u, 8983148u},
+    {8983148u, 8231567u, 4728106u, 7320276u, 7130133u, 3954500u, 5937551u, 6158615u, 3337591u, 4793992u, 5302529u, 2842455u, 3853579u, 4549498u, 2441533u, 3084788u, 3888717u, 2113300u, 2460156u, 3310584u, 1841124u, 1955875u, 2806452u, 1612296u, 1551414u, 2368466u, 1417213u, 1229168u, 10972605u, 9480264u, 5702239u},
+    {5702239u, 8983148u, 8231567u, 4728106u, 7320276u, 7130133u, 3954500u, 5937551u, 6158615u, 3337591u, 4793992u, 5302529u, 2842455u, 3853579u, 4549498u, 2441533u, 3084788u, 3888717u, 2113300u, 2460156u, 3310584u, 1841124u, 1955875u, 2806452u, 1612296u, 1551414u, 2368466u, 1417213u, 6931407u, 10972605u, 9480264u},
+    {9480264u, 5702239u, 8983148u, 8231567u, 4728106u, 7320276u, 7130133u, 3954500u, 5937551u, 6158615u, 3337591u, 4793992u, 5302529u, 2842455u, 3853579u, 4549498u, 2441533u, 3084788u, 3888717u, 2113300u, 2460156u, 3310584u, 1841124u, 1955875u, 2806452u, 1612296u, 1551414u, 2368466u, 10897477u, 6931407u, 10972605u},
+};
 
-static void init_tables(void)
-{
-    static uint32_t v[RAND_DEG + WARMUP][RAND_DEG];
-    uint64_t p;
-    int n, k;
-
-    for (k = 0; k < RAND_DEG; k++)
-        v[k][k] = 1;
-    for (n = RAND_DEG; n < RAND_DEG + WARMUP; n++)
-        for (k = 0; k < RAND_DEG; k++)
-            v[n][k] = v[n - RAND_SEP][k] + v[n - RAND_DEG][k];
-    /* table slot (RAND_SEP+n)%RAND_DEG receives its last write at warm-up
-       step n, for n in the final RAND_DEG steps */
-    for (n = WARMUP - RAND_DEG; n < WARMUP; n++)
-        for (k = 0; k < RAND_DEG; k++)
-            warm_mat[(RAND_SEP + n) % RAND_DEG][k] = v[RAND_DEG + n][k];
-
-    p = 1;
-    for (n = 0; n < RAND_DEG; n++) {
-        pow16807[n] = (uint32_t) p;
-        p = (p * 16807) % 2147483647u;
-    }
-    tables_ready = 1;
-}
+static const uint32_t pow16807[RAND_DEG] = {
+    1u, 16807u, 282475249u, 1622650073u, 984943658u, 1144108930u, 470211272u, 101027544u, 1457850878u, 1458777923u, 2007237709u, 823564440u, 1115438165u, 1784484492u, 74243042u, 114807987u, 1137522503u, 1441282327u, 16531729u, 823378840u, 143542612u, 896544303u, 1474833169u, 1264817709u, 1998097157u, 1817129560u, 1131570933u, 197493099u, 1404280278u, 893351816u, 1505795335u
+};
 
 /* Park-Miller step via Schrage's trick; FreeBSD substitutes 123459876 for a
    zero input so the LCG cannot stick at zero. */
-static int32_t good_rand(int32_t x)
+static int32_t good_rand(int32_t x, int bsd_seed)
 {
     int32_t hi, lo;
 
-    if (x == 0)
+    if (bsd_seed && x == 0)
         x = 123459876;
     hi = x / 127773;
     lo = x % 127773;
@@ -60,6 +95,46 @@ static int32_t good_rand(int32_t x)
     if (x < 0)
         x += 0x7fffffff;
     return x;
+}
+
+static void init_table_state(uint32_t tbl[RAND_DEG], int *fptr, int *rptr, unsigned seed, int bsd_seed)
+{
+    uint32_t init[RAND_DEG], x[RAND_DEG];
+    int i, j, k;
+
+    if (!bsd_seed && seed == 0)
+        seed = 1;
+
+    if ((int32_t) seed > 0 && seed < 2147483647u) {
+        /* seeding LCG is Park-Miller, so init[i] = 16807^i * seed mod
+           2^31-1: independent per word (vectorizable) instead of a 30-step
+           serial chain; reduction by Mersenne-prime folding */
+        for (i = 0; i < RAND_DEG; i++) {
+            uint64_t m = (uint64_t) seed * pow16807[i];
+            uint64_t v = (m & 0x7fffffff) + (m >> 31);
+            v = (v & 0x7fffffff) + (v >> 31);
+            if (v == 2147483647u)  /* wrap; v stays nonzero for seed > 0 */
+                v = 0;
+            init[i] = (uint32_t) v;
+        }
+    } else {
+        /* Boundary seeds use the signed recurrence. Only BSD replaces a
+           zero intermediate value; glibc leaves it at zero. */
+        init[0] = (uint32_t) seed;
+        for (i = 1; i < RAND_DEG; i++)
+            init[i] = (uint32_t) good_rand((int32_t) init[i - 1], bsd_seed);
+    }
+    /* the warm-up recurrence visits the seeded slots rotated by RAND_SEP */
+    for (k = 0; k < RAND_DEG; k++)
+        x[k] = init[(k + RAND_SEP) % RAND_DEG];
+    for (j = 0; j < RAND_DEG; j++) {
+        uint32_t acc = 0;
+        for (k = 0; k < RAND_DEG; k++)
+            acc += warm_mat[j][k] * x[k];
+        tbl[j] = acc;
+    }
+    *fptr = RAND_SEP;
+    *rptr = 0;
 }
 
 long degensac_random(void)
@@ -77,40 +152,60 @@ long degensac_random(void)
 
 void degensac_srandom(unsigned seed)
 {
-    uint32_t init[RAND_DEG], x[RAND_DEG];
-    int i, j, k;
-
-    if (!tables_ready)
-        init_tables();
-
-    if ((int32_t) seed > 0 && seed < 2147483647u) {
-        /* seeding LCG is Park-Miller, so init[i] = 16807^i * seed mod
-           2^31-1: independent per word (vectorizable) instead of a 30-step
-           serial chain; reduction by Mersenne-prime folding */
-        for (i = 0; i < RAND_DEG; i++) {
-            uint64_t m = (uint64_t) seed * pow16807[i];
-            uint64_t v = (m & 0x7fffffff) + (m >> 31);
-            v = (v & 0x7fffffff) + (v >> 31);
-            if (v == 2147483647u)  /* wrap; v stays nonzero for seed > 0 */
-                v = 0;
-            init[i] = (uint32_t) v;
-        }
-    } else {
-        /* seed 0 or with the top bit set: libc runs the LCG on the raw
-           int32 (with the good_rand zero substitution) -- follow it */
-        init[0] = (uint32_t) seed;
-        for (i = 1; i < RAND_DEG; i++)
-            init[i] = (uint32_t) good_rand((int32_t) init[i - 1]);
-    }
-    /* the warm-up recurrence visits the seeded slots rotated by RAND_SEP */
-    for (k = 0; k < RAND_DEG; k++)
-        x[k] = init[(k + RAND_SEP) % RAND_DEG];
-    for (j = 0; j < RAND_DEG; j++) {
-        uint32_t acc = 0;
-        for (k = 0; k < RAND_DEG; k++)
-            acc += warm_mat[j][k] * x[k];
-        rand_tbl[j] = acc;
-    }
-    fptr_idx = RAND_SEP;
-    rptr_idx = 0;
+    init_table_state(rand_tbl, &fptr_idx, &rptr_idx, seed, 1);
 }
+
+#if defined(__APPLE__)
+/* Darwin libc rand() is a Park-Miller LCG (see Apple Libc/gen/rand.c).
+   Using a thread-local state produces identical sequences to Darwin rand()
+   while ensuring complete thread safety. */
+static DEGENSAC_THREAD_LOCAL unsigned long deg_rand_next = 1;
+
+void degensac_srand(unsigned seed)
+{
+    deg_rand_next = seed;
+}
+
+int degensac_rand(void)
+{
+    long hi, lo, x;
+
+    if (deg_rand_next == 0)
+        deg_rand_next = 123459876;
+    hi = (long) (deg_rand_next / 127773);
+    lo = (long) (deg_rand_next % 127773);
+    x = 16807 * lo - 2836 * hi;
+    if (x < 0)
+        x += 0x7fffffff;
+    deg_rand_next = (unsigned long) x;
+    return (int) (x & 0x7fffffff);
+}
+#else
+/* On Linux glibc, rand() is identical to the TYPE_3 random() generator.
+   We maintain a separate thread-local TYPE_3 instance for degeneracy checks
+   so that Linux results remain bit-identical to serial execution without
+   interleaving across threads. */
+static DEGENSAC_THREAD_LOCAL uint32_t deg_rand_tbl[RAND_DEG];
+static DEGENSAC_THREAD_LOCAL int deg_fptr_idx = RAND_SEP;
+static DEGENSAC_THREAD_LOCAL int deg_rptr_idx = 0;
+
+void degensac_srand(unsigned seed)
+{
+    init_table_state(deg_rand_tbl, &deg_fptr_idx, &deg_rptr_idx, seed, 0);
+}
+
+int degensac_rand(void)
+{
+    uint32_t val;
+
+    deg_rand_tbl[deg_fptr_idx] += deg_rand_tbl[deg_rptr_idx];
+    val = deg_rand_tbl[deg_fptr_idx] >> 1;
+    if (++deg_fptr_idx >= RAND_DEG)
+        deg_fptr_idx = 0;
+    if (++deg_rptr_idx >= RAND_DEG)
+        deg_rptr_idx = 0;
+    return (int) (val & 0x7fffffff);
+}
+#endif
+
+#endif /* Windows / BSD generators */

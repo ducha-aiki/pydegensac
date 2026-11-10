@@ -28,13 +28,11 @@ struct ConvertedInput {
     double *u2_p1 = nullptr;
     double *u2_p2 = nullptr;
     unsigned char *inl = nullptr;
-    int *data_out = nullptr;
 
     ConvertedInput() = default;
     ConvertedInput(const ConvertedInput&) = delete;
     ConvertedInput& operator=(const ConvertedInput&) = delete;
     ~ConvertedInput() {
-        free(data_out);
         delete [] u2;
         delete [] u2_p1;
         delete [] u2_p2;
@@ -173,11 +171,6 @@ void convert_input(const py::buffer_info &buf1, const py::buffer_info &buf1a,
             u2Ptr++;
         };
     }
-
-    in.data_out = (int *) malloc(NUM_TENTS * 18 * sizeof(int));
-    if (in.data_out == nullptr) {
-        throw std::bad_alloc();
-    }
 }
 
 py::tuple pack_output(const double *model, const unsigned char *inl, size_t num_tents) {
@@ -276,24 +269,27 @@ py::tuple findHomography_(py::array_t<double, py::array::c_style | py::array::fo
     convert_input(buf1, buf1a, laf_coef, in);
 
     // Run the RANSAC
-    exp_ransacHcustomLAF(in.u2,
-                         in.u2_p1,
-                         in.u2_p2,
-                         in.num_tents,
-                         error_threshold,
-                         laf_coef,
-                         conf,
-                         max_iters,
-                         H,
-                         in.inl,
-                         4,
-                         in.data_out,
-                         oriented_constr,
-                         0,
-                         NULL,
-                         HDS1,HDSi1,HDSidx1,
-                         SymCheck_th,
-                         seed);
+    {
+        py::gil_scoped_release release;
+        exp_ransacHcustomLAF(in.u2,
+                             in.u2_p1,
+                             in.u2_p2,
+                             in.num_tents,
+                             error_threshold,
+                             laf_coef,
+                             conf,
+                             max_iters,
+                             H,
+                             in.inl,
+                             4,
+                             nullptr,
+                             oriented_constr,
+                             0,
+                             NULL,
+                             HDS1,HDSi1,HDSidx1,
+                             SymCheck_th,
+                             seed);
+    }
 
     return pack_output(H, in.inl, in.num_tents);
 }
@@ -356,24 +352,27 @@ py::tuple findFundamentalMatrix_(py::array_t<double, py::array::c_style | py::ar
     convert_input(buf1, buf1a, laf_coef, in);
 
     // Run the RANSAC
-    exp_ransacFcustomLAF(in.u2,
-                         in.u2_p1,
-                         in.u2_p2,
-                         in.num_tents,
-                         error_threshold,
-                         laf_coef,
-                         conf,
-                         max_iters,
-                         F,
-                         in.inl,
-                         in.data_out,
-                         1, 0,
-                         NULL,
-                         EXFDS1,FDS1,FDSidx1,
-                         SymCheck_th,
-                         (int)enable_degeneracy_check,
-                         seed,
-                         FDS1soa);
+    {
+        py::gil_scoped_release release;
+        exp_ransacFcustomLAF(in.u2,
+                             in.u2_p1,
+                             in.u2_p2,
+                             in.num_tents,
+                             error_threshold,
+                             laf_coef,
+                             conf,
+                             max_iters,
+                             F,
+                             in.inl,
+                             nullptr,
+                             1, 0,
+                             NULL,
+                             EXFDS1,FDS1,FDSidx1,
+                             SymCheck_th,
+                             (int)enable_degeneracy_check,
+                             seed,
+                             FDS1soa);
+    }
 
     return pack_output(F, in.inl, in.num_tents);
 }

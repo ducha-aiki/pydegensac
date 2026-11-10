@@ -4,12 +4,8 @@
 
 #include "rtools.h"
 
-#ifdef WIN32
-#define random rand
-#else
 #include "bsd_random.h"
 #define random degensac_random
-#endif
 
 /* inline int sample (int *pool, int max_sz, int i) */
 int sample (int *pool, int max_sz, int i)
