@@ -68,13 +68,14 @@ OpenCV 5.0.
 </table>
 
 **Fundamental matrix.** At each method's best budget, pydegensac reaches 0.423
-mAA at 45.8 ms/pair. PoseLib PROSAC leads with 0.457 at 40.2 ms (paired gap
--0.034 mAA, 95% CI -0.055 to -0.012); OpenCV MAGSAC reaches 0.376 at 29.2 ms and
-OpenCV RANSAC 0.340 at 179.3 ms.
+mAA at 29.0 ms/pair. PoseLib PROSAC leads with 0.457 at 39.6 ms (paired gap
+-0.034 mAA, 95% CI -0.055 to -0.012); OpenCV MAGSAC reaches 0.376 at 29.3 ms and
+OpenCV RANSAC 0.340 at 179.0 ms. At 5,000 iterations pydegensac already reaches
+0.411 at 6.3 ms.
 
-**Homography.** On HPatchesSeq, pydegensac reaches 0.905 mAA at 2.2 ms/pair
-(6,400 iterations). OpenCV MAGSAC reaches 0.927 at 0.9 ms and PoseLib PROSAC
-0.930 at 7.7 ms (paired pydegensac gap -0.025 mAA, 95% CI -0.042 to -0.012),
+**Homography.** On HPatchesSeq, pydegensac reaches 0.905 mAA at 1.9 ms/pair
+(6,400 iterations). OpenCV MAGSAC reaches 0.927 at 0.85 ms and PoseLib PROSAC
+0.930 at 7.6 ms (paired pydegensac gap -0.025 mAA, 95% CI -0.042 to -0.012),
 consistent with the 2023 homography benchmark above. EVD's 8 test pairs do not
 separate the methods.
 
@@ -83,14 +84,18 @@ three seeds and two timing repeats per pair and budget:
 
 | | Linux x86-64 (i7-14700K) | Apple M1 |
 |---|---|---|
-| F, St Peter's Square | 1.10–1.83x (1.25x summed over budgets), identical mAA | 1.19–2.10x, identical mAA |
-| H, EVD | 1.25–1.76x (1.28x), identical mAA | 1.25–1.91x (EVD and HPatchesSeq), identical mAA |
-| H, HPatchesSeq | 1.17–1.18x (1.18x), mAA within 0.0002 | identical mAA at budgets ≥100; -1.54 / -0.69 points at 10 / 25 iterations |
+| F, St Peter's Square | 1.72–2.00x (1.79x summed over budgets), identical mAA | 1.19–2.10x, identical mAA |
+| H, EVD | 1.31–1.67x (1.34x), identical mAA | 1.25–1.91x (EVD and HPatchesSeq), identical mAA |
+| H, HPatchesSeq | 1.20–1.24x (1.22x), mAA within 0.0002 | identical mAA at budgets ≥100; -1.54 / -0.69 points at 10 / 25 iterations |
 
 The speed-up is largest at small iteration budgets, where fixed per-call costs
-dominate. See [benchmark instructions](benchmarks/README.md) for the protocol
-and the [earlier study](docs/reports/2026-08-11-ransac-benchmark.md) for
-historical results and threshold-transfer caveats. Reproduce with
+dominate. On x86-64 the fundamental-matrix error and scoring loops also use AVX
+when the CPU supports it, chosen at run time and bit-identical to the scalar
+code (`PYDEGENSAC_SIMD=0` forces scalar); AVX alone is 1.26x on F summed over
+budgets. The Apple M1 column predates the AVX and MSAC-scoring changes.
+See [benchmark instructions](benchmarks/README.md) for the protocol and the
+[earlier study](docs/reports/2026-08-11-ransac-benchmark.md) for historical
+results and threshold-transfer caveats. Reproduce with
 `cd benchmarks && python setup_data.py && ./run_current.sh linux`.
 
 # Installation
