@@ -74,7 +74,7 @@ Score exp_iterHcustom(double *u, int len, int *inliers, double th, double ths,
     maxS = inlidxs(errs[4], len, th, inliers);
     if (maxS.I < 4)
         return S;
-    S = inlidxs(errs[4], len, th*MWM, inliers);
+    S.I = inlidxs_only(errs[4], len, th*MWM, inliers);
 #ifdef __D3__
     //D3 - calculate number of inliers detached for LSQ
     detachedCount = (int)(S.I * D3_H_RATIO);
@@ -119,7 +119,7 @@ Score exp_iterHcustom(double *u, int len, int *inliers, double th, double ths,
             htInsert(&HASH_TABLE_H, hash, Ss.I, iterID);
         }
 #endif //__HASHING__
-        S = inlidxs (d, len, ths*MWM, inliers);
+        S.I = inlidxs_only(d, len, ths*MWM, inliers);
 
         if (scoreLess(maxS, Ss))
         {
@@ -446,7 +446,7 @@ Score exp_ransacHcustomLAF (double *u, double *u_1, double *u_2,
             case 0:
                 break;
             case 1:
-                S = inlidxs(errs[4], len, TC*th, inliers);
+                S.I = inlidxs_only(errs[4], len, TC*th, inliers);
                 u2h(u, inliers, S.I, h, buffer);
                 d = errs[0];
 
@@ -464,7 +464,7 @@ Score exp_ransacHcustomLAF (double *u, double *u_1, double *u_2,
                 break;
             case 3:
                 d = errs[0];
-                S = inlidxs(errs[4], len, TC*th, inliers);
+                S.I = inlidxs_only(errs[4], len, TC*th, inliers);
                 u2h(u, inliers, S.I, h, buffer);
                 HDS1(Z, u, h, d, len);
 
@@ -480,21 +480,21 @@ Score exp_ransacHcustomLAF (double *u, double *u_1, double *u_2,
                 d = errs[0];
 #ifdef __LSBL_MCE__
                 hMCEscustom(Z, u, d, samidx, len, errs[4], TC*th*MWM,HDSi1);
-                S = inlidxs(d, len, TC*th*MWM, inliers);
+                S.I = inlidxs_only(d, len, TC*th*MWM, inliers);
 #else /* __LSBL_MCE__ */
-                S = inlidxs(errs[4], len, TC*th*MWM, inliers);
+                S.I = inlidxs_only(errs[4], len, TC*th*MWM, inliers);
 #endif /* __LSBL_MCE__ */
                 u2h(u, inliers, S.I, h, buffer);
                 HDS1(Z, u, h, d, len);
 #ifdef __IB_MCE__
                 hMCEscustom(Z, u, d, samidx, len, d, th,HDSi1);
 #endif /* __IB_MCE__ */
-                S = inlidxs(d, len, th, inliers);
+                S.I = inlidxs_only(d, len, th, inliers);
                 if (resids != NULL) {
                     memcpy(*resids + RESIDS_M*(iter_cnt - 1)*len + len, d, len*sizeof(double));
                 }
 #else /* __LSQ_BEFORE_LO__ */
-                S = inlidxs(errs[4], len, th, inliers);
+                S.I = inlidxs_only(errs[4], len, th, inliers);
 #endif /* __LSQ_BEFORE_LO__ */
                 S = exp_inHranicustom(u, len, inliers, S.I, th, Z, errs, buffer, h, RAN_REP, &iterID, inlLimit,
                                       resids != NULL ? *resids + 2*len + (iter_cnt-1)*RESIDS_M*len : NULL, lo_intbuff, HDS1);
@@ -575,7 +575,7 @@ Score exp_ransacHcustomLAF (double *u, double *u_1, double *u_2,
         case 0:
             break;
         case 1:
-            S = inlidxs(errs[4], len, TC*th, inliers);
+            S.I = inlidxs_only(errs[4], len, TC*th, inliers);
             u2h(u, inliers, S.I, h, buffer);
             d = errs[0];
             HDS1(Z, u, h, d, len);
@@ -593,7 +593,7 @@ Score exp_ransacHcustomLAF (double *u, double *u_1, double *u_2,
             break;
         case 3:
             d = errs[0];
-            S = inlidxs(errs[4], len, TC*th, inliers);
+            S.I = inlidxs_only(errs[4], len, TC*th, inliers);
             u2h(u, inliers, S.I, h, buffer);
             HDS1(Z, u, h, d, len);
 
@@ -609,9 +609,9 @@ Score exp_ransacHcustomLAF (double *u, double *u_1, double *u_2,
             d = errs[0];
 #ifdef __LSBL_MCE__
             hMCEscustom(Z, u, d, bestsamidx, len, errs[4], TC*th*MWM,HDSi1);
-            S = inlidxs(d, len, TC*th*MWM, inliers);
+            S.I = inlidxs_only(d, len, TC*th*MWM, inliers);
 #else /* __LSBL_MCE__ */
-            S = inlidxs(errs[4], len, TC*th*MWM, inliers);
+            S.I = inlidxs_only(errs[4], len, TC*th*MWM, inliers);
 #endif /* __LSBL_MCE__ */
             u2h(u, inliers, S.I, h, buffer);
             HDS1(Z, u, h, d, len);
@@ -619,12 +619,12 @@ Score exp_ransacHcustomLAF (double *u, double *u_1, double *u_2,
 #ifdef __IB_MCE__
             hMCEscustom(Z, u, d, bestsamidx, len, d, th,HDSi1);
 #endif /* __IB_MCE__ */
-            S = inlidxs(d, len, th, inliers);
+            S.I = inlidxs_only(d, len, th, inliers);
             if (resids != NULL) {
                 memcpy(*resids + RESIDS_M*(iter_cnt - 1)*len + len, d, len*sizeof(double));
             }
 #else /* __LSQ_BEFORE_LO__ */
-            S = inlidxs(errs[4], len, th, inliers);
+            S.I = inlidxs_only(errs[4], len, th, inliers);
 #endif /* __LSQ_BEFORE_LO__ */
             S = exp_inHranicustom(u, len, inliers, S.I, th, Z, errs, buffer, h, RAN_REP, &iterID, inlLimit,
                                   resids != NULL ? *resids + 2*len + (iter_cnt-1)*RESIDS_M*len : NULL, lo_intbuff, HDS1);

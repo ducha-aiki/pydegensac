@@ -40,7 +40,7 @@ Score iterH (double *u, int len, int *inliers, double th, double ths,
 	    HDs (Z, u, h, d, len);
 #endif
 	    S = inlidxs(d, len, th, inliers);
-		Ss = inlidxs(d, len, ths, inliers);
+		Ss.I = inlidxs_only(d, len, ths, inliers);
 
 		if (scoreLess(maxS, S)) {
 			maxS = S;

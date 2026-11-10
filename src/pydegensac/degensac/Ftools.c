@@ -211,6 +211,42 @@ void exFDs (const double *u, const double *F, double *p, double *w, int len)
         u += 6;
     }
 }
+
+/* Sampson LO needs every residual, but only the selected refit's weights.
+   Keep exFDs' arithmetic order, leaving its denominators in w until the
+   inlier subset has been chosen. */
+void exFDs_den (const double *u, const double *F, double *p, double *w, int len)
+{
+    double rx, ry, rwc, ryc, rxc, r;
+    int i;
+
+    for (i=1; i<=len; i++)
+    {
+        rxc = _f1 * u4 + _f4 * u5 + _f7;
+        ryc = _f2 * u4 + _f5 * u5 + _f8;
+        rwc = _f3 * u4 + _f6 * u5 + _f9;
+        r =(u1 * rxc + u2 * ryc + rwc);
+        rx = _f1 * u1 + _f2 * u2 + _f3;
+        ry = _f4 * u1 + _f5 * u2 + _f6;
+
+        *w = rxc*rxc + ryc*ryc + rx*rx + ry*ry;
+        *p = r*r / *w;
+
+        p ++;
+        w ++;
+        u += 6;
+    }
+}
+
+void exFDs_weights (double *w, const int *inliers, int len)
+{
+    int i, j;
+    for (i = 0; i < len; ++i) {
+        j = inliers[i];
+        w[j] = 1 / sqrt(w[j]);
+    }
+}
+
 void FDsSym (const double *u, const double *F, double *p, int len)
 {
     double rx, ry, rwc, ryc, rxc, r;
@@ -447,7 +483,10 @@ void u2f(const double *u, const int *inl, int len,
     } else
     {
         lin_fm(u, Z, inl, len);
-        svduv(D,Z,V,9,U,8);
+        if (len == 8)
+            svdnull8(Z,V);
+        else
+            svduv(D,Z,V,9,U,8);
         p = V + 8;      /* ccmath's V is row-major: column 8, stride 9 */
         step = 9;
     }
@@ -503,7 +542,10 @@ void u2fw(const double *u, const int *inl, const double * w,
             j = inl[i];
             scalmul(Z+i, w[j], 9, 9);
         }
-        svduv(D,Z,V,9,U,8);
+        if (len == 8)
+            svdnull8(Z,V);
+        else
+            svduv(D,Z,V,9,U,8);
         p = V + 8;      /* ccmath's V is row-major: column 8, stride 9 */
         step = 9;
     }

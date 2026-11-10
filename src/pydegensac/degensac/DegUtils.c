@@ -757,7 +757,7 @@ unsigned innerH(double * H, double * u, unsigned len, double th, unsigned iters,
   d = errs[0];
 
   HDs(NULL, u, H, d, (int) len);
-  S = inlidxs(d, (int) len, th, inliers);
+  S.I = inlidxs_only(d, (int) len, th, inliers);
   S = inHrani (u, (int) len, inliers, S.I, th, NULL, errs, buffer, H, iters);
 
   d = errs[0];

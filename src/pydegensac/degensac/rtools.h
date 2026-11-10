@@ -66,6 +66,10 @@ void multirsampleT (double *data, int dat_siz, int dps,
 /* Indexes of inliers with error lower than given threshold. Returns RANSAC score. */
 Score inlidxs (const double * err, int len, double th, int * inl);
 
+/* Same indices and buffer writes as inlidxs, without calculating a score.
+   inl must have room for len entries, including the speculative tail store. */
+unsigned inlidxs_only (const double *err, int len, double th, int *inl);
+
 /*Indexes of inliers with error lower than given threshold. Returns inliers count.*/
 int inlidxso (const double * err, const double * sgn, int len, double th,
               int * inl_buff, int ** inls);

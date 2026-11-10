@@ -8,7 +8,8 @@
 #include <stdlib.h>
 #include <math.h>
 #include "matutl.h"
-int svduv(double *d,double *a,double *u,int m,double *v,int n)
+static int svduv_impl(double *d,double *a,double *u,int m,double *v,int n,
+                      int null_only)
 { double *p,*p1,*q,*pp,*w,*e;
   double s,h,r,t,sv;
   int i,j,k,mm,nm,ms;
@@ -51,6 +52,15 @@ int svduv(double *d,double *a,double *u,int m,double *v,int n)
      }
     if(nm==1) e[i]= *p1;
    }
+  /* For a 9x8 input, column 8 of u is already the null vector after
+     ldumat. qrbdv rotates only columns 0..7, and the sign repair below
+     changes v, not u. Keep the reduction arithmetic shared with svduv
+     so the eight-point F solver gets exactly the same null vector. */
+  if(null_only){
+    ldumat(a,u,m,n);
+    free(w);
+    return 0;
+   }
   ldvmat(a,v,n); ldumat(a,u,m,n);
   qrbdv(d,e,u,m,v,n);
   for(i=0; i<n ;++i){
@@ -60,4 +70,15 @@ int svduv(double *d,double *a,double *u,int m,double *v,int n)
    }
   free(w);
   return 0;
+}
+
+int svduv(double *d,double *a,double *u,int m,double *v,int n)
+{
+  return svduv_impl(d,a,u,m,v,n,0);
+}
+
+int svdnull8(double *a,double *u)
+{
+  double d[8];
+  return svduv_impl(d,a,u,9,NULL,8,1);
 }

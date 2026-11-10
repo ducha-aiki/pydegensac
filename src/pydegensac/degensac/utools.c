@@ -209,6 +209,82 @@ int nullspace(double *matrix, double *nullspace, int n, int * buffer) /* Expects
 }
 
 
+/* Keep nullspace's pivot order, tolerance, division and elimination order.
+   The two padded rows stay zero under finite pivot-row updates. If a
+   normalized pivot row is nonfinite (including overflow from finite input),
+   keep all subsequent padded-row arithmetic: 0 * Inf/NaN can change rank.
+   The fixed stride also lets the compiler specialize these small loops. */
+int nullspace7x9(double *matrix, double *basis, int *buffer)
+{
+   const int n = 9;
+   int row_limit = 7;
+   int *pnopivot = buffer, nonpivot = 0;
+   int *ppivot = buffer + n;
+   int i = 0, j, k, l, max;
+   double pivot, t;
+   double tol = 1e-12;
+
+   for (j=0; j<n; j++)
+   {
+      pivot = fabs(matrix[n*i+j]); max = i;
+      for (k=i+1; k<n; k++)
+      {
+         t = fabs(matrix[n*k+j]);
+         if (pivot<t) { pivot=t; max=k; }
+      }
+      if (pivot<tol)
+      {
+         *(pnopivot++) = j; nonpivot++;
+         for (k=i; k<n; k++) matrix[n*k+j]=0;
+      } else {
+         *(ppivot++) = j;
+         for (k=j; k<n; k++)
+         {
+            t = matrix[i*n+k];
+            matrix[i*n+k] = matrix[max*n+k];
+            matrix[max*n+k]=t;
+         }
+         pivot = matrix[i*n+j];
+         for (k=j; k<n; k++)
+            matrix[i*n+k] /= pivot;
+
+         if (row_limit < n)
+         {
+            for (k=j; k<n; k++)
+               if (!isfinite(matrix[i*n+k])) {
+                  row_limit = n;
+                  break;
+               }
+         }
+
+         for (k=0; k<i; k++)
+         {
+            pivot = -matrix[k*n+j];
+            for (l=j; l<n; l++)
+               matrix[k*n+l] += pivot*matrix[i*n+l];
+         }
+         for (k=i+1; k<row_limit; k++)
+         {
+            pivot = matrix[k*n+j];
+            for (l=j; l<n; l++)
+               matrix[k*n+l] -= pivot*matrix[i*n+l];
+         }
+         i++;
+      }
+   }
+
+   for (k=0; k<nonpivot; k++)
+   {
+      j = buffer[k];
+      for (l=0; l<n-nonpivot; l++)
+         basis[k*n+buffer[n+l]]=-matrix[l*n+j];
+      for (l=0; l<nonpivot; l++)
+         basis[k*n+buffer[l]]=(j==buffer[l])?1:0;
+   }
+   return nonpivot;
+}
+
+
 /* Cv = Z^T Z for Z of shape len x siz, row-major; both triangles filled.
 
    One pass over the points, accumulating every unique entry at once. The

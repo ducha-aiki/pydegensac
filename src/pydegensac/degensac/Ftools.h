@@ -77,6 +77,18 @@ extern "C"
 #endif
 void exFDs (const double *u, const double *F, double *p, double *w, int len);
 
+/* Sampson residuals with unconverted denominators in w. Complete only the
+   selected weights below; residual arithmetic matches exFDs. */
+#ifdef __cplusplus
+extern "C"
+#endif
+void exFDs_den (const double *u, const double *F, double *p, double *w, int len);
+/* Convert each selected denominator once. Indices must be distinct. */
+#ifdef __cplusplus
+extern "C"
+#endif
+void exFDs_weights (double *w, const int *inliers, int len);
+
 
 #ifdef __cplusplus
 extern "C"
