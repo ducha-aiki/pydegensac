@@ -53,7 +53,10 @@ Outputs are `results/{f,h}_current_<platform>.jsonl`,
 `results/report_{f,h}_<platform>.md`, and
 `results/time_maa_{f,h}_<platform>.png`. These generated reports, plots, and
 raw JSONL are temporary investigation outputs; keep them out of commits and
-pull requests. Store shared comparison artifacts outside the repository.
+pull requests. Store shared comparison artifacts outside the repository. The
+exception is the two figures shown in the top-level README,
+`results/time_maa_{f,h}_linux.png`, which are refreshed deliberately for a
+release.
 Do not run other CPU-intensive work concurrently with the timing sweeps.
 
 For historical A/B experiments, `./run_ab.sh <base-ref>` remains available.

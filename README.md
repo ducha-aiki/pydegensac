@@ -47,49 +47,51 @@ For homography, pydegensac is worse than newest OpenCV MAGSAC++ (`cv2.USAC_MAGSA
 
 `benchmarks/` is a self-contained accuracy-vs-compute benchmark on public data:
 fundamental matrix on IMC-2020 PhotoTourism val (600 pairs of
-`st_peters_square`, pose mAA 1-10°), homography on EVD + HPatchesSeq (the
-CVPR-2020 RANSAC tutorial data, reprojection mAA 1-20 px). Every method runs at
-its own tuned thresholds; each point on a curve is one iteration budget.
+`st_peters_square`, pose mAA 1-10°), homography on EVD (8 test pairs) +
+HPatchesSeq (145 test pairs) from the CVPR-2020 RANSAC tutorial data
+(reprojection mAA 1-20 px). Every method runs at its own tuned thresholds; each
+point on a curve is one iteration budget. Shaded bands are marginal 95%
+bootstrap intervals; method gaps below are paired intervals.
+
+The figures compare **pydegensac 0.3.1** with **OpenCV 5.0.0** (`RANSAC`,
+`USAC_MAGSAC`) and **PoseLib 2.0.5** (with and without PROSAC) on Linux x86-64
+(Intel Core i7-14700K, WSL2, gcc 13.3), single-threaded, pydegensac seed 12345.
+Thresholds come from the earlier OpenCV 4.13 tuning and were not retuned for
+OpenCV 5.0.
 
 <table>
-<tr><th width="50%">Linux x86-64</th><th width="50%">Apple M1</th></tr>
+<tr><th width="50%">Fundamental matrix</th><th width="50%">Homography</th></tr>
 <tr>
-<td><img alt="F time-mAA, Linux" src="benchmarks/results/time_maa_f.png"></td>
-<td><img alt="F time-mAA, Apple M1" src="benchmarks/results/time_maa_f_m1.png"></td>
-</tr>
-<tr>
-<td><img alt="H time-mAA, Linux" src="benchmarks/results/time_maa_h.png"></td>
-<td><img alt="H time-mAA, Apple M1" src="benchmarks/results/time_maa_h_m1.png"></td>
+<td><img alt="F time-mAA, Linux x86-64" src="benchmarks/results/time_maa_f_linux.png"></td>
+<td><img alt="H time-mAA, Linux x86-64" src="benchmarks/results/time_maa_h_linux.png"></td>
 </tr>
 </table>
 
-**Fundamental matrix.** poselib with PROSAC leads, but pydegensac is no longer
-separable from it — -0.017 mAA on Linux, -0.021 on M1, both with confidence
-intervals containing zero — and it beats both OpenCV estimators by a wide
-margin. It costs about 1.3x the leader on Linux (52 vs 41 ms/pair) and is level
-with it on M1 (50 vs 52).
+**Fundamental matrix.** At each method's best budget, pydegensac reaches 0.423
+mAA at 45.8 ms/pair. PoseLib PROSAC leads with 0.457 at 40.2 ms (paired gap
+-0.034 mAA, 95% CI -0.055 to -0.012); OpenCV MAGSAC reaches 0.376 at 29.2 ms and
+OpenCV RANSAC 0.340 at 179.3 ms.
 
-**Homography.** pydegensac is the second-cheapest estimator in the roster
-(2.3 ms/pair on Linux, 2.6 on M1), undercutting both poselib variants, but it
-remains measurably behind the top three on accuracy: -0.021 mAA on Linux,
--0.010 on M1, both intervals excluding zero. `cv2.USAC_MAGSAC` wins homography
-outright, matching the leader's accuracy at 0.9 ms. That is consistent with the
-2023 homography benchmark above.
+**Homography.** On HPatchesSeq, pydegensac reaches 0.905 mAA at 2.2 ms/pair
+(6,400 iterations). OpenCV MAGSAC reaches 0.927 at 0.9 ms and PoseLib PROSAC
+0.930 at 7.7 ms (paired pydegensac gap -0.025 mAA, 95% CI -0.042 to -0.012),
+consistent with the 2023 homography benchmark above. EVD's 8 test pairs do not
+separate the methods.
 
-So the two problems now have different answers: on F pydegensac is competitive
-with the best available, on H it is a cost/accuracy trade rather than a
-straight win. (EVD's 8 test pairs cannot separate anything, hence the
-confidence bands swamping that panel.)
+**0.3.0 → 0.3.1.** Both releases built with the same toolchain, pydegensac only,
+three seeds and two timing repeats per pair and budget:
 
-Both platforms show the same picture, but the version-to-version speed-up
-differs: the 0.3.0 optimisation work is worth **2.2x (F) / 1.7x (H) on Linux**
-and **2.3x / 2.9x on M1**. The gap is mostly the denominator — macOS had more
-to gain because a lock in its `srandom()` left the old build further behind.
+| | Linux x86-64 (i7-14700K) | Apple M1 |
+|---|---|---|
+| F, St Peter's Square | 1.10–1.83x (1.25x summed over budgets), identical mAA | 1.19–2.10x, identical mAA |
+| H, EVD | 1.25–1.76x (1.28x), identical mAA | 1.25–1.91x (EVD and HPatchesSeq), identical mAA |
+| H, HPatchesSeq | 1.17–1.18x (1.18x), mAA within 0.0002 | identical mAA at budgets ≥100; -1.54 / -0.69 points at 10 / 25 iterations |
 
-Full results, protocol, and the caveats that matter (run-to-run scatter,
-threshold-transfer failure between scenes):
-[`docs/reports/2026-08-11-ransac-benchmark.md`](docs/reports/2026-08-11-ransac-benchmark.md).
-Reproduce with `cd benchmarks && python setup_data.py && ./run_ab.sh`.
+The speed-up is largest at small iteration budgets, where fixed per-call costs
+dominate. See [benchmark instructions](benchmarks/README.md) for the protocol
+and the [earlier study](docs/reports/2026-08-11-ransac-benchmark.md) for
+historical results and threshold-transfer caveats. Reproduce with
+`cd benchmarks && python setup_data.py && ./run_current.sh linux`.
 
 # Installation
 
