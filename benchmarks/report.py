@@ -21,6 +21,7 @@ import metrics
 #: stay distinct from it — cv2-magsac in particular must not read as a shade
 #: of pydegensac-base.
 COLORS = {
+    "pydegensac (0.3.1)": "#c9302c",
     "pydegensac (base)": "#f2a25c",
     "pydegensac (branch)": "#c9302c",
     "cv2-ransac": "#1f9e78",

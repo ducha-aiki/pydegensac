@@ -45,51 +45,47 @@ For homography, pydegensac is worse than newest OpenCV MAGSAC++ (`cv2.USAC_MAGSA
 
 ## Speed/accuracy against the current field (2026)
 
-`benchmarks/` is a self-contained accuracy-vs-compute benchmark on public data:
-fundamental matrix on IMC-2020 PhotoTourism val (600 pairs of
-`st_peters_square`, pose mAA 1-10°), homography on EVD + HPatchesSeq (the
-CVPR-2020 RANSAC tutorial data, reprojection mAA 1-20 px). Every method runs at
-its own tuned thresholds; each point on a curve is one iteration budget.
+The current comparison runs **pydegensac 0.3.1**, including the latest speed-up,
+against **OpenCV 5.0.0** (`RANSAC` and `USAC_MAGSAC`) and **PoseLib 2.0.5**
+(with and without PROSAC). Each curve shows one estimator; each point is an
+iteration budget. Shaded bands are marginal 95% bootstrap confidence intervals;
+method differences are tested with paired intervals in the full reports.
 
-<table>
-<tr><th width="50%">Linux x86-64</th><th width="50%">Apple M1</th></tr>
-<tr>
-<td><img alt="F time-mAA, Linux" src="benchmarks/results/time_maa_f.png"></td>
-<td><img alt="F time-mAA, Apple M1" src="benchmarks/results/time_maa_f_m1.png"></td>
-</tr>
-<tr>
-<td><img alt="H time-mAA, Linux" src="benchmarks/results/time_maa_h.png"></td>
-<td><img alt="H time-mAA, Apple M1" src="benchmarks/results/time_maa_h_m1.png"></td>
-</tr>
-</table>
+The public datasets and metrics are unchanged: fundamental matrix on 600
+IMC-2020 PhotoTourism validation pairs from `st_peters_square` (pose mAA 1–10°),
+and homography on EVD (8 test pairs) and HPatchesSeq (145 test pairs), using
+reprojection mAA 1–20 px. Thresholds are retained from the previous tuning,
+which used OpenCV 4.13; they have not been retuned for OpenCV 5.0.
 
-**Fundamental matrix.** poselib with PROSAC leads, but pydegensac is no longer
-separable from it — -0.017 mAA on Linux, -0.021 on M1, both with confidence
-intervals containing zero — and it beats both OpenCV estimators by a wide
-margin. It costs about 1.3x the leader on Linux (52 vs 41 ms/pair) and is level
-with it on M1 (50 vs 52).
+**Linux x86-64** — Intel Core i7-14700K, WSL2, single-threaded estimator calls.
+These are single-run measurements with stochastic estimators; the confidence
+intervals resample image pairs, not repeated runs or timing noise.
 
-**Homography.** pydegensac is the second-cheapest estimator in the roster
-(2.3 ms/pair on Linux, 2.6 on M1), undercutting both poselib variants, but it
-remains measurably behind the top three on accuracy: -0.021 mAA on Linux,
--0.010 on M1, both intervals excluding zero. `cv2.USAC_MAGSAC` wins homography
-outright, matching the leader's accuracy at 0.9 ms. That is consistent with the
-2023 homography benchmark above.
+![Fundamental matrix time versus mAA, Linux, pydegensac 0.3.1](benchmarks/results/time_maa_f_linux.png)
+![Homography time versus mAA, Linux, pydegensac 0.3.1](benchmarks/results/time_maa_h_linux.png)
 
-So the two problems now have different answers: on F pydegensac is competitive
-with the best available, on H it is a cost/accuracy trade rather than a
-straight win. (EVD's 8 test pairs cannot separate anything, hence the
-confidence bands swamping that panel.)
+**Fundamental matrix.** At each method's best budget, pydegensac reaches
+0.427 mAA at 51.0 ms/pair, compared with PoseLib PROSAC's 0.457 at 40.4 ms.
+The paired gap is -0.030 mAA (95% CI -0.053 to -0.008), so this run separates
+them on accuracy. OpenCV MAGSAC reaches 0.376 mAA at 30.2 ms; OpenCV RANSAC
+reaches 0.340 at 183.2 ms.
 
-Both platforms show the same picture, but the version-to-version speed-up
-differs: the 0.3.0 optimisation work is worth **2.2x (F) / 1.7x (H) on Linux**
-and **2.3x / 2.9x on M1**. The gap is mostly the denominator — macOS had more
-to gain because a lock in its `srandom()` left the old build further behind.
+**Homography.** On HPatchesSeq, pydegensac reaches 0.9145 mAA at 3.04 ms/pair.
+OpenCV MAGSAC reaches 0.9269 at 0.88 ms, while PoseLib PROSAC reaches 0.9297
+at 7.81 ms. The paired pydegensac gap to PoseLib PROSAC is -0.015 mAA
+(95% CI -0.023 to -0.008). EVD has only 8 test pairs and much wider intervals;
+it does not separate pydegensac from the leader in this run.
 
-Full results, protocol, and the caveats that matter (run-to-run scatter,
-threshold-transfer failure between scenes):
-[`docs/reports/2026-08-11-ransac-benchmark.md`](docs/reports/2026-08-11-ransac-benchmark.md).
-Reproduce with `cd benchmarks && python setup_data.py && ./run_ab.sh`.
+The Apple M1 rerun for 0.3.1 and OpenCV 5.0 is pending; the older M1 measurements
+are retained in the historical reports rather than mixed into this comparison.
+
+Full results: [fundamental matrix](benchmarks/results/report_f_linux.md) and
+[homography](benchmarks/results/report_h_linux.md).
+See [benchmark instructions](benchmarks/README.md) for dependencies and the
+protocol, and the [earlier study](docs/reports/2026-08-11-ransac-benchmark.md)
+for historical results and threshold-transfer caveats.
+Reproduce with `cd benchmarks && python setup_data.py && ./run_current.sh linux`
+(or `./run_current.sh m1` on the M1 machine).
 
 # Installation
 
