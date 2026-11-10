@@ -6,6 +6,9 @@
 #include "degensac/exp_ranF.h"
 #include "degensac/exp_ranH.h"
 
+/* simd.h pulls in C-only headers; this is all the binding needs. */
+extern "C" const char *degensac_simd_backend(void);
+
 namespace py = pybind11;
 
 enum RANSAC_error_t_h {SAMPSON = 0,
@@ -409,4 +412,7 @@ PYBIND11_MODULE(pydegensac, m) {
           py::arg("laf_coef") = 0,
           py::arg("enable_degeneracy_check") = 1,
           py::arg("seed") = -1);
+
+    m.def("simd_backend_", []() { return std::string(degensac_simd_backend()); },
+          "Active kernel backend: 'avx' or 'scalar' (PYDEGENSAC_SIMD=0 forces scalar).");
 }
