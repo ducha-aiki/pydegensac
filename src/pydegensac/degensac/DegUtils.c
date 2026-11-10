@@ -230,6 +230,55 @@ void crossp(double *h,double *u,double *v)
   h[2]=u[0]*v[1]-u[1]*v[0];
 }
 
+/* Scratch shared by all innerFH attempts of one rFtH recovery.  Keeping it
+   local to the recovery preserves reentrancy while avoiding allocations in
+   each inner hypothesis and iterative least-squares refinement. */
+typedef struct {
+  unsigned char *v;
+  double *usam, *Ds, *buffer;
+  int *allInl, *fitInl;
+  unsigned *ptrA, *ptrB;
+  void *memory;
+} DegInnerWorkspace;
+
+static void innerFH_workspace(double *uH, unsigned lenH, double *uO,
+                              unsigned lenO, double *u, unsigned len,
+                              double th, unsigned repCount,
+                              unsigned sam_sizH, unsigned sam_sizO,
+                              double *F, unsigned char *inl,
+                              DegInnerWorkspace *workspace);
+
+static int initDegInnerWorkspace(DegInnerWorkspace * w, unsigned len,
+                                 unsigned lenA, unsigned lenB,
+                                 unsigned sampleSize) {
+  /* Sample fitting and full-data refinement use these buffers sequentially. */
+  size_t fitSize = len > sampleSize ? len : sampleSize;
+  size_t doubles = (size_t)len + (size_t)6 * sampleSize + 9 * fitSize;
+  size_t ints = (size_t)len + lenA + lenB + sampleSize;
+  double * d;
+  int * i;
+
+  w->memory = malloc(doubles * sizeof(double) + ints * sizeof(int) +
+                     (size_t)len * sizeof(unsigned char));
+  if (w->memory == NULL)
+    return 0;
+  d = (double *)w->memory;
+  w->usam = d; d += (size_t)6 * sampleSize;
+  w->Ds = d; d += len;
+  w->buffer = d; d += 9 * fitSize;
+  i = (int *)d;
+  w->allInl = i; i += sampleSize;
+  w->fitInl = i; i += len;
+  w->ptrA = (unsigned *)i; i += lenA;
+  w->ptrB = (unsigned *)i; i += lenB;
+  w->v = (unsigned char *)i;
+  return 1;
+}
+
+static void clearDegInnerWorkspace(DegInnerWorkspace * w) {
+  free(w->memory);
+}
+
 
 /*function [F, inls] = rFtH(u, hinl, th, H)*/
 unsigned rFtH(double * u, unsigned char * hinl, double th, double * H, unsigned len,
@@ -237,6 +286,8 @@ unsigned rFtH(double * u, unsigned char * hinl, double th, double * H, unsigned 
 
   unsigned char * nhinl, * v, * inl;
   double * Ds, * uN, * us, * uH, *uV;
+  DegInnerWorkspace innerWorkspace;
+  int haveInnerWorkspace = 0;
   unsigned i, nhinlCount = 0, hinlCount = 0, ninl, maxni;
   unsigned * ptr, max_i, m_i, max_sam, s_size, pos, idx, auxI, no_i;
   double ec[3], ecNorm, c1[3], c2[3], aFt[3*3], aFtH[3*3], aF[3*3], Ht[3*3];
@@ -375,7 +426,14 @@ unsigned rFtH(double * u, unsigned char * hinl, double th, double * H, unsigned 
                     }
                 }
               m_i = no_i;
-              innerFH(uH, hinlCount, uV, no_i, u, len, th, 15, sam_sizH, sam_sizO, aF, inl);
+              if (!haveInnerWorkspace) {
+                  if (!initDegInnerWorkspace(&innerWorkspace, len, hinlCount,
+                                             nhinlCount, sam_sizH + sam_sizO))
+                      break;
+                  haveInnerWorkspace = 1;
+                }
+              innerFH_workspace(uH, hinlCount, uV, no_i, u, len, th, 15,
+                                sam_sizH, sam_sizO, aF, inl, &innerWorkspace);
 
               /*if sum(inl) > max_i
                                           max_i = sum(inl);
@@ -421,6 +479,8 @@ unsigned rFtH(double * u, unsigned char * hinl, double th, double * H, unsigned 
   free(uH);
   free(ptr);
   free(v);
+  if (haveInnerWorkspace)
+      clearDegInnerWorkspace(&innerWorkspace);
   return max_i;
 }
 
@@ -466,18 +526,81 @@ end */
 
 
 /*function [F,inl, tinl] = innerFH (uH, uO, u, th, num, sam_sizH, sam_sizO)*/
-void innerFH(double * uH, unsigned lenH, double * uO, unsigned lenO,
+static unsigned u2FitWorkspace(double * u, unsigned len, double * F,
+                               unsigned char * inl, double th, double ths,
+                               unsigned iters, int *inlI, double *Ds,
+                               double *buffer) {
+  double dth = (ths - th) / (iters - 1);
+  unsigned iter, i, no_i;
+
+  for (iter = 0; iter < iters; ++iter) {
+      FDs(u, F, Ds, len);
+      no_i = 0;
+      for (i = 0; i < len; ++i) {
+          if (Ds[i] < ths) {
+              inl[i] = 1;
+              ++no_i;
+            } else {
+              inl[i] = 0;
+            }
+        }
+      if (no_i < 8)
+          return no_i;
+      no_i = 0;
+      for (i = 0; i < len; ++i) {
+          if (inl[i])
+              inlI[no_i++] = i;
+        }
+      u2f(u, inlI, no_i, F, buffer);
+      ths -= dth;
+    }
+
+  FDs(u, F, Ds, len);
+  no_i = 0;
+  for (i = 0; i < len; ++i) {
+      if (Ds[i] < th) {
+          inl[i] = 1;
+          ++no_i;
+        } else {
+          inl[i] = 0;
+        }
+    }
+  return no_i;
+}
+
+static void dual_sample_workspace(double * uA, unsigned lenA, unsigned sA,
+                                  double * uB, unsigned lenB, unsigned sB,
+                                  double *usam, unsigned *ptrA, unsigned *ptrB) {
+  unsigned idx, pos, i;
+
+  for (i = 0; i < lenA; ++i)
+      ptrA[i] = i;
+  for (i = 0; i < lenB; ++i)
+      ptrB[i] = i;
+  for (pos = 0; pos < sA; ++pos) {
+      idx = degensac_rand() % lenA;
+      i = ptrA[pos]; ptrA[pos] = ptrA[idx]; ptrA[idx] = i;
+    }
+  for (pos = 0; pos < sB; ++pos) {
+      idx = degensac_rand() % lenB;
+      i = ptrB[pos]; ptrB[pos] = ptrB[idx]; ptrB[idx] = i;
+    }
+  for (i = 0; i < sA; ++i)
+      memcpy(usam+6*i, uA+6*ptrA[i], 6*sizeof(double));
+  for (i = 0; i < sB; ++i)
+      memcpy(usam+6*(i+sA), uB+6*ptrB[i], 6*sizeof(double));
+}
+
+static void innerFH_workspace(double * uH, unsigned lenH, double * uO, unsigned lenO,
 	     double * u, unsigned len, double th, unsigned repCount, unsigned sam_sizH, unsigned sam_sizO,
-	     double * F, unsigned char * inl) {
+	     double * F, unsigned char * inl, DegInnerWorkspace *w) {
 
   unsigned i, rep, max_i, max_s, no_i;
   double aF[3*3];
-
-  unsigned char * v = (unsigned char *) malloc(len*sizeof(unsigned char));
-  double * usam = (double *) malloc(6*(sam_sizH+sam_sizO)*sizeof(double));
-  double * Ds = (double *) malloc(len*sizeof(double));
-  int * allInl = (int *) malloc((sam_sizH+sam_sizO)*sizeof(int));
-  double * buffer = (double *) malloc(9*(sam_sizH+sam_sizO)*sizeof(double));
+  unsigned char *v = w->v;
+  double *usam = w->usam, *Ds = w->Ds, *buffer = w->buffer;
+  int *allInl = w->allInl, *fitInl = w->fitInl;
+  unsigned *ptrA = w->ptrA, *ptrB = w->ptrB;
 
   for (i = 0; i < sam_sizH+sam_sizO; ++i) {
       allInl[i] = i;
@@ -510,7 +633,8 @@ void innerFH(double * uH, unsigned lenH, double * uO, unsigned lenO,
   for (rep = 0; rep < repCount; ++rep) {
 
       /*usam = [rsample(ptrH, uH, sH),rsample(ptrO, uO, sO)];*/
-      dual_sample(uH, lenH, sam_sizH, uO, lenO, sam_sizO, usam);
+      dual_sample_workspace(uH, lenH, sam_sizH, uO, lenO, sam_sizO,
+                            usam, ptrA, ptrB);
 
       /*aF = fu2F(usam);
                 Ds = fFDs(aF,u);*/
@@ -547,7 +671,8 @@ void innerFH(double * uH, unsigned lenH, double * uO, unsigned lenO,
                         no_i  = sum(v);*/
       if (no_i > max_s) {
           max_s = no_i;
-          no_i = u2Fit(u, len, aF, v, th, th*3, 4);
+          no_i = u2FitWorkspace(u, len, aF, v, th, th*3, 4,
+                                fitInl, Ds, buffer);
 
           /*if max_i < no_i
                                 inl = v;
@@ -566,104 +691,48 @@ void innerFH(double * uH, unsigned lenH, double * uO, unsigned lenO,
         end*/
     }
 
-  free(usam);
-  free(Ds);
-  free(allInl);
-  free(buffer);
-  free(v);
+}
+
+void innerFH(double * uH, unsigned lenH, double * uO, unsigned lenO,
+             double * u, unsigned len, double th, unsigned repCount,
+             unsigned sam_sizH, unsigned sam_sizO, double * F,
+             unsigned char * inl) {
+  DegInnerWorkspace workspace;
+  if (sam_sizH > lenH || sam_sizO > lenO ||
+      !initDegInnerWorkspace(&workspace, len, lenH, lenO,
+                             sam_sizH + sam_sizO)) {
+      memset(F, 0, 9 * sizeof(double));
+      memset(inl, 0, len * sizeof(unsigned char));
+      return;
+    }
+  innerFH_workspace(uH, lenH, uO, lenO, u, len, th, repCount,
+                    sam_sizH, sam_sizO, F, inl, &workspace);
+  clearDegInnerWorkspace(&workspace);
 }
 
 /*Draw combined sample from two arrays of TCs*/
 void dual_sample(double * uA, unsigned lenA, unsigned sA, double * uB, unsigned lenB, unsigned sB, double * usam) {
-  unsigned idx, pos, i;
-  unsigned * ptrA = (unsigned *) malloc(lenA*sizeof(unsigned));
-  unsigned * ptrB = (unsigned *) malloc(lenB*sizeof(unsigned));
+  unsigned *ptrA, *ptrB;
+  if (sA > lenA || sB > lenB)
+      return;
+  ptrA = (unsigned *) malloc(lenA*sizeof(unsigned));
+  ptrB = (unsigned *) malloc(lenB*sizeof(unsigned));
 
-  for (i = 0; i < lenA; ++i) {
-      ptrA[i] = i;
-    }
-  for (i = 0; i < lenB; ++i) {
-      ptrB[i] = i;
-    }
-
-  /*Shuffle pointers - at least the first 's̈́'*/
-  for (pos = 0; pos < sA; ++pos) {
-      idx = degensac_rand() % lenA;
-      i = ptrA[pos];
-      ptrA[pos] = ptrA[idx];
-      ptrA[idx] = i;
-    }
-  for (pos = 0; pos < sB; ++pos) {
-      idx = degensac_rand() % lenB;
-      i = ptrB[pos];
-      ptrB[pos] = ptrB[idx];
-      ptrB[idx] = i;
-    }
-
-  /*Fill samples*/
-  for (i = 0; i < sA; ++i) {
-      memcpy(usam+6*i, uA+6*ptrA[i], 6*sizeof(double));
-    }
-  for (i = 0; i < sB; ++i) {
-      memcpy(usam+6*(i+sA), uB+6*ptrB[i], 6*sizeof(double));
-    }
-
+  if ((ptrA != NULL || lenA == 0) && (ptrB != NULL || lenB == 0))
+      dual_sample_workspace(uA, lenA, sA, uB, lenB, sB, usam, ptrA, ptrB);
   free(ptrA);
   free(ptrB);
 }
 
 /*function [F,inl] = u2Fit(u, F, th, ths)*/
 unsigned u2Fit(double * u, unsigned len, double * F, unsigned char * inl, double th, double ths, unsigned iters) {
-  /*Error threshold step*/
-  double dth = (ths - th) / (iters - 1);
-  unsigned iter, i, no_i;
   int * inlI = (int *) malloc(len*sizeof(int));
   double * Ds = (double *) malloc(len*sizeof(double));
   double * buffer = (double *) malloc(9*len*sizeof(double));
+  unsigned no_i = 0;
 
-  for (iter = 0; iter < iters; ++iter) {
-      /*New inliers from old F*/
-      FDs(u, F, Ds, len);
-      no_i = 0;
-      for (i = 0; i < len; ++i) {
-          if (Ds[i] < ths) {
-              inl[i] = 1;
-              ++no_i;
-            } else {
-              inl[i] = 0;
-            }
-        }
-      /*Not enough inliers for F estimation*/
-      if (no_i < 8) {
-          free(inlI);
-          free(Ds);
-          free(buffer);
-          return no_i;
-        }
-      /*New F from new inliers*/
-      no_i = 0;
-      for (i = 0; i < len; ++i) {
-          if (inl[i]) {
-              inlI[no_i++] = i;
-            }
-        }
-      u2f(u, inlI, no_i, F, buffer);
-
-      ths -= dth;
-    }
-
-  /*New inliers from new F*/
-  FDs(u, F, Ds, len);
-  no_i = 0;
-  for (i = 0; i < len; ++i) {
-      if (Ds[i] < th) {
-          inl[i] = 1;
-          ++no_i;
-        } else {
-          inl[i] = 0;
-        }
-    }
-
+  if (inlI != NULL && Ds != NULL && buffer != NULL)
+      no_i = u2FitWorkspace(u, len, F, inl, th, ths, iters, inlI, Ds, buffer);
   free(inlI);
   free(Ds);
   free(buffer);
