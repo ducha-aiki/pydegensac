@@ -49,30 +49,44 @@ uint32_t SuperFastHash (const char * data, int len) {
 
 void htInit(HashTable * ht) {
 	unsigned i;
+	ht->used = 0;
+	ht->blocks = NULL;
 	for (i = 0; i < HT_FIELDS; ++i) {
 		ht->fields[i] = 0;
 	}
 }
 
 void htClear(HashTable * ht) {
-	unsigned i;
-	HashField * hf;
-	for (i = 0; i < HT_FIELDS; ++i) {
-		while (ht->fields[i]) {
-			hf = ht->fields[i];
-			ht->fields[i] = ht->fields[i]->next;
-			free(hf);
-		}
-	}
+    HashBlock * block = ht->blocks;
+    while (block != NULL) {
+        HashBlock * next = block->next;
+        free(block);
+        block = next;
+    }
+    htInit(ht);
 }
 
 void htInsert(HashTable * ht, uint32_t hash, int length, int iterID) {
-	HashField * hf = (HashField *)malloc(sizeof(HashField));
-	hf->next = ht->fields[hash % HT_FIELDS];
-	hf->hash = hash;
-	hf->length = length;
-	hf->iterID = iterID;
-	ht->fields[hash % HT_FIELDS] = hf;
+    HashField * hf;
+    if (ht->used < HT_BLOCK_CAPACITY) {
+        hf = &ht->nodes[ht->used++];
+    } else {
+        HashBlock * block = ht->blocks;
+        if (block == NULL || block->used == HT_BLOCK_CAPACITY) {
+            block = (HashBlock *)malloc(sizeof(HashBlock));
+            if (block == NULL)
+                return;
+            block->next = ht->blocks;
+            block->used = 0;
+            ht->blocks = block;
+        }
+        hf = &block->nodes[block->used++];
+    }
+    hf->next = ht->fields[hash % HT_FIELDS];
+    hf->hash = hash;
+    hf->length = length;
+    hf->iterID = iterID;
+    ht->fields[hash % HT_FIELDS] = hf;
 }
 
 int htContains(HashTable * ht, uint32_t hash, int length, int iterID) { /* compare thrs to be sure, but slower */
