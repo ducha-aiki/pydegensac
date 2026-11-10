@@ -43,6 +43,7 @@ D3: Detached  - use only subset of inliers (randomly chosen)
 unsigned getticks(void);
 #endif /*__linux__*/
 
+/* inl2 is optional scratch output: pass NULL when its inlier mask is unused. */
 Score exp_iterFcustom(double *u, int len, int *inliers, int * inl2, double th, double ths, int iters,
           double *F, double **errs, double *buffer, int * samidx, int iterID, unsigned inlLimit, double *resids, exFDsPtr EXFDS1,FDsPtr FDS1,
           const double *u_soa, FDsPtr FDS1soa);

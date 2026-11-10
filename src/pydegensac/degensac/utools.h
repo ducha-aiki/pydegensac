@@ -25,6 +25,11 @@ void scalmul (double *data, double m, int len, int step) ;
 
 int nullspace(double *matrix, double *nullspace, int n, int * buffer);
 
+/* Seven-point specialization. matrix is 9x9 row-major scratch with its last
+   two rows zero-padded. Basis/rank and the 18-entry pivot buffer match
+   nullspace(..., 9, ...); basis needs room for up to 81 doubles. */
+int nullspace7x9(double *matrix, double *basis, int *buffer);
+
 void cov_mat(double *Cv, const double * Z, int len, int siz);
 
 void crossprod_st(double *out, const double *a, const double *b, int st);

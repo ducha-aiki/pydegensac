@@ -200,6 +200,16 @@ Score inlidxs (const double * err, int len, double th, int * inl) {
 }
 
 
+unsigned inlidxs_only (const double *err, int len, double th, int *inl) {
+  unsigned count = 0;
+  int i;
+  for (i = 0; i < len; ++i) {
+      inl[count] = i;
+      count += (err[i] <= th);
+    }
+  return count;
+}
+
 int inlidxso (const double * err, const double * sgn, int len, double th,
               int * inl_buff, int ** inls)
 {

@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 import pydegensac
 
@@ -231,3 +232,58 @@ def test_homography_laf_consistency():
     assert np.count_nonzero(mask_laf[30:]) == 0
     assert h_laf.shape == (3, 3)
     assert np.isfinite(h_laf).all()
+
+
+@pytest.mark.parametrize("estimator", ["homography", "fundamental"])
+@pytest.mark.parametrize("sym_check,laf_coef", [(False, 0.0), (True, 0.0),
+                                             (False, 1.0), (True, 1.0)])
+def test_native_mask_owns_storage_across_calls(estimator, sym_check, laf_coef):
+    # Odd-sized inputs also exercise alignment between double and int scratch.
+    rng = np.random.RandomState(19)
+    pts1 = rng.uniform(0, 100, (65, 2))
+    pts2 = pts1 + [3.0, -2.0]
+    if estimator == "fundamental":
+        xyz = rng.uniform([-2, -2, 4], [2, 2, 10], (65, 3))
+        pts1 = 800 * xyz[:, :2] / xyz[:, 2:]
+        xyz2 = xyz + [0.5, 0.1, 0.05]
+        pts2 = 800 * xyz2[:, :2] / xyz2[:, 2:]
+
+    if laf_coef:
+        frame = np.tile([1.0, 0.0, 0.0, 1.0], (len(pts1), 1))
+        pts1 = np.column_stack((pts1, frame))
+        pts2 = np.column_stack((pts2, frame))
+    if estimator == "homography":
+        call = lambda: pydegensac.findHomography_(
+            pts1, pts2, 1.0, 0.999, 10, 0, sym_check, laf_coef, 42)
+    else:
+        call = lambda: pydegensac.findFundamentalMatrix_(
+            pts1, pts2, 1.0, 0.999, 10, 0, sym_check, laf_coef, True, 42)
+    model, mask = call()
+    assert mask.any()
+    saved_model, saved_mask = model.copy(), mask.copy()
+    for _ in range(3):
+        next_model, next_mask = call()
+        assert next_mask.dtype == np.bool_
+        assert next_mask.shape == (len(pts1),)
+        np.testing.assert_array_equal(next_model, saved_model)
+        np.testing.assert_array_equal(next_mask, saved_mask)
+        next_mask[:] = False
+        next_model[:] = 0
+        np.testing.assert_array_equal(model, saved_model)
+        np.testing.assert_array_equal(mask, saved_mask)
+
+
+def test_degenerate_native_calls_return_empty_masks():
+    points = np.zeros((8, 2), dtype=np.float64)
+
+    h, h_mask = pydegensac.findHomography_(
+        points[:4], points[:4], 1.0, 0.999, 1, 0, False, 0.0, 42
+    )
+    f, f_mask = pydegensac.findFundamentalMatrix_(
+        points, points, 1.0, 0.999, 1, 0, False, 0.0, False, 42
+    )
+
+    np.testing.assert_array_equal(h, np.zeros((3, 3)))
+    np.testing.assert_array_equal(f, np.zeros((3, 3)))
+    assert not h_mask.any()
+    assert not f_mask.any()
