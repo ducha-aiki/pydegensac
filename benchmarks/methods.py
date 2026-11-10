@@ -18,12 +18,26 @@ import numpy as np
 F_CONF = 0.9999
 H_CONF = 0.999
 
+# Reset pydegensac for every call, including every iteration budget.
+PYDEGENSAC_SEED = 12345
+
 #: Iteration budgets for the time-mAA sweeps.
 F_BUDGETS = (125, 250, 500, 1000, 2500, 5000, 10000, 25000, 50000)
 H_BUDGETS = (10, 25, 100, 400, 1600, 6400, 25000)
 
 METHOD_NAMES = ("cv2-ransac", "cv2-magsac", "poselib", "poselib-prosac",
                 "pydegensac")
+
+
+def require_seed_support(problem):
+    """Reject legacy builds instead of silently scoring seed keyword errors."""
+    import inspect
+    import pydegensac
+    name = "findFundamentalMatrix" if problem == "f" else "findHomography"
+    if "seed" not in inspect.signature(getattr(pydegensac, name)).parameters:
+        raise SystemExit(
+            f"installed pydegensac.{name} does not support seed; "
+            "use a release with explicit seeding for this benchmark")
 
 
 def _fail(n):
@@ -98,7 +112,8 @@ def _pydegensac_f(pts1, pts2, th, scores=None, max_iters=F_BUDGETS[-1]):
         return _fail(n)
     try:
         F, mask = pydegensac.findFundamentalMatrix(
-            pts1, pts2, th, conf=F_CONF, max_iters=max_iters)
+            pts1, pts2, th, conf=F_CONF, max_iters=max_iters,
+            seed=PYDEGENSAC_SEED)
     except Exception:
         return _fail(n)
     if F is None or not np.any(F):
@@ -169,7 +184,8 @@ def _pydegensac_h(pts1, pts2, th, scores=None, max_iters=H_BUDGETS[-1]):
         return _fail(n)
     try:
         H, mask = pydegensac.findHomography(
-            pts1, pts2, th, conf=H_CONF, max_iters=max_iters)
+            pts1, pts2, th, conf=H_CONF, max_iters=max_iters,
+            seed=PYDEGENSAC_SEED)
     except Exception:
         return _fail(n)
     if H is None or not np.any(H):

@@ -265,7 +265,15 @@ jobs:
         run: .venv\Scripts\python -m cibuildwheel --output-dir wheelhouse
         env:
           CIBW_ARCHS_WINDOWS: AMD64
-          CIBW_BEFORE_ALL_WINDOWS: vcpkg install openblas lapack --triplet x64-windows
+          # openblas[threads], not plain openblas. The port has no default
+          # features, so plain openblas is built with USE_THREAD=0 and without
+          # USE_LOCKING, and that build is unsafe for concurrent callers: its
+          # buffer allocator is unlocked. The estimators release the GIL, so
+          # threaded calls returned wrong models (about 3 in 10,000 calls in
+          # test_degeneracy_workspace's threaded scenes). USE_THREAD=1 turns
+          # on the allocator lock. A USE_LOCKING overlay triplet breaks
+          # lapack-reference's gfortran configure step.
+          CIBW_BEFORE_ALL_WINDOWS: vcpkg install openblas[threads] lapack --triplet x64-windows
           CIBW_BUILD: >
             cp38-win_amd64
             cp39-win_amd64
@@ -317,7 +325,8 @@ jobs:
         run: .venv\Scripts\python -m cibuildwheel --output-dir wheelhouse
         env:
           CIBW_ARCHS_WINDOWS: AMD64
-          CIBW_BEFORE_ALL_WINDOWS: vcpkg install openblas lapack --triplet x64-windows
+          # openblas[threads]: see build_wheels_windows.
+          CIBW_BEFORE_ALL_WINDOWS: vcpkg install openblas[threads] lapack --triplet x64-windows
           CIBW_BUILD: cp314-win_amd64
           CIBW_ENVIRONMENT_WINDOWS: >
             VCPKG_ROOT=C:/vcpkg

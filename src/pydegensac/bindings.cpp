@@ -6,6 +6,9 @@
 #include "degensac/exp_ranF.h"
 #include "degensac/exp_ranH.h"
 
+/* simd.h pulls in C-only headers; this is all the binding needs. */
+extern "C" const char *degensac_simd_backend(void);
+
 namespace py = pybind11;
 
 enum RANSAC_error_t_h {SAMPSON = 0,
@@ -19,15 +22,13 @@ enum RANSAC_error_t_f {SAMPSON_F = 0,
 
 namespace {
 
-// Input arrays converted to the layout the C core expects, plus the C-side
-// scratch/output buffers shared by both estimators. The destructor owns all
-// cleanup, so every exit path (including exceptions) releases the memory.
+// Input arrays converted to the layout the C core expects. The destructor
+// owns cleanup, so every exit path (including exceptions) releases the memory.
 struct ConvertedInput {
     size_t num_tents = 0;
     double *u2 = nullptr;
     double *u2_p1 = nullptr;
     double *u2_p2 = nullptr;
-    unsigned char *inl = nullptr;
 
     ConvertedInput() = default;
     ConvertedInput(const ConvertedInput&) = delete;
@@ -36,7 +37,6 @@ struct ConvertedInput {
         delete [] u2;
         delete [] u2_p1;
         delete [] u2_p2;
-        delete [] inl;
     }
 };
 
@@ -94,9 +94,6 @@ void convert_input(const py::buffer_info &buf1, const py::buffer_info &buf1a,
     in.u2_p1 = u2Ptr_p1;
     double *u2Ptr_p2 = do_laf_check ? new double[NUM_TENTS*6] : nullptr;
     in.u2_p2 = u2Ptr_p2;
-
-    typedef unsigned char uchar;
-    in.inl = new uchar[NUM_TENTS];
 
     if (do_laf_check) {
         for (size_t i=0; i < NUM_TENTS; i++) {
@@ -173,7 +170,7 @@ void convert_input(const py::buffer_info &buf1, const py::buffer_info &buf1a,
     }
 }
 
-py::tuple pack_output(const double *model, const unsigned char *inl, size_t num_tents) {
+py::tuple pack_output(const double *model, const py::array_t<bool> &inliers_out) {
     //Model
     py::array_t<double> model_out = py::array_t<double>({3,3});
     py::buffer_info buf_model_out = model_out.request();
@@ -181,13 +178,6 @@ py::tuple pack_output(const double *model, const unsigned char *inl, size_t num_
 
     for (size_t i=0; i<9; i++)
         ptr_model_out[i]=model[i];
-
-    //Inliers
-    py::array_t<bool> inliers_out = py::array_t<bool>(num_tents);
-    py::buffer_info buf_inliers = inliers_out.request();
-    bool *ptr_inliers= (bool *)buf_inliers.ptr;
-    for (size_t i = 0; i < num_tents; i++)
-        ptr_inliers[i] = (bool) inl[i];
 
     return py::make_tuple(model_out, inliers_out);
 }
@@ -267,6 +257,10 @@ py::tuple findHomography_(py::array_t<double, py::array::c_style | py::array::fo
 
     ConvertedInput in;
     convert_input(buf1, buf1a, laf_coef, in);
+    // The core writes only 0/1 bytes, directly into the NumPy boolean output.
+    static_assert(sizeof(bool) == sizeof(unsigned char), "Boolean mask must use one byte");
+    py::array_t<bool> inliers_out(in.num_tents);
+    unsigned char *inl = reinterpret_cast<unsigned char *>(inliers_out.mutable_data());
 
     // Run the RANSAC
     {
@@ -280,7 +274,7 @@ py::tuple findHomography_(py::array_t<double, py::array::c_style | py::array::fo
                              conf,
                              max_iters,
                              H,
-                             in.inl,
+                             inl,
                              4,
                              nullptr,
                              oriented_constr,
@@ -291,7 +285,7 @@ py::tuple findHomography_(py::array_t<double, py::array::c_style | py::array::fo
                              seed);
     }
 
-    return pack_output(H, in.inl, in.num_tents);
+    return pack_output(H, inliers_out);
 }
 
 py::tuple findFundamentalMatrix_(py::array_t<double, py::array::c_style | py::array::forcecast>  x1y1_,
@@ -350,6 +344,10 @@ py::tuple findFundamentalMatrix_(py::array_t<double, py::array::c_style | py::ar
 
     ConvertedInput in;
     convert_input(buf1, buf1a, laf_coef, in);
+    // The core writes only 0/1 bytes, directly into the NumPy boolean output.
+    static_assert(sizeof(bool) == sizeof(unsigned char), "Boolean mask must use one byte");
+    py::array_t<bool> inliers_out(in.num_tents);
+    unsigned char *inl = reinterpret_cast<unsigned char *>(inliers_out.mutable_data());
 
     // Run the RANSAC
     {
@@ -363,7 +361,7 @@ py::tuple findFundamentalMatrix_(py::array_t<double, py::array::c_style | py::ar
                              conf,
                              max_iters,
                              F,
-                             in.inl,
+                             inl,
                              nullptr,
                              1, 0,
                              NULL,
@@ -374,7 +372,7 @@ py::tuple findFundamentalMatrix_(py::array_t<double, py::array::c_style | py::ar
                              FDS1soa);
     }
 
-    return pack_output(F, in.inl, in.num_tents);
+    return pack_output(F, inliers_out);
 }
 
 
@@ -414,4 +412,7 @@ PYBIND11_MODULE(pydegensac, m) {
           py::arg("laf_coef") = 0,
           py::arg("enable_degeneracy_check") = 1,
           py::arg("seed") = -1);
+
+    m.def("simd_backend_", []() { return std::string(degensac_simd_backend()); },
+          "Active kernel backend: 'avx' or 'scalar' (PYDEGENSAC_SIMD=0 forces scalar).");
 }

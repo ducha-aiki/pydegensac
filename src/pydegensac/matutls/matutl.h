@@ -11,7 +11,7 @@
 /* Utility routines for real and complex matrix computations
  */
 #ifndef CPX
-#ifdef WIN32
+#if defined(WIN32) || defined(_WIN32)
 #undef complex
 #endif
 struct complex
@@ -43,6 +43,9 @@ void ldvmat(double *x,double *y,int k);
 int qrbdv(double *x,double *y,double *z,int i,double *w,int j);
 int qrbdi(double *x,double *y,int l);
 int svduv(double *d,double *a,double *u,int m,double *v,int n);
+/* Eight-point nullspace: a is a mutable row-major 9x8 matrix; u has room
+   for 9x9 doubles. Only column 8 of u is specified, bit-identical to svduv. */
+int svdnull8(double *a,double *u);
 int svdu1v(double *d,double *a,int m,double *v,int n);
 
 #endif

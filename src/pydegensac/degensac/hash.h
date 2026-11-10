@@ -1,3 +1,6 @@
+#ifndef DEGENSAC_HASH_H
+#define DEGENSAC_HASH_H
+
 #include <stdint.h>  /* Replace with <stdint.h if appropriate */
 #include <stdlib.h>
 
@@ -13,6 +16,7 @@
 #endif
 
 #define HT_FIELDS 64
+#define HT_BLOCK_CAPACITY 64
 
 uint32_t SuperFastHash (const char * data, int len);
 
@@ -25,9 +29,21 @@ typedef struct _HashField
     struct _HashField * next;
 } HashField;
 
+/* Most calls fit in the inline nodes. Overflow blocks keep node addresses
+   stable while avoiding one allocation per inlier set. */
+typedef struct _HashBlock
+{
+    struct _HashBlock * next;
+    unsigned used;
+    HashField nodes[HT_BLOCK_CAPACITY];
+} HashBlock;
+
 typedef struct _HashTable
 {
     HashField * fields[HT_FIELDS];
+    unsigned used;
+    HashField nodes[HT_BLOCK_CAPACITY];
+    HashBlock * blocks;
 } HashTable;
 
 void htInit(HashTable * ht);
@@ -37,3 +53,5 @@ void htClear(HashTable * ht);
 void htInsert(HashTable * ht, uint32_t hash, int length, int iterID);
 
 int htContains(HashTable * ht, uint32_t hash, int length, int iterID);
+
+#endif /* DEGENSAC_HASH_H */

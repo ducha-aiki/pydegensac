@@ -40,7 +40,7 @@ Score iterH (double *u, int len, int *inliers, double th, double ths,
 	    HDs (Z, u, h, d, len);
 #endif
 	    S = inlidxs(d, len, th, inliers);
-		Ss = inlidxs(d, len, ths, inliers);
+		Ss.I = inlidxs_only(d, len, ths, inliers);
 
 		if (scoreLess(maxS, S)) {
 			maxS = S;
@@ -82,17 +82,31 @@ Score iterH (double *u, int len, int *inliers, double th, double ths,
 
 Score inHrani (double *u, int len, int *inliers, int ninl, double th, double *Z,
 			double **errs, double *buffer, double *H, unsigned inlLimit) {
+	Score S = {0,0};
+	int *intbuff;
+	if (ninl < 8)
+		return S;
+	intbuff = (int *) malloc ((size_t)len * sizeof(int));
+	if (intbuff != NULL) {
+		S = inHrani_workspace(u, len, inliers, ninl, th, Z, errs, buffer, H,
+		                        inlLimit, intbuff);
+		free(intbuff);
+	}
+	return S;
+}
+
+Score inHrani_workspace(double *u, int len, int *inliers, int ninl, double th, double *Z,
+                        double **errs, double *buffer, double *H, unsigned inlLimit,
+                        int *intbuff) {
 	int ssiz, i;
 	Score S, maxS = {0,0};
 	double *d, h[9];
 	int *sample;
-	int *intbuff;
 
 	if (ninl < 8) {
 		return maxS;
 	}
 
-	intbuff = (int *) malloc (len * sizeof(int));
 
 	ssiz = ninl / 2;
 	if (ssiz > 12) {
@@ -125,7 +139,6 @@ Score inHrani (double *u, int len, int *inliers, int ninl, double th, double *Z,
 	errs[2] = errs[0];
 	errs[0] = d;
 
-	free(intbuff);
 	return maxS;
 }
 

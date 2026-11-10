@@ -9,6 +9,7 @@
 #include "lapwrap.h"
 
 #include "Ftools.h"
+#include "simd.h"
 #define SYMMETRIC_ERROR
 #define SYMMETRIC_ERROR_CHECK
 #define pit 1.0471975511965967
@@ -117,6 +118,10 @@ void FDs_soa (const double *s, const double *F, double *p, int len)
     double rx, ry, rwc, ryc, rxc, r, a1, a2, b1, b2;
     int i;
 
+#ifdef DEGENSAC_HAVE_AVX_KERNELS
+    if (degensac_use_avx()) { FDs_soa_avx(s, F, p, len); return; }
+#endif
+
     for (i=0; i<len; i++)
     {
         a1 = x1[i]; a2 = y1[i]; b1 = x2[i]; b2 = y2[i];
@@ -135,6 +140,10 @@ void FDsSym_soa (const double *s, const double *F, double *p, int len)
     const double *x1 = s, *y1 = s + len, *x2 = s + 2*len, *y2 = s + 3*len;
     double rx, ry, rwc, ryc, rxc, r, a1, a2, b1, b2, a, b;
     int i;
+
+#ifdef DEGENSAC_HAVE_AVX_KERNELS
+    if (degensac_use_avx()) { FDsSym_soa_avx(s, F, p, len); return; }
+#endif
 
     for (i=0; i<len; i++)
     {
@@ -211,6 +220,42 @@ void exFDs (const double *u, const double *F, double *p, double *w, int len)
         u += 6;
     }
 }
+
+/* Sampson LO needs every residual, but only the selected refit's weights.
+   Keep exFDs' arithmetic order, leaving its denominators in w until the
+   inlier subset has been chosen. */
+void exFDs_den (const double *u, const double *F, double *p, double *w, int len)
+{
+    double rx, ry, rwc, ryc, rxc, r;
+    int i;
+
+    for (i=1; i<=len; i++)
+    {
+        rxc = _f1 * u4 + _f4 * u5 + _f7;
+        ryc = _f2 * u4 + _f5 * u5 + _f8;
+        rwc = _f3 * u4 + _f6 * u5 + _f9;
+        r =(u1 * rxc + u2 * ryc + rwc);
+        rx = _f1 * u1 + _f2 * u2 + _f3;
+        ry = _f4 * u1 + _f5 * u2 + _f6;
+
+        *w = rxc*rxc + ryc*ryc + rx*rx + ry*ry;
+        *p = r*r / *w;
+
+        p ++;
+        w ++;
+        u += 6;
+    }
+}
+
+void exFDs_weights (double *w, const int *inliers, int len)
+{
+    int i, j;
+    for (i = 0; i < len; ++i) {
+        j = inliers[i];
+        w[j] = 1 / sqrt(w[j]);
+    }
+}
+
 void FDsSym (const double *u, const double *F, double *p, int len)
 {
     double rx, ry, rwc, ryc, rxc, r;
@@ -397,6 +442,9 @@ void lin_fmN(const double *u, double *p, const int *inl, int len,
 void singulF(double *F)
 {
     double S[3], UT[9], V[9], D[9] = {1,0,0,0,1,0,0,0,1}, VD[9];
+    /* Avoid a full SVD when its discarded direction is well conditioned.
+       The fast path preserves F on failure for the LAPACK fallback. */
+    if (rank2_project3(F) == 0) return;
     trnm(F,3);
 
     if( lap_SVD (S, F, UT, 3, V, 3) != 0 ) {
@@ -419,7 +467,7 @@ void u2f(const double *u, const int *inl, int len,
 {
     double A1[3], A2[3];
     double *Z, V[9*9], U[8*8], D[9], *p;
-    int i, j, step;
+    int i, step;
 
     if (buffer == NULL)
         Z = (double *) malloc(sizeof(double) * 9 * len);
@@ -432,22 +480,18 @@ void u2f(const double *u, const int *inl, int len,
         lin_fmN(u, Z, inl, len, A1, A2);
 
         cov_mat(V, Z, len, 9);
-        lap_eig(V,D,9);
+        lap_eig_min9(V);
 
-        /* LAPACK returns the eigenvectors as Fortran columns, which in this
-           row-major buffer are rows -- so the one we want is already
-           contiguous. The old code transposed the entire 9x9 just to read it
-           back with stride 9; reading row j directly is the same nine values.
-           (u2h has always done it this way.) */
-        j = 0;
-        for (i = 1; i<9; i++)
-            if (D[i] < D[j]) j = i;
-        p = V + 9*j;
+        /* Only the minimum eigenvector is needed; it is contiguous. */
+        p = V;
         step = 1;
     } else
     {
         lin_fm(u, Z, inl, len);
-        svduv(D,Z,V,9,U,8);
+        if (len == 8)
+            svdnull8(Z,V);
+        else
+            svduv(D,Z,V,9,U,8);
         p = V + 8;      /* ccmath's V is row-major: column 8, stride 9 */
         step = 9;
     }
@@ -487,13 +531,10 @@ void u2fw(const double *u, const int *inl, const double * w,
         }
 
         cov_mat(V, Z, len, 9);
-        lap_eig(V,D,9);
+        lap_eig_min9(V);
 
-        /* Eigenvector j is already contiguous here -- see u2f. */
-        j = 0;
-        for (i = 1; i<9; i++)
-            if (D[i] < D[j]) j = i;
-        p = V + 9*j;
+        /* Only the minimum eigenvector is needed; it is contiguous. */
+        p = V;
         step = 1;
     } else
     {
@@ -503,7 +544,10 @@ void u2fw(const double *u, const int *inl, const double * w,
             j = inl[i];
             scalmul(Z+i, w[j], 9, 9);
         }
-        svduv(D,Z,V,9,U,8);
+        if (len == 8)
+            svdnull8(Z,V);
+        else
+            svduv(D,Z,V,9,U,8);
         p = V + 8;      /* ccmath's V is row-major: column 8, stride 9 */
         step = 9;
     }

@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "rtools.h"
+#include "simd.h"
 
 #include "bsd_random.h"
 #define random degensac_random
@@ -173,6 +174,10 @@ Score inlidxs (const double * err, int len, double th, int * inl) {
      the speculative write at s.I is in bounds. */
   double j0 = 0, j1 = 0, j2 = 0, j3 = 0;
   int n4 = len & ~3;
+#ifdef DEGENSAC_HAVE_AVX_KERNELS
+  if (th != 0 && degensac_use_avx())
+      return inlidxs_avx(err, len, th, inl);
+#endif
   if (score_j) {
       for (i = 0; i < n4; i += 4) {
           j0 += truncQuadInv(err[i],   inv);
@@ -199,6 +204,16 @@ Score inlidxs (const double * err, int len, double th, int * inl) {
   return s;
 }
 
+
+unsigned inlidxs_only (const double *err, int len, double th, int *inl) {
+  unsigned count = 0;
+  int i;
+  for (i = 0; i < len; ++i) {
+      inl[count] = i;
+      count += (err[i] <= th);
+    }
+  return count;
+}
 
 int inlidxso (const double * err, const double * sgn, int len, double th,
               int * inl_buff, int ** inls)

@@ -125,6 +125,17 @@ extern void dsyev_( char* jobz, char* uplo, lapack_int* n, double* a, lapack_int
 
 
 /* Eigen-decomposition */
+int lap_eig_min9(double *a) {
+  double out[9], ev[9];
+  int i;
+  if (eig9_psd_smallest(a, out) == 0) {
+    for (i = 0; i < 9; ++i) a[i] = out[i];
+    return 0;
+  }
+  /* Both full solvers order eigenvalues increasingly. */
+  return lap_eig(a, ev, 9);
+}
+
 int lap_eig(double *a, double *ev, lapack_int n) {
   static LAP_THREAD_LOCAL lap_work_entry cache[LAP_CACHE_SLOTS];
   double stack_work[LAP_WORK_STACK];
@@ -132,6 +143,10 @@ int lap_eig(double *a, double *ev, lapack_int n) {
   double wkopt;
   double *work;
   double *heap_work = NULL;
+
+  /* Fixed-size reduction avoids the generic LAPACK driver overhead. On
+     nonconvergence or unsafe scaling, the input is intact for DSYEV. */
+  if (n == 9 && eig9_symmetric(a, ev) == 0) return 0;
 
   /* Query the optimal workspace, unless this shape has been seen before */
   lwork = lap_cache_get(cache, n, n);

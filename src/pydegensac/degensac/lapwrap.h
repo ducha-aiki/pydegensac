@@ -74,5 +74,19 @@ int lap_SVD (double *d, double *a, double *u, lapack_int m, double *vt, lapack_i
      The columns of E are the eigenvectors. */
 int lap_eig(double *a,double *ev, lapack_int n);
 
+/* Internal fixed-size solver: column-major upper triangle in, ascending
+   eigenvalues and column-major eigenvectors out. Failure preserves a/ev. */
+int eig9_symmetric(double *a, double *ev);
+
+/* Minimum eigenvector of a PSD 9x9 normal matrix. The fast kernel preserves
+   its input and writes out[9] only on success. The wrapper falls back to the
+   general eigensolver and places the resulting vector in a[0..8]. */
+int eig9_psd_smallest(const double *a, double *out);
+int lap_eig_min9(double *a);
+
+/* Internal 3x3 rank-2 projection. Returns 1, preserving f, when the normal
+   equations are ill-conditioned or the projection cannot be computed. */
+int rank2_project3(double *f);
+
 #endif /* __LAPWRAP_H__ */
 

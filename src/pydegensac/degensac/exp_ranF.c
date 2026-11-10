@@ -18,9 +18,6 @@ static DEGENSAC_THREAD_LOCAL HashTable HASH_TABLE_F;
 #include <time.h>
 //#include <mex.h>
 
-#define CHECK_ORIG(inl,orig) 1
-//#define CHECK_ORIG(inl,orig) (inl[orig[0]] && inl[orig[1]] && inl[orig[2]] && inl[orig[3]] && inl[orig[4]] && inl[orig[5]] && inl[orig[6]]) //to be used only with DegenSAC
-
 #define CHECK_COEF 16.0
 #define SYMM_COEF 0.6
 #define __HASHING__
@@ -51,6 +48,22 @@ static void reseed_rng(unsigned seed_value) {
     degensac_srandom(seed_value);
 }
 
+static int init_lo_workspace(int len, double **workspace, double **weights,
+                             int **intbuff, int **intbuff_best)
+{
+    int *ints;
+
+    *workspace = (double *) malloc((size_t) len * sizeof(double) +
+                                   2 * (size_t) len * sizeof(int));
+    if (*workspace == NULL)
+        return 0;
+    *weights = *workspace;
+    ints = (int *) (*workspace + len);
+    *intbuff = ints;
+    *intbuff_best = ints + len;
+    return 1;
+}
+
 int no_mto(double *A)
 {
     double x,y;
@@ -63,12 +76,16 @@ int no_mto(double *A)
 
 
 /******* Custom *********/
-Score exp_iterFcustom(double *u, int len, int *inliers, int * inl2, double th, double ths, int iters,
+static Score exp_iterFcustom_workspace(double *u, int len, int *inliers, int * inl2, double th, double ths, int iters,
                       double *F, double **errs, double *buffer, int * samidx, int iterID, unsigned inlLimit, double *resids, exFDsPtr EXFDS1,FDsPtr FDS1,
-                      const double *u_soa, FDsPtr FDS1soa) {
-    double *d = errs[1], *w;
+                      const double *u_soa, FDsPtr FDS1soa, double *w) {
+    double *d = errs[1];
     double f[9], dth;
     unsigned it;
+    int *fit_inliers;
+    unsigned fit_count;
+    /* Preserve symmetric and custom callbacks, whose weights can differ. */
+    const int selected_weights = EXFDS1 == exFDs;
     Score S = {0,0}, Ss, maxS;
 #ifdef __D3__
     int * detachedInl;
@@ -78,16 +95,14 @@ Score exp_iterFcustom(double *u, int len, int *inliers, int * inl2, double th, d
     int iterIDret;
     uint32_t hash;
 #endif //__HASHING__
-    w = (double *) malloc(len * sizeof(double));
     dth = (ths - th) / ILSQ_ITERS;
 
     /* F from the sample inliers by th */
     maxS = inlidxs(errs[4], len, th, inliers);
     if (maxS.I < 8) {
-        free(w);
         return S;
     }
-    S = inlidxs(errs[4], len, th*MWM, inliers);
+    S.I = inlidxs_only(errs[4], len, th*MWM, inliers);
 #ifdef __D3__
     //D3 - calculate number of inliers detached for LSQ
     detachedCount = (int)(S.I * D3_F_RATIO);
@@ -112,7 +127,10 @@ Score exp_iterFcustom(double *u, int len, int *inliers, int * inl2, double th, d
 
     /*iterate */
     for (it = 0; it < iters; it ++) {
-        EXFDS1 (u, f, d, w, len);
+        if (selected_weights)
+            exFDs_den(u, f, d, w, len);
+        else
+            EXFDS1 (u, f, d, w, len);
         if (resids != NULL) {
             memcpy(resids + it*len, d, len*sizeof(double));
         }
@@ -125,7 +143,6 @@ Score exp_iterFcustom(double *u, int len, int *inliers, int * inl2, double th, d
         if (iterIDret != -1 && iterIDret != iterID) {
             S.I = 0;
             S.J = 0;
-            free(w);
             return S;
         }
         if (iterIDret == -1) {
@@ -133,9 +150,12 @@ Score exp_iterFcustom(double *u, int len, int *inliers, int * inl2, double th, d
         }
 #endif //__HASHING__
 
-        transformInliers(inliers, inl2, S.I, len);
+        /* The legacy C wrapper can request this scratch mask. The estimator
+           does not consume it: original-sample membership is not checked. */
+        if (inl2 != NULL)
+            transformInliers(inliers, inl2, S.I, len);
 
-        if (scoreLess(maxS, S) && CHECK_ORIG(inl2,samidx)) {
+        if (scoreLess(maxS, S)) {
             maxS = S;
             errs[1] = errs[0];
             errs[0] = d;
@@ -143,12 +163,13 @@ Score exp_iterFcustom(double *u, int len, int *inliers, int * inl2, double th, d
             memcpy(F, f, 9*sizeof(double));
         }
 
-        Ss = inlidxs (d, len, ths*MWM, inliers);
+        Ss.I = inlidxs_only(d, len, ths*MWM, inliers);
         if (Ss.I < 8) {
-            free(w);
             return maxS;
         }
 
+        fit_inliers = inliers;
+        fit_count = Ss.I;
 #ifdef __D3__
         //D3 - calculate number of inliers detached for LSQ
         detachedCount = (int)(Ss.I * D3_F_RATIO);
@@ -161,15 +182,14 @@ Score exp_iterFcustom(double *u, int len, int *inliers, int * inl2, double th, d
         if (detachedCount < 8) {
             detachedCount = 8;
         }
-        if (detachedCount >= Ss.I) { // if we want to use more than (or all) we have, just use what we have without shuffling
-            u2fw(u, inliers, w, Ss.I, f, buffer);
-        } else {
-            detachedInl = randsubset (inliers, Ss.I, detachedCount);
-            u2fw(u, detachedInl, w, detachedCount, f, buffer);
+        if (detachedCount < Ss.I) {
+            fit_inliers = randsubset (inliers, Ss.I, detachedCount);
+            fit_count = detachedCount;
         }
-#else //__D3__
-        u2fw(u, inliers, w, Ss.I, f, buffer);
 #endif //__D3__
+        if (selected_weights)
+            exFDs_weights(w, fit_inliers, fit_count);
+        u2fw(u, fit_inliers, w, fit_count, f, buffer);
 
         ths -= dth;
     }
@@ -179,8 +199,9 @@ Score exp_iterFcustom(double *u, int len, int *inliers, int * inl2, double th, d
         memcpy(resids + 4*len, d, len*sizeof(double));
     }
     S = inlidxs (d, len, th, inliers);
-    transformInliers(inliers, inl2, S.I, len);
-    if (scoreLess(maxS, S) && CHECK_ORIG(inl2,samidx))
+    if (inl2 != NULL)
+        transformInliers(inliers, inl2, S.I, len);
+    if (scoreLess(maxS, S))
     {
         maxS = S;
         errs[1] = errs[0];
@@ -188,33 +209,37 @@ Score exp_iterFcustom(double *u, int len, int *inliers, int * inl2, double th, d
         memcpy(F, f, 9*sizeof(double));
     }
 
-    free(w);
     return maxS;
 }
 
-Score exp_inFranicustom (double *u, int len, int *inliers, int ninl,
+Score exp_iterFcustom(double *u, int len, int *inliers, int *inl2, double th, double ths, int iters,
+                      double *F, double **errs, double *buffer, int *samidx, int iterID, unsigned inlLimit, double *resids, exFDsPtr EXFDS1, FDsPtr FDS1,
+                      const double *u_soa, FDsPtr FDS1soa) {
+    Score S;
+    double *w = (double *) malloc((size_t) len * sizeof(double));
+
+    if (w == NULL)
+        return (Score) {0, 0};
+    S = exp_iterFcustom_workspace(u, len, inliers, inl2, th, ths, iters, F, errs, buffer,
+                                  samidx, iterID, inlLimit, resids, EXFDS1, FDS1, u_soa, FDS1soa, w);
+    free(w);
+    return S;
+}
+
+static Score exp_inFranicustom_workspace (double *u, int len, int *inliers, int ninl,
                          double th, double **errs, double *buffer,
                          double *F, int * samidx, int * iterID, unsigned inlLimit, double *resids,exFDsPtr EXFDS1,FDsPtr FDS1,
-                         const double *u_soa, FDsPtr FDS1soa) {
+                         const double *u_soa, FDsPtr FDS1soa, int *intbuff, int *intbuff_best, double *w) {
     unsigned ssiz, i;
     Score S = {0, 0}, maxS = {0, 0};
     int jj;
     double *d, f[9];
     int *sample;
-    int *intbuff, * intbuff2, *intbuff_best;
-
-    intbuff = (int *) malloc(sizeof(int) * len);
-    intbuff2 = (int *) malloc(sizeof(int) * len);
-    intbuff_best = (int *) malloc(sizeof(int) * len);
-
     if (ninl < 16) {
         /*//printf("Prematurely escaped LO, not enough inliers (<16)!\n");*/
         if (resids != NULL) {
             memset(resids, 0, (RESIDS_M-2)*len*sizeof(double));
         }
-        free(intbuff);
-        free(intbuff2);
-        free(intbuff_best);
         return maxS; /*Zeros*/
     }
     ssiz = ninl / 2;
@@ -235,7 +260,7 @@ Score exp_inFranicustom (double *u, int len, int *inliers, int ninl,
         }
         errs[4] = errs[0];
 
-        S = exp_iterFcustom(u, len, intbuff, intbuff2, th, TC*th, ILSQ_ITERS, f, errs, buffer, samidx, ++*iterID, inlLimit, resids != NULL ? resids + i*6*len + len : NULL,EXFDS1,FDS1,u_soa,FDS1soa);
+        S = exp_iterFcustom_workspace(u, len, intbuff, NULL, th, TC*th, ILSQ_ITERS, f, errs, buffer, samidx, ++*iterID, inlLimit, resids != NULL ? resids + i*6*len + len : NULL,EXFDS1,FDS1,u_soa,FDS1soa,w);
         if (scoreLess(maxS, S)) {
             maxS = S;
             d = errs[2];
@@ -254,10 +279,34 @@ Score exp_inFranicustom (double *u, int len, int *inliers, int ninl,
     for ( jj =0; jj <maxS.I ; jj++) {
         inliers[jj] = intbuff_best[jj];
     }
-    free(intbuff);
-    free(intbuff2);
-    free(intbuff_best);
     return maxS;
+}
+
+Score exp_inFranicustom (double *u, int len, int *inliers, int ninl,
+                         double th, double **errs, double *buffer,
+                         double *F, int *samidx, int *iterID, unsigned inlLimit, double *resids, exFDsPtr EXFDS1, FDsPtr FDS1,
+                         const double *u_soa, FDsPtr FDS1soa) {
+    Score S;
+    double *w;
+    int *work;
+
+    if (ninl < 16)
+        return exp_inFranicustom_workspace(u, len, inliers, ninl, th, errs, buffer, F, samidx,
+                                           iterID, inlLimit, resids, EXFDS1, FDS1, u_soa, FDS1soa,
+                                           NULL, NULL, NULL);
+    w = (double *) malloc((size_t) len * sizeof(double));
+    work = (int *) malloc(2 * (size_t) len * sizeof(int));
+    if (w == NULL || work == NULL) {
+        free(w);
+        free(work);
+        return (Score) {0, 0};
+    }
+    S = exp_inFranicustom_workspace(u, len, inliers, ninl, th, errs, buffer, F, samidx,
+                                    iterID, inlLimit, resids, EXFDS1, FDS1, u_soa, FDS1soa,
+                                    work, work + len, w);
+    free(work);
+    free(w);
+    return S;
 }
 
 static inline void sampleF7(const double *u, int *pool, int len, double *A) {
@@ -279,29 +328,37 @@ int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2, int len, double th
                          int * data_out, int do_lo, unsigned inlLimit, double **resids, exFDsPtr EXFDS1, FDsPtr FDS1, FDsidxPtr FDS1idx, double SymCheck_th,
                          int enable_degen_check, int seed, FDsPtr FDS1soa) {
 
-    int *pool, no_sam, new_sam;  double *Z, *buffer, *u_soa, u7[6*7], H[3*3], FBest[3*3];
-    int * bufferP;
+    int *pool, no_sam = 0, new_sam;  double *buffer, *u_soa, u7[6*7], H[3*3], FBest[3*3];
+    int *bufferP;
     double *f1, *f2;
     int do_update;
     double poly[4], roots[3], f[9], *err, *d, *d_check;
     double *errs[5];
-    int nsol, i, j, *inliers, new_max, do_iterate;
+    int nsol, i, j, *inliers, new_max, do_iterate, u7_loaded;
     unsigned I;
     Score maxS = {0,0}, maxSs = {0,0}, S = {0,0}, Scheck={0,0};
     int *samidx, samidxBest[7];
-    double * errorsBest; /*To store best non-deg inls for ALO LO*/ //TODO replace with errs[3], there are the same data! BUT! do we want BEST data or BEST NON-DEGENERATED data? :(
+    double *errorsBest; /*To store best non-deg inls for ALO LO*/ //TODO replace with errs[3], there are the same data! BUT! do we want BEST data or BEST NON-DEGENERATED data? :(
     /* to eliminate */
     int degen_cnt = 0, iter_cnt = 0, LmaxI, iterID = 0;
     unsigned non_degen_samples_count = 0; //only those with so-far-the-best model
     double jj;
-    double * HDs = (double *) malloc(len*sizeof(double));
+    double *HDs;
     int bad_model = 0;
     const int doSymCheck = SymCheck_th > 0;
     const int DO_LAF_CHECK =  laf_coef > 0;
     const double th_laf_check = laf_coef * th;
     int p1_inliers = 0;
     double *err_laf;
-    int a;
+    double *workspace, *double_cursor, *lo_workspace, *lo_weights, *degen_h_workspace;
+    int *int_cursor, *lo_intbuff, *lo_intbuff_best;
+    size_t workspace_doubles, workspace_ints;
+    int a, model_found = 0;
+
+    lo_workspace = NULL;
+    degen_h_workspace = NULL;
+    if (resids != NULL)
+        *resids = NULL;
 
     if (seed >= 0) {
         reseed_rng((unsigned)seed);
@@ -326,39 +383,85 @@ int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2, int len, double th
 
     ////printf("__PROFILE: BEFORE ransac: %d\n", getticks()/1000);
 
-    /* allocations */
+    /* Most O(len) scratch lives in one per-call allocation. The LO block is
+       allocated only if an LO with enough inliers actually runs. */
+    workspace_doubles = 4 + 18 + 4;
+    workspace_ints = 2; /* pool and inliers */
+    if (do_lo) {
+        workspace_doubles++; /* errorsBest */
+    }
+    if (doSymCheck)
+        workspace_doubles++;
+    if (DO_LAF_CHECK)
+        workspace_doubles++;
+    if (enable_degen_check) {
+        workspace_doubles++;
+        workspace_ints++;
+    }
+    workspace = (double *) malloc(workspace_doubles * len * sizeof(double) +
+                                  workspace_ints * len * sizeof(int));
+    if (workspace == NULL)
+        goto allocation_failure;
+    double_cursor = workspace;
+    int_cursor = (int *) (workspace + workspace_doubles * len);
 
-    pool = (int *)malloc(len * sizeof(int));
+    u_soa = double_cursor;
+    double_cursor += 4 * len;
+    buffer = double_cursor;
+    double_cursor += 18 * len;
+    if (do_lo) {
+        errorsBest = double_cursor;
+        double_cursor += len;
+    } else {
+        errorsBest = NULL;
+    }
+    err = double_cursor;
+    double_cursor += 4 * len;
+    if (DO_LAF_CHECK) {
+        err_laf = double_cursor;
+        double_cursor += len;
+    } else {
+        err_laf = NULL;
+    }
+    if (doSymCheck) {
+        d_check = double_cursor;
+        double_cursor += len;
+    } else {
+        d_check = NULL;
+    }
+    if (enable_degen_check) {
+        HDs = double_cursor;
+        double_cursor += len;
+    } else {
+        HDs = NULL;
+    }
+    lo_weights = NULL;
+
+    pool = int_cursor;
+    int_cursor += len;
+    if (enable_degen_check) {
+        bufferP = int_cursor;
+        int_cursor += len;
+    } else {
+        bufferP = NULL;
+    }
+    inliers = int_cursor;
+    int_cursor += len;
+    lo_intbuff = lo_intbuff_best = NULL;
+
     for (i = 0; i < len; i ++) {
         pool[i] = i;
     }
     samidx = pool + len - 7;
 
-    Z = NULL;
-
     /* Coordinates repacked once per call into x1|y1|x2|y2, so the whole-array
        error evaluations read contiguously instead of gathering four doubles
        out of every six. Same arithmetic, same order, same results. */
-    u_soa = (double *) malloc(len * 4 * sizeof(double));
     soa_pack(u, u_soa, len);
-
-    buffer = (double *) malloc(len * 18 * sizeof(double)); /*It would be enough 9 for u2f, but dHDs needs 18*/
-    bufferP = (int *) malloc(len * sizeof(int));
-
-    errorsBest = (double *) malloc(len * sizeof(double));
-    err = (double *) malloc(len * 4 * sizeof(double));
-    err_laf = (double *) malloc(len * sizeof(double));
-
-    d_check = (double *) malloc(len * sizeof(double));
     for (i=0; i<4; i++)
         errs[i] = err + i * len;
     errs[4] = errs[3];
 
-    inliers = (int *) malloc(sizeof(int) * len);
-
-    if (resids != NULL) {
-        *resids = NULL;
-    }
 
     maxS.I  = 8;
     maxSs.I = 8;
@@ -373,7 +476,7 @@ int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2, int len, double th
         no_sam ++;
 
         sampleF7(u, pool, len, A);
-        loadSample(u, samidx, 7, 6, u7);
+        u7_loaded = 0;
 
 
 #if USE_QR
@@ -397,7 +500,7 @@ int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2, int len, double th
             A[i] = 0.0;
         }
 
-        nullsize = nullspace(A, f1, 9, nullspace_buff);
+        nullsize = nullspace7x9(A, f1, nullspace_buff);
         if (nullsize != 2) {
             continue;
         }
@@ -461,6 +564,7 @@ int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2, int len, double th
                 maxS = S;
                 ////printf("I risen in main loop to %u.\n", maxS.I);
                 memcpy(F,f,9*sizeof(double)); /*!!!*/
+                model_found = 1;
                 new_max = 1;
 
             }
@@ -469,6 +573,10 @@ int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2, int len, double th
 
             if(scoreLess(maxSs, S)) {
                 maxSs = S;
+                if (enable_degen_check && !u7_loaded) {
+                    loadSample(u, samidx, 7, 6, u7);
+                    u7_loaded = 1;
+                }
                 ////printf("__PROFILE: BEFORE checksample: %d\n", getticks()/1000);
                 if (enable_degen_check && checksample(f, u7, 3*th, H)) {
                     ////printf("__PROFILE: AFTER  checksample: %d\n", getticks()/1000);
@@ -485,7 +593,13 @@ int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2, int len, double th
                     ////printf("__PROFILE: BEFORE innerH: %d\n", getticks()/1000);
                     ////printf("I before innrH %u.\n", I);
 
-                    I = innerH(H, u, len, 16*th, 10, inl, bufferP, buffer); /*originally was 30 reps, lowered because of bad performance*/
+                    if (degen_h_workspace == NULL) {
+                        degen_h_workspace = (double *) malloc((size_t)len *
+                                                 (4 * sizeof(double) + 2 * sizeof(int)));
+                        if (degen_h_workspace == NULL)
+                            goto allocation_failure;
+                    }
+                    I = innerH_workspace(H, u, len, 16*th, 10, inl, buffer, HDs, degen_h_workspace); /*originally was 30 reps, lowered because of bad performance*/
 
                     ////printf("I after innrH %u.\n", I);
 
@@ -495,7 +609,7 @@ int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2, int len, double th
                                                 no_i = sum(v);
                                                 f//printf(1,'P+P %d %d\n',sum(ahi), no_i);*/
                         ////printf("__PROFILE: BEFORE rFtH: %d\n", getticks()/1000);
-                        I = rFtH(u, inl, th, H, len, f, bufferP, buffer);
+                        I = rFtH_soa(u, inl, th, H, len, f, bufferP, buffer, u_soa);
                         ////printf("I after rFtH %u.\n", I);
 
                         ////printf("__PROFILE: AFTER  rFtH: %d\n", getticks()/1000);
@@ -504,6 +618,7 @@ int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2, int len, double th
                             maxS.I = I; /*maxS.J is set later*/
                             ////printf("I risen in degen to %u.\n", maxS.I);
                             memcpy(F,f,3*3*sizeof(double));
+                            model_found = 1;
                             new_max = 1;
                             d = errs[3]; /*For IJ calculation*/
                         } else {
@@ -529,7 +644,8 @@ int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2, int len, double th
                     errs[4] = d;
                     non_degen_samples_count++;
                     memcpy(samidxBest, samidx, 7 * sizeof(int));
-                    memcpy(errorsBest, d, len * sizeof(double));
+                    if (do_lo)
+                        memcpy(errorsBest, d, len * sizeof(double));
                     memcpy(FBest, f, 3*3*sizeof(double));
                 }
             }
@@ -551,19 +667,24 @@ int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2, int len, double th
 
 #ifdef __LSQ_BEFORE_LO__
             d = errs[0];
-            S = inlidxs(errs[4], len, TC*th*MWM, inliers);
+            S.I = inlidxs_only(errs[4], len, TC*th*MWM, inliers);
             u2f(u, inliers, S.I, f, buffer);
             FDS1soa(u_soa, f, d, len);
-            S = inlidxs(d, len, th, inliers);
+            S.I = inlidxs_only(d, len, th, inliers);
             if (resids != NULL) {
                 memcpy(*resids + RESIDS_M*(iter_cnt - 1)*len + len, d, len*sizeof(double));
             }
 #else
-            S = inlidxs(errs[4], len, th, inliers);
+            S.I = inlidxs_only(errs[4], len, th, inliers);
 #endif /* __LSQ_BEFORE_LO__ */
             /*******/
-            S = exp_inFranicustom(u, len, inliers, S.I, th, errs, buffer, f, samidx, &iterID, inlLimit,
-                                  resids != NULL ? *resids + 2*len + (iter_cnt-1)*RESIDS_M*len : NULL,EXFDS1,FDS1,u_soa,FDS1soa);
+            if (S.I >= 16 && lo_workspace == NULL &&
+                !init_lo_workspace(len, &lo_workspace, &lo_weights, &lo_intbuff,
+                                   &lo_intbuff_best))
+                goto allocation_failure;
+            S = exp_inFranicustom_workspace(u, len, inliers, S.I, th, errs, buffer, f, samidx, &iterID, inlLimit,
+                                  resids != NULL ? *resids + 2*len + (iter_cnt-1)*RESIDS_M*len : NULL,EXFDS1,FDS1,u_soa,FDS1soa,
+                                  lo_intbuff, lo_intbuff_best, lo_weights);
             /*******/
             // minimalistic LO' (just one iterations)
             /*			S = exp_iterF(u, len, inliers, bufferP, th, 16*TC*th, 10, f, errs, buffer, samidx, ++iterID, inlLimit, *resids + 2*len + (iter_cnt-1)*RESIDS_M*len);*/
@@ -613,6 +734,7 @@ int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2, int len, double th
                     maxS = S;
                     ////printf("I risen in LO to %u.\n", maxI);
                     memcpy(F,f,9*sizeof(double)); /*!!!*/
+                    model_found = 1;
                     new_max = 1;
                 }
             }
@@ -640,7 +762,13 @@ int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2, int len, double th
             }
             if (I >= 8) {
                 ////printf("__PROFILE: BEFORE innerH: %d\n", getticks()/1000);
-                I = innerH(H, u, len, 16*th, 10, inl, bufferP, buffer); /*originally was 30 reps, lowered because of bad performance*/
+                if (degen_h_workspace == NULL) {
+                    degen_h_workspace = (double *) malloc((size_t)len *
+                                             (4 * sizeof(double) + 2 * sizeof(int)));
+                    if (degen_h_workspace == NULL)
+                        goto allocation_failure;
+                }
+                I = innerH_workspace(H, u, len, 16*th, 10, inl, buffer, HDs, degen_h_workspace); /*originally was 30 reps, lowered because of bad performance*/
                 ////printf("__PROFILE: AFTER  innerH: %d\n", getticks()/1000);
             }
             if (I > 6) {
@@ -648,13 +776,14 @@ int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2, int len, double th
                                 no_i = sum(v);
                                 f//printf(1,'P+P %d %d\n',sum(ahi), no_i);*/
                 ////printf("__PROFILE: BEFORE rFtH: %d\n", getticks()/1000);
-                I = rFtH(u, inl, th, H, len, f, bufferP, buffer);
+                I = rFtH_soa(u, inl, th, H, len, f, bufferP, buffer, u_soa);
                 ////printf("__PROFILE: AFTER  rFtH: %d\n", getticks()/1000);
                 if(I > maxS.I) { //TODO hybrid scoring down to rFtH?
                     FDS1soa(u_soa, f, errs[3], len);
                     maxS.I = I; /*maxS.J is set later*/
                     ////printf("I risen in degen to %u.\n", maxS.I);
                     memcpy(F,f,3*3*sizeof(double));
+                    model_found = 1;
                     new_max = 1;
                     d = errs[3]; /*For IJ calculation*/
                 } else {
@@ -683,19 +812,24 @@ int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2, int len, double th
             }
 #ifdef __LSQ_BEFORE_LO__
             d = errs[0];
-            S = inlidxs(errorsBest, len, TC*th*MWM, inliers);
+            S.I = inlidxs_only(errorsBest, len, TC*th*MWM, inliers);
             u2f(u, inliers, S.I, f, buffer);
             FDS1soa(u_soa, f, d, len);
-            S = inlidxs(d, len, th, inliers);
+            S.I = inlidxs_only(d, len, th, inliers);
             if (resids != NULL) {
                 memcpy(*resids + RESIDS_M*(iter_cnt - 1)*len + len, d, len*sizeof(double));
             }
 #else
-            S = inlidxs(errorsBest, len, th, inliers);
+            S.I = inlidxs_only(errorsBest, len, th, inliers);
 #endif /* __LSQ_BEFORE_LO__ */
             /*******/
-            S = exp_inFranicustom (u, len, inliers, S.I, th, errs, buffer, f, samidxBest, &iterID, inlLimit,
-                                   resids != NULL ? *resids + 2*len + (iter_cnt-1)*RESIDS_M*len : NULL,EXFDS1,FDS1,u_soa,FDS1soa);
+            if (S.I >= 16 && lo_workspace == NULL &&
+                !init_lo_workspace(len, &lo_workspace, &lo_weights, &lo_intbuff,
+                                   &lo_intbuff_best))
+                goto allocation_failure;
+            S = exp_inFranicustom_workspace (u, len, inliers, S.I, th, errs, buffer, f, samidxBest, &iterID, inlLimit,
+                                   resids != NULL ? *resids + 2*len + (iter_cnt-1)*RESIDS_M*len : NULL,EXFDS1,FDS1,u_soa,FDS1soa,
+                                   lo_intbuff, lo_intbuff_best, lo_weights);
             /*******/
             // minimalistic LO' (just one iterations)
             /*			S = exp_iterF(u, len, inliers, bufferP, th, 16*TC*th, 10, f, errs, buffer, samidxBest, ++iterID, inlLimit, *resids + 2*len + (iter_cnt-1)*RESIDS_M*len);*/
@@ -742,10 +876,18 @@ int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2, int len, double th
                     maxS = S;
                     ////printf("I risen in LO to %u.\n", maxI);
                     memcpy(F,f,9*sizeof(double)); /*!!!*/
+                    model_found = 1;
                     new_max = 1;
                 }
             }
         }
+    }
+
+    if (!model_found) {
+        memset(F, 0, 9 * sizeof(double));
+        memset(inl, 0, len * sizeof(unsigned char));
+        maxS.I = 0;
+        goto cleanup;
     }
 
     d = errs[3];
@@ -792,21 +934,15 @@ int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2, int len, double th
     }
 
 
+cleanup:
     /* deallocations */
 
 #ifdef __HASHING__
     htClear(&HASH_TABLE_F);
 #endif // __HASHING__
-    free(d_check);
-    free(err_laf);
-    free(pool);
-    free(u_soa);
-    free(err);
-    free(errorsBest);
-    free(inliers);
-    free(buffer);
-    free(bufferP);
-    free(HDs);
+    free(degen_h_workspace);
+    free(lo_workspace);
+    free(workspace);
     if (data_out != NULL) {
         *data_out = no_sam;
         data_out[1] = iter_cnt;
@@ -814,5 +950,17 @@ int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2, int len, double th
 
     ////printf("__PROFILE: AFTER ransac: %d\n", getticks()/1000);
     return maxS.I;
+
+allocation_failure:
+    memset(F, 0, 9 * sizeof(double));
+    memset(inl, 0, len * sizeof(unsigned char));
+    if (resids != NULL) {
+        free(*resids);
+        *resids = NULL;
+    }
+    no_sam = 0;
+    iter_cnt = 0;
+    maxS.I = 0;
+    goto cleanup;
 
 }

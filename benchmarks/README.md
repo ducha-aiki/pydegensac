@@ -35,15 +35,35 @@ Everything lands in `data/` (gitignored).
 ## Run
 
 ```bash
-./run_ab.sh                   # master vs the current branch, both problems
-./run_ab.sh v0.2.2            # or any other base ref
+python -m pip install numpy h5py matplotlib "opencv-python-headless==5.0.0.93" "poselib==2.0.5"
+./run_current.sh linux        # current checkout against the field, F and H
+# On the Apple M1 machine, from the same checkout:
+./run_current.sh m1
 ```
 
-`run_ab.sh` builds both pydegensac versions into separate directories with
-`pip --target` and selects them per run with `PYTHONPATH`, so one interpreter
-and one set of cv2/poselib wheels serve both arms — the only thing that
-differs is pydegensac. The base arm runs `--methods pydegensac` only; the
-branch arm runs the whole roster.
+The OpenCV 5.0 Apple Silicon wheel requires macOS 13 or newer.
+
+`run_current.sh` builds the checkout with `pip --target` and selects it with
+`PYTHONPATH`. It runs the full roster with one pydegensac curve labeled by
+release version, and records the source commit, backend versions, and
+pydegensac seed in the raw results. The default seed is 12345; override it
+with `SEED=42 ./run_current.sh linux`, using a separate platform label if
+you want to keep multiple runs. All three thread-count variables are forced to 1.
+Outputs are `results/{f,h}_current_<platform>.jsonl`,
+`results/report_{f,h}_<platform>.md`, and
+`results/time_maa_{f,h}_<platform>.png`. These generated reports, plots, and
+raw JSONL are temporary investigation outputs; keep them out of commits and
+pull requests. Store shared comparison artifacts outside the repository. The
+exception is the two figures shown in the top-level README,
+`results/time_maa_{f,h}_linux.png`, which are refreshed deliberately for a
+release.
+Do not run other CPU-intensive work concurrently with the timing sweeps.
+
+For historical A/B experiments, `./run_ab.sh <base-ref>` remains available.
+The seeded protocol requires a pydegensac release whose API accepts `seed`.
+Older releases such as 0.1.2 and 0.2.1 stop with an explicit error, including
+when selected by `run_releases.sh`; they cannot participate in matched-seed
+comparisons.
 
 Individually:
 
@@ -60,8 +80,8 @@ lacks the latter two:
 ```bash
 conda create -y -p .ab/env -c conda-forge python=3.13 numpy h5py matplotlib \
     lapack cmake make
-.ab/env/bin/pip install "opencv-python-headless==4.13.*" poselib
-PYTHON=$PWD/.ab/env/bin/python ./run_ab.sh
+.ab/env/bin/pip install "opencv-python-headless==5.0.0.93" "poselib==2.0.5"
+PYTHON=$PWD/.ab/env/bin/python ./run_current.sh linux
 ```
 
 ## Thresholds
@@ -119,6 +139,21 @@ LAPACK held constant so the compiler is the only variable. See
 
 ## Protocol notes
 
+- pydegensac uses an explicit seed (default **12345**), reset for every
+  estimator call, including warm-up, tuning, and every iteration budget.
+  Use the same seed when comparing releases or platforms. `run.py f`,
+  `run.py h`, and `run.py tune` accept `--seed`; the raw metadata records
+  `pydegensac_seed`, and generated reports print it. Negative seeds are
+  rejected because pydegensac interprets them as wall-clock seeding.
+- OpenCV and PoseLib retain their existing estimator defaults; `--seed`
+  controls pydegensac only. Equal numeric seeds do not imply equal random
+  samples across different estimators or guarantee identical floating-point
+  results across platforms.
+- These are single-seed measurements. Bootstrap intervals resample image
+  pairs, not seeds or repeated runs. A multi-seed study is needed to assess
+  sensitivity to sampling. Larger budgets need not improve ground-truth
+  mAA monotonically: the estimator selects models by its internal score.
+
 - Timing covers the estimator call only, single-threaded (`OMP_NUM_THREADS=1`,
   `cv2.setNumThreads(1)`), with a warm-up call per method before the timed
   loop. Methods are interleaved per pair so machine drift hits them equally.
@@ -132,6 +167,7 @@ LAPACK held constant so the compiler is the only variable. See
 - EVD (7 val / 8 test pairs) and HPatchesSeq (145 each) are scored separately
   and never pooled — EVD is tiny and much harder, so a pooled number would be
   dominated by HPatches while inheriting EVD's noise.
-- cv2 is pinned to 4.13 in the reference environment, the version the borrowed
-  F thresholds were tuned under. All backend versions are recorded in each
-  result file's meta line.
+- The 0.3.1 comparison uses OpenCV 5.0.0 and PoseLib 2.0.5. Thresholds are
+  unchanged from the earlier OpenCV 4.13 tuning, so they are not claimed to
+  be optimal for OpenCV 5.0. All backend versions are recorded in each
+  result file's meta line. Historical reports retain their original versions.

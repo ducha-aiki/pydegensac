@@ -21,6 +21,7 @@ import metrics
 #: stay distinct from it — cv2-magsac in particular must not read as a shade
 #: of pydegensac-base.
 COLORS = {
+    "pydegensac (0.3.1)": "#c9302c",
     "pydegensac (base)": "#f2a25c",
     "pydegensac (branch)": "#c9302c",
     "cv2-ransac": "#1f9e78",
@@ -75,9 +76,8 @@ BOOT_SEED = 0
 def maa_ci(errs, problem, n_boot=N_BOOT):
     """Percentile bootstrap 95% CI of mAA over pairs.
 
-    Backends are unseeded and the pair sets are small, so differences of a
-    couple of points are not readable without this: two runs of the identical
-    configuration can differ by more than the gap between two methods.
+    Resample pairs to measure uncertainty from the evaluation set. This
+    does not measure variation across estimator seeds or repeated runs.
     """
     errs = np.asarray(errs, float)
     ths = metrics.F_THRESHOLDS if problem == "f" else metrics.H_THRESHOLDS
@@ -320,6 +320,8 @@ def main():
               f"cv2 {m['versions'].get('cv2')}, "
               f"poselib {m['versions'].get('poselib')}, "
               f"repo {m['git_sha']}, host {m['host']}")
+        if "pydegensac_seed" in m:
+            print(f"  - pydegensac seed: `{m['pydegensac_seed']}` (reset per call)")
         if "config" in m:
             print(f"  - config: `{json.dumps(m['config'])}`")
 

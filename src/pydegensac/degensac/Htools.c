@@ -100,7 +100,7 @@ void lin_hgN(const double *u, double *p, const int* inl, int len,
 
 void u2h(const double *u, const int *inl, int len, double *H, double *buffer) {
     double A1[3], A2[3];
-    double *Z, V[9*9], D[9];
+    double *Z, V[9*9];
     int i, nullspace_buff[2*9];
 
     if (len < 4) { /* Nothing to do */
@@ -123,7 +123,7 @@ void u2h(const double *u, const int *inl, int len, double *H, double *buffer) {
         normu (u, inl, len, A1, A2);
         lin_hgN(u, Z, inl, len, A1, A2);
         cov_mat(V, Z, 2*len, 9);
-        lap_eig(V, D, 9);
+        lap_eig_min9(V);
         memcpy(H, V, 3*3 * sizeof(double));
         denormH(H, A1, A2);
         if (!buffer) {
