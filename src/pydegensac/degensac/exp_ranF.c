@@ -350,12 +350,13 @@ int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2, int len, double th
     const double th_laf_check = laf_coef * th;
     int p1_inliers = 0;
     double *err_laf;
-    double *workspace, *double_cursor, *lo_workspace, *lo_weights;
+    double *workspace, *double_cursor, *lo_workspace, *lo_weights, *degen_h_workspace;
     int *int_cursor, *lo_intbuff, *lo_intbuff_best;
     size_t workspace_doubles, workspace_ints;
     int a, model_found = 0;
 
     lo_workspace = NULL;
+    degen_h_workspace = NULL;
     if (resids != NULL)
         *resids = NULL;
 
@@ -592,7 +593,13 @@ int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2, int len, double th
                     ////printf("__PROFILE: BEFORE innerH: %d\n", getticks()/1000);
                     ////printf("I before innrH %u.\n", I);
 
-                    I = innerH(H, u, len, 16*th, 10, inl, bufferP, buffer); /*originally was 30 reps, lowered because of bad performance*/
+                    if (degen_h_workspace == NULL) {
+                        degen_h_workspace = (double *) malloc((size_t)len *
+                                                 (4 * sizeof(double) + 2 * sizeof(int)));
+                        if (degen_h_workspace == NULL)
+                            goto allocation_failure;
+                    }
+                    I = innerH_workspace(H, u, len, 16*th, 10, inl, buffer, HDs, degen_h_workspace); /*originally was 30 reps, lowered because of bad performance*/
 
                     ////printf("I after innrH %u.\n", I);
 
@@ -602,7 +609,7 @@ int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2, int len, double th
                                                 no_i = sum(v);
                                                 f//printf(1,'P+P %d %d\n',sum(ahi), no_i);*/
                         ////printf("__PROFILE: BEFORE rFtH: %d\n", getticks()/1000);
-                        I = rFtH(u, inl, th, H, len, f, bufferP, buffer);
+                        I = rFtH_soa(u, inl, th, H, len, f, bufferP, buffer, u_soa);
                         ////printf("I after rFtH %u.\n", I);
 
                         ////printf("__PROFILE: AFTER  rFtH: %d\n", getticks()/1000);
@@ -755,7 +762,13 @@ int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2, int len, double th
             }
             if (I >= 8) {
                 ////printf("__PROFILE: BEFORE innerH: %d\n", getticks()/1000);
-                I = innerH(H, u, len, 16*th, 10, inl, bufferP, buffer); /*originally was 30 reps, lowered because of bad performance*/
+                if (degen_h_workspace == NULL) {
+                    degen_h_workspace = (double *) malloc((size_t)len *
+                                             (4 * sizeof(double) + 2 * sizeof(int)));
+                    if (degen_h_workspace == NULL)
+                        goto allocation_failure;
+                }
+                I = innerH_workspace(H, u, len, 16*th, 10, inl, buffer, HDs, degen_h_workspace); /*originally was 30 reps, lowered because of bad performance*/
                 ////printf("__PROFILE: AFTER  innerH: %d\n", getticks()/1000);
             }
             if (I > 6) {
@@ -763,7 +776,7 @@ int exp_ransacFcustomLAF(double *u, double *u_1, double *u_2, int len, double th
                                 no_i = sum(v);
                                 f//printf(1,'P+P %d %d\n',sum(ahi), no_i);*/
                 ////printf("__PROFILE: BEFORE rFtH: %d\n", getticks()/1000);
-                I = rFtH(u, inl, th, H, len, f, bufferP, buffer);
+                I = rFtH_soa(u, inl, th, H, len, f, bufferP, buffer, u_soa);
                 ////printf("__PROFILE: AFTER  rFtH: %d\n", getticks()/1000);
                 if(I > maxS.I) { //TODO hybrid scoring down to rFtH?
                     FDS1soa(u_soa, f, errs[3], len);
@@ -927,6 +940,7 @@ cleanup:
 #ifdef __HASHING__
     htClear(&HASH_TABLE_F);
 #endif // __HASHING__
+    free(degen_h_workspace);
     free(lo_workspace);
     free(workspace);
     if (data_out != NULL) {

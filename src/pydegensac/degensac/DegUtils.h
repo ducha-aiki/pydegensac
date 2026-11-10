@@ -34,6 +34,10 @@ void crossp(double *h,double *u,double *v);
 unsigned rFtH(double * u, unsigned char * hinl, double th, double * H, unsigned len,
               double * F, int * bufferP, double * bufferZ);
 
+/* Optional packed full input (x1|y1|x2|y2), shared with the outer F loop. */
+unsigned rFtH_soa(double *u, unsigned char *hinl, double th, double *H, unsigned len,
+                  double *F, int *bufferP, double *bufferZ, const double *u_soa);
+
 unsigned dmin(unsigned a, unsigned b);
 
 /*%calculates number of samples needed to be done
@@ -55,6 +59,12 @@ unsigned u2Fit(double * u, unsigned len, double * F, unsigned char * inl, double
 
 /*Copied from mex file*/
 unsigned innerH(double * H, double * u, unsigned len, double th, unsigned iters, unsigned char * inl, int * pool, double * buffer);
+
+/* Reuse initial homography errors (or pass NULL to evaluate them).
+   workspace holds 4*len doubles followed by 2*len ints, aligned as double. */
+unsigned innerH_workspace(double *H, double *u, unsigned len, double th, unsigned iters,
+                          unsigned char *inl, double *buffer,
+                          const double *initial_errors, double *workspace);
 
 /*Transforms inliers from list to bit-array*/
 void transformInliers(int * inl, int * inl2, unsigned inlCount, unsigned len);

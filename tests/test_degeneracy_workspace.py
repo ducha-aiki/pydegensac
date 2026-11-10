@@ -22,8 +22,10 @@ def _scene(n, plane_fraction):
     return pts1, pts2
 
 
-@pytest.mark.parametrize("plane_fraction", [0.6, 0.9])
-def test_planar_recovery_reuses_scratch_safely(plane_fraction):
+@pytest.mark.parametrize("error_type", ["sampson", "symm_epipolar"])
+@pytest.mark.parametrize("plane_fraction", [0.6, 0.9, 1.0])
+def test_planar_recovery_reuses_scratch_safely(plane_fraction, error_type):
+    """Recovery remains deterministic with and without off-plane support."""
     cases = [(*_scene(n, plane_fraction), seed)
              for n in (65, 257) for seed in (42, 2024)]
 
@@ -31,7 +33,7 @@ def test_planar_recovery_reuses_scratch_safely(plane_fraction):
         pts1, pts2, seed = case
         return pydegensac.findFundamentalMatrix(
             pts1, pts2, px_th=0.75, max_iters=100, seed=seed,
-            enable_degeneracy_check=True)
+            error_type=error_type, enable_degeneracy_check=True)
 
     expected = [estimate(case) for case in cases]
     for (model, mask), (pts1, _, _) in zip(expected, cases):

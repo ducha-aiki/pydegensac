@@ -209,6 +209,81 @@ int nullspace(double *matrix, double *nullspace, int n, int * buffer) /* Expects
 }
 
 
+/* Fixed-size homography elimination. Keep every operation, including the
+   padded ninth row, in the same order as nullspace(..., 9, ...). */
+int nullspace9(double *matrix, double *basis, int *buffer)
+{
+   const int n = 9;
+   int *pnopivot=buffer, nonpivot=0;
+   int *ppivot=buffer+n;
+   int i, j, k, l, ptr, max;
+   double pivot, t;
+   double tol=1e-12;
+
+   ptr = 0;
+   i = 0;
+   for (j=0;j<n;j++)
+   {
+      /* find pivot, start with diagonal element */
+      pivot = fabs(matrix[n*i+j]); max = i;
+      for (k=i+1; k<n; k++)
+      {
+         t = fabs(matrix[n*k+j]);
+         if (pivot<t) { pivot=t; max=k; }
+      }
+      if (pivot<tol)
+      {
+         *(pnopivot++) = j; nonpivot++;
+         /* negligible column, zero out */
+         for (k=i;k<n;k++) matrix[n*k+j]=0;
+      } else {
+         *(ppivot++) = j;
+         /* swap rows i <-> max */
+         for (k=j; k<n; k++)
+         {
+            t = matrix[i*n+k];
+            matrix[i*n+k] = matrix[max*n+k];
+            matrix[max*n+k]=t;
+         }
+         pivot = matrix[i*n+j];
+         /* divide the pivot row by the pivot element. */
+         for (k=j; k<n; k++)
+            matrix[i*n+k] /= pivot;
+
+         /* Subtract multiples of the pivot row from all the other rows. */
+         for (k=0; k<i; k++)
+         {
+            pivot = -matrix[k*n+j];
+            for (l=j; l<n; l++)
+               matrix[k*n+l] += pivot*matrix[i*n+l];
+         }
+
+         for (k=i+1; k<n; k++)
+         {
+            pivot = matrix[k*n+j];
+            for (l=j; l<n; l++)
+               matrix[k*n+l] -= pivot*matrix[i*n+l];
+         }
+         i++;
+      }
+   }
+
+   /* initialize null space vectors */
+   for (k=0;k<nonpivot;k++)
+   {
+      j=buffer[k];
+      /* copy nonpivot -column above diagonal */
+      for (l=0;l<n-nonpivot;l++)
+         basis[k*n+buffer[n+l]]=-matrix[l*n+j];
+
+      for (l=0;l<nonpivot;l++)
+         basis[k*n+buffer[l]]=(j==buffer[l])?1:0;
+   }
+   /* number of nullspace vectors */
+   return nonpivot;
+}
+
+
 /* Keep nullspace's pivot order, tolerance, division and elimination order.
    The two padded rows stay zero under finite pivot-row updates. If a
    normalized pivot row is nonfinite (including overflow from finite input),

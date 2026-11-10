@@ -433,6 +433,9 @@ void lin_fmN(const double *u, double *p, const int *inl, int len,
 void singulF(double *F)
 {
     double S[3], UT[9], V[9], D[9] = {1,0,0,0,1,0,0,0,1}, VD[9];
+    /* Avoid a full SVD when its discarded direction is well conditioned.
+       The fast path preserves F on failure for the LAPACK fallback. */
+    if (rank2_project3(F) == 0) return;
     trnm(F,3);
 
     if( lap_SVD (S, F, UT, 3, V, 3) != 0 ) {
@@ -455,7 +458,7 @@ void u2f(const double *u, const int *inl, int len,
 {
     double A1[3], A2[3];
     double *Z, V[9*9], U[8*8], D[9], *p;
-    int i, j, step;
+    int i, step;
 
     if (buffer == NULL)
         Z = (double *) malloc(sizeof(double) * 9 * len);
@@ -468,17 +471,10 @@ void u2f(const double *u, const int *inl, int len,
         lin_fmN(u, Z, inl, len, A1, A2);
 
         cov_mat(V, Z, len, 9);
-        lap_eig(V,D,9);
+        lap_eig_min9(V);
 
-        /* LAPACK returns the eigenvectors as Fortran columns, which in this
-           row-major buffer are rows -- so the one we want is already
-           contiguous. The old code transposed the entire 9x9 just to read it
-           back with stride 9; reading row j directly is the same nine values.
-           (u2h has always done it this way.) */
-        j = 0;
-        for (i = 1; i<9; i++)
-            if (D[i] < D[j]) j = i;
-        p = V + 9*j;
+        /* Only the minimum eigenvector is needed; it is contiguous. */
+        p = V;
         step = 1;
     } else
     {
@@ -526,13 +522,10 @@ void u2fw(const double *u, const int *inl, const double * w,
         }
 
         cov_mat(V, Z, len, 9);
-        lap_eig(V,D,9);
+        lap_eig_min9(V);
 
-        /* Eigenvector j is already contiguous here -- see u2f. */
-        j = 0;
-        for (i = 1; i<9; i++)
-            if (D[i] < D[j]) j = i;
-        p = V + 9*j;
+        /* Only the minimum eigenvector is needed; it is contiguous. */
+        p = V;
         step = 1;
     } else
     {

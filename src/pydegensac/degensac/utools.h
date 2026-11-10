@@ -25,6 +25,10 @@ void scalmul (double *data, double m, int len, int step) ;
 
 int nullspace(double *matrix, double *nullspace, int n, int * buffer);
 
+/* Fixed 9x9 row-major elimination. matrix is overwritten; basis needs up
+   to 81 doubles and buffer needs 18 ints, as in nullspace(..., 9, ...). */
+int nullspace9(double *matrix, double *basis, int *buffer);
+
 /* Seven-point specialization. matrix is 9x9 row-major scratch with its last
    two rows zero-padded. Basis/rank and the 18-entry pivot buffer match
    nullspace(..., 9, ...); basis needs room for up to 81 doubles. */

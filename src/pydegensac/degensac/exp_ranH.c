@@ -356,7 +356,7 @@ Score exp_ransacHcustomLAF (double *u, double *u_1, double *u_2,
         for (i = 9*8; i < 9*9; ++i) { /* Fill with zeros to square */
             M[i] = 0.0;
         }
-        nullsize = nullspace(M, sol, 9, nullspace_buff); /* nullspace function expects M row-wise */
+        nullsize = nullspace9(M, sol, nullspace_buff); /* nullspace function expects M row-wise */
         if (nullsize != 1) {
 
             no_rej++;
