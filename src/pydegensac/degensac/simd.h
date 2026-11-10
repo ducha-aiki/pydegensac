@@ -6,7 +6,10 @@
    Wheels are built for the baseline ISA, so wider kernels are selected at
    run time from CPUID. The AVX kernels use only separate multiplies, adds,
    subtractions, divisions and max in the scalar evaluation order (no FMA,
-   no reassociation), so both paths produce bit-identical results.
+   no reassociation), so both paths produce bit-identical results. This
+   assumes that the scalar path is not contracted into FMAs either. That
+   holds for the baseline-ISA wheels, but not necessarily for a source build
+   with -march=native or another flag that enables FMA.
 
    PYDEGENSAC_SIMD=0 (or "scalar") in the environment forces the scalar
    path; it is read once, at the first dispatch. */

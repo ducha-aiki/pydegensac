@@ -84,15 +84,17 @@ three seeds and two timing repeats per pair and budget:
 
 | | Linux x86-64 (i7-14700K) | Apple M1 |
 |---|---|---|
-| F, St Peter's Square | 1.72–2.00x (1.79x summed over budgets), identical mAA | 1.19–2.10x, identical mAA |
-| H, EVD | 1.31–1.67x (1.34x), identical mAA | 1.25–1.91x (EVD and HPatchesSeq), identical mAA |
-| H, HPatchesSeq | 1.20–1.24x (1.22x), mAA within 0.0002 | identical mAA at budgets ≥100; -1.54 / -0.69 points at 10 / 25 iterations |
+| F, St Peter's Square | 1.72–2.00x (1.79x summed over budgets), identical mAA | 1.18–2.10x (1.39x), identical mAA |
+| H, EVD | 1.31–1.67x (1.34x), identical mAA | 1.31–1.55x (1.41x), identical mAA |
+| H, HPatchesSeq | 1.20–1.24x (1.22x), mAA within 0.0002 | 1.11–1.26x (1.20x), identical mAA |
 
 The speed-up is largest at small iteration budgets, where fixed per-call costs
 dominate. On x86-64 the fundamental-matrix error and scoring loops also use AVX
 when the CPU supports it, chosen at run time and bit-identical to the scalar
 code (`PYDEGENSAC_SIMD=0` forces scalar); AVX alone is 1.26x on F summed over
-budgets. The Apple M1 column predates the AVX and MSAC-scoring changes.
+budgets. Apple M1 runs the scalar code. On M1, pydegensac F reaches 0.425 mAA
+at 38 ms/pair with 50,000 iterations (PoseLib PROSAC: 0.457 at 50 ms). On
+HPatchesSeq it reaches 0.905 at 1.3 ms/pair with 6,400 iterations.
 See [benchmark instructions](benchmarks/README.md) for the protocol and the
 [earlier study](docs/reports/2026-08-11-ransac-benchmark.md) for historical
 results and threshold-transfer caveats. Reproduce with
