@@ -6,6 +6,7 @@ cd "$(dirname "$0")"
 
 PYTHON="${PYTHON:-python3}"
 PLATFORM="${1:-local}"
+SEED="${SEED:-12345}"
 if [[ ! "$PLATFORM" =~ ^[a-zA-Z0-9_-]+$ ]]; then
     echo "Platform label must contain only letters, digits, underscores or hyphens." >&2
     exit 1
@@ -23,7 +24,7 @@ VERSION="$("$PYTHON" -c 'from importlib.metadata import version; print(version("
 LABEL="$VERSION:$(git rev-parse --short HEAD)"
 
 for problem in f h; do
-    "$PYTHON" run.py "$problem" --label "$LABEL" --out "${problem}_current_${PLATFORM}.jsonl"
+    "$PYTHON" run.py "$problem" --seed "$SEED" --label "$LABEL" --out "${problem}_current_${PLATFORM}.jsonl"
     "$PYTHON" report.py "$problem" "results/${problem}_current_${PLATFORM}.jsonl" \
         --full --plot "results/time_maa_${problem}_${PLATFORM}.png" \
         > "results/report_${problem}_${PLATFORM}.md"

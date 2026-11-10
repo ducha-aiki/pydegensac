@@ -45,8 +45,10 @@ The OpenCV 5.0 Apple Silicon wheel requires macOS 13 or newer.
 
 `run_current.sh` builds the checkout with `pip --target` and selects it with
 `PYTHONPATH`. It runs the full roster with one pydegensac curve labeled by
-release version, and records the source commit and backend versions in the
-raw results. All three thread-count variables are forced to 1.
+release version, and records the source commit, backend versions, and
+pydegensac seed in the raw results. The default seed is 12345; override it
+with `SEED=42 ./run_current.sh linux`, using a separate platform label if
+you want to keep multiple runs. All three thread-count variables are forced to 1.
 Outputs are `results/{f,h}_current_<platform>.jsonl`,
 `results/report_{f,h}_<platform>.md`, and
 `results/time_maa_{f,h}_<platform>.png`. Commit the reports and plots after
@@ -54,6 +56,10 @@ the M1 run and add them to the README comparison; raw JSONL stays local.
 Do not run other CPU-intensive work concurrently with the timing sweeps.
 
 For historical A/B experiments, `./run_ab.sh <base-ref>` remains available.
+The seeded protocol requires a pydegensac release whose API accepts `seed`.
+Older releases such as 0.1.2 and 0.2.1 stop with an explicit error, including
+when selected by `run_releases.sh`; they cannot participate in matched-seed
+comparisons.
 
 Individually:
 
@@ -128,6 +134,21 @@ LAPACK held constant so the compiler is the only variable. See
 `docs/reports/2026-08-11-ransac-benchmark.md`.
 
 ## Protocol notes
+
+- pydegensac uses an explicit seed (default **12345**), reset for every
+  estimator call, including warm-up, tuning, and every iteration budget.
+  Use the same seed when comparing releases or platforms. `run.py f`,
+  `run.py h`, and `run.py tune` accept `--seed`; the raw metadata records
+  `pydegensac_seed`, and generated reports print it. Negative seeds are
+  rejected because pydegensac interprets them as wall-clock seeding.
+- OpenCV and PoseLib retain their existing estimator defaults; `--seed`
+  controls pydegensac only. Equal numeric seeds do not imply equal random
+  samples across different estimators or guarantee identical floating-point
+  results across platforms.
+- These are single-seed measurements. Bootstrap intervals resample image
+  pairs, not seeds or repeated runs. A multi-seed study is needed to assess
+  sensitivity to sampling. Larger budgets need not improve ground-truth
+  mAA monotonically: the estimator selects models by its internal score.
 
 - Timing covers the estimator call only, single-threaded (`OMP_NUM_THREADS=1`,
   `cv2.setNumThreads(1)`), with a warm-up call per method before the timed

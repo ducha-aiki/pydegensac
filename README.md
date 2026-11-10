@@ -58,23 +58,25 @@ reprojection mAA 1–20 px. Thresholds are retained from the previous tuning,
 which used OpenCV 4.13; they have not been retuned for OpenCV 5.0.
 
 **Linux x86-64** — Intel Core i7-14700K, WSL2, single-threaded estimator calls.
-These are single-run measurements with stochastic estimators; the confidence
-intervals resample image pairs, not repeated runs or timing noise.
+pydegensac uses **seed 12345**, reset for every pair and iteration budget;
+OpenCV and PoseLib retain their estimator defaults. These are single-seed
+measurements: confidence intervals resample image pairs, not seeds, repeated
+runs, or timing noise.
 
 ![Fundamental matrix time versus mAA, Linux, pydegensac 0.3.1](benchmarks/results/time_maa_f_linux.png)
 ![Homography time versus mAA, Linux, pydegensac 0.3.1](benchmarks/results/time_maa_h_linux.png)
 
 **Fundamental matrix.** At each method's best budget, pydegensac reaches
-0.427 mAA at 51.0 ms/pair, compared with PoseLib PROSAC's 0.457 at 40.4 ms.
-The paired gap is -0.030 mAA (95% CI -0.053 to -0.008), so this run separates
-them on accuracy. OpenCV MAGSAC reaches 0.376 mAA at 30.2 ms; OpenCV RANSAC
-reaches 0.340 at 183.2 ms.
+0.423 mAA at 51.2 ms/pair, compared with PoseLib PROSAC's 0.457 at 40.3 ms.
+The paired gap is -0.034 mAA (95% CI -0.055 to -0.012), so this run separates
+them on accuracy. OpenCV MAGSAC reaches 0.376 mAA at 29.9 ms; OpenCV RANSAC
+reaches 0.340 at 183.7 ms.
 
-**Homography.** On HPatchesSeq, pydegensac reaches 0.9145 mAA at 3.04 ms/pair.
-OpenCV MAGSAC reaches 0.9269 at 0.88 ms, while PoseLib PROSAC reaches 0.9297
-at 7.81 ms. The paired pydegensac gap to PoseLib PROSAC is -0.015 mAA
-(95% CI -0.023 to -0.008). EVD has only 8 test pairs and much wider intervals;
-it does not separate pydegensac from the leader in this run.
+**Homography.** On HPatchesSeq, pydegensac reaches 0.9048 mAA at 2.25 ms/pair
+(6,400 iterations). OpenCV MAGSAC reaches 0.9269 at 0.88 ms, while PoseLib
+PROSAC reaches 0.9297 at 7.79 ms. The paired pydegensac gap to PoseLib PROSAC
+is -0.025 mAA (95% CI -0.042 to -0.012). EVD has only 8 test pairs and much
+wider intervals; it does not separate pydegensac from the leader in this run.
 
 The Apple M1 rerun for 0.3.1 and OpenCV 5.0 is pending; the older M1 measurements
 are retained in the historical reports rather than mixed into this comparison.

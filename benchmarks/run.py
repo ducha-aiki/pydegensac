@@ -74,7 +74,8 @@ def git_sha():
 def meta(label, extra):
     return {"record": "meta", "label": label, "git_sha": git_sha(),
             "host": platform.node(), "python": platform.python_version(),
-            "versions": methods.versions(), **extra}
+            "versions": methods.versions(),
+            "pydegensac_seed": methods.PYDEGENSAC_SEED, **extra}
 
 
 # --------------------------------------------------------------------------
@@ -271,7 +272,12 @@ def main():
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
 
+    def seed_options(p):
+        p.add_argument("--seed", type=int, default=12345,
+                       help="pydegensac seed reset per call (default: 12345)")
+
     def common(p, default_out):
+        seed_options(p)
         p.add_argument("--methods", nargs="*", choices=methods.METHOD_NAMES,
                        help="default: all")
         p.add_argument("--label", default="local",
@@ -281,6 +287,7 @@ def main():
                        help="cap pairs per subset (smoke tests)")
 
     t = sub.add_parser("tune", help="grid-search thresholds")
+    seed_options(t)
     t.add_argument("problem", choices=["f", "h"])
     t.add_argument("--methods", nargs="*", choices=methods.METHOD_NAMES)
     t.add_argument("--label", default="local")
@@ -296,6 +303,11 @@ def main():
     h.set_defaults(func=cmd_h)
 
     args = ap.parse_args()
+    if not 0 <= args.seed <= 2147483647:
+        ap.error("--seed must be between 0 and 2147483647; negative seeds use wall-clock time")
+    methods.PYDEGENSAC_SEED = args.seed
+    if not args.methods or "pydegensac" in args.methods:
+        methods.require_seed_support(args.problem if args.cmd == "tune" else args.cmd)
     args.func(args)
 
 
