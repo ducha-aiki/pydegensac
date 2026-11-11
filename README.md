@@ -5,6 +5,28 @@ from sparse correspondences. It implements [LO-RANSAC](https://link.springer.com
 
 It was originally located in [https://github.com/ducha-aiki/pyransac](https://github.com/ducha-aiki/pyransac), but was renamed to avoid conflict with already existing [pyransac](https://pypi.org/project/pyransac/) in pypi from other author.
 
+## Release history
+
+- **0.1.1 / 0.1.2** (April 2020) — the original C code by Ondřej Chum, with small
+  changes for the LAF consistency check, wrapped with pybind11. 0.1.2 added
+  prebuilt wheels. *Yanked: with numpy 2.x it returns every correspondence as
+  an inlier.*
+- **0.2** (January 2026) — wheels for Linux, macOS and Windows built by
+  `cibuildwheel`, PyPI publishing from CI, an RNG `seed` for the C core, and
+  initialisation fixes in the bindings. Start of AI help: OpenAI Codex. *Yanked:
+  the old vendored pybind11 does not work with numpy 2.0.*
+- **0.2.1** (January 2026) — pybind11 updated; works with numpy 2.x.
+- **0.2.2** (April 2026) — `seed` in the Python API and deterministic results
+  with a fixed seed; LAF buffers allocated only when the check is enabled.
+- **0.3.0** (August 2026) — fixes macOS builds, which had compiled out every
+  LAPACK call, so local optimisation never ran (see the box below). Fixed-seed
+  golden regression tests, dead-code cleanup, about 2x faster on public data at
+  equal accuracy, the `benchmarks/` suite, Python 3.14 wheels. AI help: Claude
+  Fable 5 and Claude Opus 5.
+- **0.3.1** (November 2026) — 1.1–2.1x faster than 0.3.0 at the same accuracy, AVX kernels chosen at run time on x86-64, the GIL released during
+  estimation with thread-safe concurrent calls, examples that run on OpenCV 5.
+  AI help: OpenAI Codex (GPT-6) and Claude Opus 5.5.
+
 > ### macOS users: upgrade
 >
 > Every macOS build published before **0.3.0** silently skipped all of its
@@ -112,9 +134,9 @@ pip install pydegensac
 > returns **every correspondence as an inlier**, silently — on a synthetic set
 > with 150 planted outliers among 300 matches it reports 300 inliers, where the
 > same wheel under numpy 1.26 correctly reports 150. It is the old pybind11
-> incompatibility that `0.2` was yanked for, but `0.1.2` was never yanked, so
-> it is what an old pin or an unconstrained resolve on a fresh numpy can still
-> land on. Use the latest release, or hold numpy below 2.0.
+> incompatibility that `0.2` was yanked for. `0.1.2` is now yanked too, but an
+> exact `==0.1.2` pin still installs it. Use the latest release, or hold numpy
+> below 2.0.
 
 Or clone or download this repository and then, from within the repository, run:
 
