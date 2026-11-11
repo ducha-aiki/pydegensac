@@ -5,6 +5,16 @@ from sparse correspondences. It implements [LO-RANSAC](https://link.springer.com
 
 It was originally located in [https://github.com/ducha-aiki/pyransac](https://github.com/ducha-aiki/pyransac), but was renamed to avoid conflict with already existing [pyransac](https://pypi.org/project/pyransac/) on PyPI from another author.
 
+## Speed across releases
+
+Fundamental-matrix mAA against time per image pair for 0.1.2, 0.2.2, 0.3.0
+and 0.3.1, all installed from PyPI into one environment (Python 3.11,
+numpy 1.26). Lines are the mean over 10 seeds; bands show the min–max across
+seeds. At 50k iterations 0.3.1 takes 31 ms per pair where 0.2.2 took 144 ms
+(4.7x), and no release differs in accuracy by more than seed-to-seed noise.
+
+![F time-mAA across releases](img/releases_time_maa_f.png)
+
 ## Release history
 
 - **0.1.1 / 0.1.2** (April 2020) — the original C code by Ondřej Chum, with
