@@ -1,4 +1,8 @@
-cmake_minimum_required(VERSION 3.9...3.31)
+# Keep the policy max below 3.27: CMP0148 NEW removes FindPythonInterp, which the
+# vendored pybind11 still uses. pybind11 sets CMP0148 OLD locally, but on Windows
+# vcpkg's find_package wrapper records policies when the toolchain loads, so the
+# override has no effect there and configure fails.
+cmake_minimum_required(VERSION 3.9...3.26)
 project(pydegensac)
 
 add_definitions(-fPIC)
