@@ -1,9 +1,9 @@
 # pydegensac
 
-This repository contains an Python wrapper of RANSAC for homography and fundamental matrix estimation
+This repository contains a Python wrapper of RANSAC for homography and fundamental matrix estimation
 from sparse correspondences. It implements [LO-RANSAC](https://link.springer.com/chapter/10.1007/978-3-540-45243-0_31) and [DEGENSAC](https://doi.org/10.1109/CVPR.2005.354).
 
-It was originally located in [https://github.com/ducha-aiki/pyransac](https://github.com/ducha-aiki/pyransac), but was renamed to avoid conflict with already existing [pyransac](https://pypi.org/project/pyransac/) in pypi from other author.
+It was originally located in [https://github.com/ducha-aiki/pyransac](https://github.com/ducha-aiki/pyransac), but was renamed to avoid conflict with already existing [pyransac](https://pypi.org/project/pyransac/) on PyPI from another author.
 
 ## Release history
 

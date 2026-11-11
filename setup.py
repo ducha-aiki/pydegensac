@@ -1,6 +1,5 @@
 #! /usr/bin/env python3
 import os
-import re
 import shlex
 import sys
 import platform
@@ -19,18 +18,12 @@ class CMakeExtension(Extension):
 class CMakeBuild(build_ext):
     def run(self):
         try:
-            out = subprocess.check_output(["cmake", "--version"])
+            subprocess.check_output(["cmake", "--version"])
         except OSError as e:
             raise RuntimeError(
                 "CMake must be installed to build the following extensions: "
                 + ", ".join(ext.name for ext in self.extensions)
             ) from e
-
-        if platform.system() == "Windows":
-            m = re.search(r"version\s*([\d.]+)", out.decode())
-            ver = tuple(int(x) for x in m.group(1).split(".")[:3]) if m else (0,)
-            if ver < (3, 1):
-                raise RuntimeError("CMake >= 3.1.0 is required on Windows")
 
         for ext in self.extensions:
             self.build_extension(ext)
