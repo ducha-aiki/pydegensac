@@ -1,9 +1,33 @@
 # pydegensac
 
-This repository contains an Python wrapper of RANSAC for homography and fundamental matrix estimation
-from sparse correspondences. It implements [LO-RANSAC](https://link.springer.com/chapter/10.1007/978-3-540-45243-0_31) and [DEGENSAC](http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.466.2719&rep=rep1&type=pdf).
+This repository contains a Python wrapper of RANSAC for homography and fundamental matrix estimation
+from sparse correspondences. It implements [LO-RANSAC](https://link.springer.com/chapter/10.1007/978-3-540-45243-0_31) and [DEGENSAC](https://doi.org/10.1109/CVPR.2005.354).
 
-It was originally located in [https://github.com/ducha-aiki/pyransac](https://github.com/ducha-aiki/pyransac), but was renamed to avoid conflict with already existing [pyransac](https://pypi.org/project/pyransac/) in pypi from other author.
+It was originally located in [https://github.com/ducha-aiki/pyransac](https://github.com/ducha-aiki/pyransac), but was renamed to avoid conflict with already existing [pyransac](https://pypi.org/project/pyransac/) on PyPI from another author.
+
+## Release history
+
+- **0.1.1 / 0.1.2** (April 2020) — the original C code by Ondřej Chum, with
+  small changes for the LAF consistency check, wrapped with pybind11. 0.1.2
+  added prebuilt wheels. *Yanked: with numpy 2.x it returns every correspondence
+  as an inlier.*
+- **0.2** (January 2026) — wheels for Linux, macOS and Windows built by
+  `cibuildwheel`, PyPI publishing from CI, an RNG `seed` for the C core, and
+  initialisation fixes in the bindings. Start of AI help: OpenAI Codex
+  (GPT-5.2-Codex). *Yanked: the old vendored pybind11 does not work with numpy
+  2.0.*
+- **0.2.1** (January 2026) — pybind11 updated; works with numpy 2.x.
+- **0.2.2** (April 2026) — `seed` in the Python API and deterministic results
+  with a fixed seed; LAF buffers allocated only when the check is enabled.
+- **0.3.0** (August 2026) — fixes macOS builds, which had compiled out every
+  LAPACK call, so local optimisation never ran (see the box below). Fixed-seed
+  golden regression tests, dead-code cleanup, about 2x faster on public data at
+  equal accuracy, the `benchmarks/` suite, Python 3.14 wheels. AI help: Claude
+  Fable 5 and Claude Opus 5.
+- **0.3.1** (November 2026) — 1.1–2.1x faster than 0.3.0 at the same accuracy,
+  AVX kernels chosen at run time on x86-64, the GIL released during estimation
+  with thread-safe concurrent calls, examples that run on OpenCV 5. AI help:
+  OpenAI Codex (GPT-6 Astra) and Claude Opus 5.5.
 
 > ### macOS users: upgrade
 >
@@ -112,21 +136,20 @@ pip install pydegensac
 > returns **every correspondence as an inlier**, silently — on a synthetic set
 > with 150 planted outliers among 300 matches it reports 300 inliers, where the
 > same wheel under numpy 1.26 correctly reports 150. It is the old pybind11
-> incompatibility that `0.2` was yanked for, but `0.1.2` was never yanked, so
-> it is what an old pin or an unconstrained resolve on a fresh numpy can still
-> land on. Use the latest release, or hold numpy below 2.0.
+> incompatibility that `0.2` was yanked for. `0.1.2` is now yanked too, but an
+> exact `==0.1.2` pin still installs it. Use the latest release, or hold numpy
+> below 2.0.
 
 Or clone or download this repository and then, from within the repository, run:
 
 ```bash
-python3 ./setup.py install
+pip install .
 ```
 
-or
-
-```bash
-pip3 install .
-```
+Building from source needs CMake, LAPACK/BLAS and a C++11 compiler (see
+[Requirements](#requirements)); use the platform default compiler (Clang on
+macOS). On Debian/Ubuntu the system packages are
+`cmake libblas-dev liblapack-dev g++`.
 
 To check if everything works, run the following:
 
@@ -135,77 +158,12 @@ cd examples
 python -utt simple-example.py
 ```
 
-You should see the following output:
-
-```
-Num tentatives: 625
-Running homography estimation
-cv2 found 39 inliers
-OpenCV runtime 0.01810  sec
-pydegensac found 74 inliers
-pydegensac runtime 0.00251  sec
-H =  [[ 3.11780982e-01  5.25464685e-02 -1.03843008e+03]
- [ 1.74306833e+00 -4.19829687e+00 -3.96516667e+02]
- [ 6.90073255e-03  2.20936659e-04 -6.11602534e+00]]
-Running fundamental matrix estimation
-cv2 found 32 inliers
-OpenCV runtime 0.51542  sec
-pydegensac found 77 inliers
-pydegensac 0.05508  sec
-F =  [[ 6.48569395e-06  5.83116242e-05 -2.14328944e-02]
- [-2.87155326e-05 -1.89643410e-07  1.49425716e-02]
- [ 6.96294565e-03 -2.02712455e-02  2.67319526e+00]]
-```
-
-# Building hints from Tomasz Malisiewicz
-
-1. Compiling pydegensac without a system-wide install.
-
-```bash
-python3 ./setup.py build
-```
-
-2. Compiling on Mac OS X computer
-Use GCC instead of Clang. The most recent version on my machine (installed via brew) is gcc-8. Try this:
-
-```bash
-CC=gcc-8 python3 ./setup.py build
-```
-
-*(Note, 2026: this hint dates from 2020. Current Clang builds pydegensac fine and is the recommended compiler on macOS — prefer the platform default unless you hit an actual failure.)*
-
-3. Compiling on Ubuntu 18.04
-You need LAPACK and a few other libraries and I always forget those specific package names. Take a look at my pydegensac Dockerfile to see the exact packages you need to apt install on an Ubuntu 18.04 system (https://github.com/quantombone/pydegensac-dockerfile/blob/master/Dockerfile)
-
-```bash
-FROM ubuntu:18.04
-```
-
-## update system
-```bash
-RUN apt-get clean
-RUN apt-get update
-RUN apt-get install -qy \
-    git python3 python3-setuptools python3-dev
-RUN apt-get install -y cmake libblas-dev liblapack-dev gfortran
-RUN apt-get install -y g++ gcc
-```
-
-## download and build pydegensac
-```
-RUN git clone https://github.com/ducha-aiki/pydegensac.git
-WORKDIR pydegensac
-RUN python3 ./setup.py build
-```
-
-## copy built assets into target directory (which will be a -v volume)
-```docker
-CMD cp -R /pydegensac/build/lib.linux-x86_64-3.6/pydegensac /target_directory
-```
-
-# dockerfile
-
-https://github.com/quantombone/pydegensac-dockerfile
+It runs homography and fundamental matrix estimation on a sample image pair
+with both OpenCV and pydegensac, and prints the inlier counts, runtimes and
+estimated matrices. pydegensac runs with a fixed seed, but OpenCV's RANSAC is
+unseeded and the exact numbers also depend on platform and library versions, so
+no reference output is given here. pydegensac should find at least as many
+inliers as OpenCV's vanilla RANSAC, in a fraction of its time.
 
 
 # Example of usage
@@ -224,9 +182,9 @@ And this [notebook](examples/how-to-use-detailed.ipynb) with detailed explanatio
 
 # Requirements
 
-- Python 3
-- CMake 2.8.12 or higher
-- LAPACK, 
+- Python 3.8 or higher
+- CMake 3.9 or higher
+- LAPACK
 - BLAS (OpenBLAS, MKL, Atlas, ...)
 - A modern compiler with C++11 support
 

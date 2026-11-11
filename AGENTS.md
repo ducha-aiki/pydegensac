@@ -1,7 +1,7 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-`src/pydegensac/` contains the Python package, the `pybind11` binding layer in `bindings.cpp`, and the bundled C/C sources under `degensac/` and `matutls/`. Keep Python-facing helpers in `src/pydegensac/utils.py` and public exports in `src/pydegensac/__init__.py`. Put regression tests in `tests/`; the current suite is minimal and centered on import/build validation. Use `examples/` for runnable demos and notebooks, `docs/` for Sphinx docs, and treat `lib/pybind11/` as vendored third-party code unless a dependency update is intentional.
+`src/pydegensac/` contains the Python package, the `pybind11` binding layer in `bindings.cpp`, and the bundled C/C sources under `degensac/` and `matutls/`. Keep Python-facing helpers in `src/pydegensac/utils.py` and public exports in `src/pydegensac/__init__.py`. Put regression tests in `tests/`; the suite covers import and input validation, fixed-seed golden bit-exactness tests (`tests/test_golden_regression.py`) and C unit tests compiled from `tests/c/`. Use `examples/` for runnable demos and notebooks, `docs/reports/` for benchmark and investigation write-ups, and treat `lib/pybind11/` as vendored third-party code unless a dependency update is intentional.
 
 ## Build, Test, and Development Commands
 Install locally with `pip install .` for a normal build or `python setup.py build` while iterating on the extension. Run `pytest tests` to execute the repository test suite. Smoke-test the built module with `cd examples && python -utt simple-example.py`; this mirrors the wheel CI test command. For packaging work, GitHub Actions uses `python -m cibuildwheel --output-dir wheelhouse` from `.github/workflows/build_wheels.yml`.

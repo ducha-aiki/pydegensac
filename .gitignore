@@ -1,6 +1,5 @@
 # Build directory
 build
-docs/_build
 tests/bin
 
 # Python
